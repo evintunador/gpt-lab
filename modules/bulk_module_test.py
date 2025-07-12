@@ -118,15 +118,33 @@ def test_bulk_module_correctness(
     for i, (ref_out, comp_out) in enumerate(zip(ref_outputs_tuple, competitor_outputs_tuple)):
          if isinstance(ref_out, torch.Tensor):
             assert torch.allclose(ref_out, comp_out, **tolerances), \
-                f"Forward output {i} mismatch for {CompetitorModuleCls.__name__} vs {ReferenceModuleCls.__name__} on {device}"
+                (
+                    f"Forward output {i} mismatch on {device}. "
+                    f"Max abs diff: {(ref_out - comp_out).abs().max().item()}, "
+                    f"Max rel diff: {((ref_out - comp_out).abs() / (ref_out.abs() + 1e-8)).max().item()}, "
+                    f"Percent breaking tolerance: "
+                    f"{((~torch.isclose(ref_out, comp_out, **tolerances)).float().mean().item() * 100):.5f}%"
+                )
 
     for (p_name, p_ref), (_, p_comp) in zip(ref_module.named_parameters(), competitor_module.named_parameters()):
         assert p_ref.grad is not None and p_comp.grad is not None, f"Gradient for {p_name} is None in one of the modules"
         assert torch.allclose(p_ref.grad, p_comp.grad, **tolerances), \
-            f"Gradient mismatch for parameter {p_name} on {device}"
-            
+            (
+                f"Gradient mismatch for parameter {p_name} on {device}. "
+                f"Max abs diff: {(p_ref.grad - p_comp.grad).abs().max().item()}, "
+                f"Max rel diff: {((p_ref.grad - p_comp.grad).abs() / (p_ref.grad.abs() + 1e-8)).max().item()}, "
+                f"Percent breaking tolerance: "
+                f"{((~torch.isclose(p_ref.grad, p_comp.grad, **tolerances)).float().mean().item() * 100):.5f}%"
+            )
+
     for i, (ref_in, comp_in) in enumerate(zip(ref_inputs, competitor_inputs)):
         if ref_in.requires_grad and comp_in.requires_grad:
             assert ref_in.grad is not None and comp_in.grad is not None, f"Gradient for input {i} is None in one of the modules"
             assert torch.allclose(ref_in.grad, comp_in.grad, **tolerances), \
-                f"Gradient mismatch for input {i} on {device}"
+                (
+                    f"Gradient mismatch for input {i} on {device}. "
+                    f"Max abs diff: {(ref_in.grad - comp_in.grad).abs().max().item()}, "
+                    f"Max rel diff: {((ref_in.grad - comp_in.grad).abs() / (ref_in.grad.abs() + 1e-8)).max().item()}, "
+                    f"Percent breaking tolerance: "
+                    f"{((~torch.isclose(ref_in.grad, comp_in.grad, **tolerances)).float().mean().item() * 100):.5f}%"
+                )

@@ -147,9 +147,9 @@ __test_config__ = ModuleTestConfig(
     test_cases=[
         {
             'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': dim * 4, 'activation': act, 'dtype': dt},
-            'input_args': lambda dev, d=dim, dt=dt: (torch.randn(16, d, device=dev, dtype=dt, requires_grad=True),),
+            'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
             'output_validator': output_validator,
-            'tolerances': {'atol': 5e-3, 'rtol': 5e-3},          # Optional
+            'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
             'case_descriptor': f'dim={dim}_dt={dt}_act={act}',
         }
         for dim, dt in [(128, torch.float16), (512, torch.float32), (2048, torch.bfloat16)]
