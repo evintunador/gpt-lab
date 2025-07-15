@@ -186,7 +186,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    all_benchmark_configs = discover_dunder_objects(dunder='__benchmark_config__', object=BenchmarkConfig)
+    all_benchmark_configs = discover_dunder_objects(
+        dunder='__benchmark_config__', 
+        object=BenchmarkConfig,
+        search_folders="modules/catalog/"
+    )
 
     if not all_benchmark_configs:
         print("No `__benchmark_config__` found in any module files. Nothing to do.")

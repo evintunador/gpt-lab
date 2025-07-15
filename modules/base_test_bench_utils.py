@@ -91,9 +91,6 @@ def get_available_devices(exclude: List[str] = []) -> Tuple[List[str]]:
     available_devices_with_ranks = []
     world_size = torch.cuda.device_count()
 
-    # Always include CPU
-    available_devices.append('cpu')
-
     # Check for CUDA devices
     if torch.cuda.is_available():
         available_devices.append('cuda')
@@ -120,27 +117,62 @@ def get_available_devices(exclude: List[str] = []) -> Tuple[List[str]]:
         available_devices = [dev for dev in available_devices if should_keep(dev)]
         available_devices_with_ranks = [dev for dev in available_devices_with_ranks if should_keep(dev)]
 
+    # Only include CPU if there are no other options
+    if not available_devices:
+        available_devices.append('cpu')
+
     return available_devices, available_devices_with_ranks
 
 
 def discover_dunder_objects(
         dunder: str, 
         object: Any,
-        excluded_files: List[str] = ['bulk_module_test.py', 'bulk_module_benchmark.py', 'base_test_bench_utils.py']
+        excluded_files: List[str] = [],
+        search_folders: Union[None, str, List[str]] = None
     ) -> List[Any]:
+    """
+    Discover objects with a given dunder name in Python files within specified folders.
+
+    Args:
+        dunder: The dunder attribute name to look for (e.g., '__test_config__').
+        object: The type or class to check isinstance(obj, object).
+        excluded_files: List of filenames to exclude from search.
+        search_folders: A folder path, or list of folder paths, to search. If None, uses the current directory.
+
+    Returns:
+        List of discovered objects.
+    """
+    import os
+    import sys
+    import importlib
+
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(current_dir)
 
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
-    all_files = list_all_files_in_folder_and_subdirs(current_dir)
+    # Determine which folders to search
+    if search_folders is None:
+        folders_to_search = [current_dir]
+    elif isinstance(search_folders, str):
+        folders_to_search = [os.path.abspath(search_folders)]
+    else:
+        folders_to_search = [os.path.abspath(f) for f in search_folders]
+
+    all_files = []
+    for folder_path in folders_to_search:
+        all_files.extend(list_all_files_in_folder_and_subdirs(folder_path))
+
     all_files = [f for f in all_files if os.path.basename(f) not in excluded_files]
 
     objects = []
     for file in all_files:
         try:
-            relative_path = os.path.relpath(os.path.join(current_dir, file), project_root)
+            # Figure out the correct module name for importlib
+            # file may be absolute or relative to project_root
+            abs_file_path = os.path.abspath(os.path.join(folder_path if not os.path.isabs(file) else '', file))
+            relative_path = os.path.relpath(abs_file_path, project_root)
             module_name = relative_path.replace('.py', '').replace(os.sep, '.')
             
             module = importlib.import_module(module_name)

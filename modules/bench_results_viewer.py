@@ -23,7 +23,7 @@ def _(mo):
 @app.cell
 def _(glob, mo, os):
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    csv_files = glob.glob(os.path.join(current_dir, '*.csv'))
+    csv_files = glob.glob(os.path.join(current_dir, 'bench_results/*.csv'))
 
     if not csv_files:
         mo.md("No benchmark CSV files found in this directory.")

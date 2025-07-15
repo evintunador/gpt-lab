@@ -55,7 +55,11 @@ def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: Li
     return test_suite
 
 
-ALL_TEST_CONFIGS = discover_dunder_objects(dunder='__test_config__', object=ModuleTestConfig)
+ALL_TEST_CONFIGS = discover_dunder_objects(
+    dunder='__test_config__', 
+    object=ModuleTestConfig,
+    search_folders="modules/catalog/"
+)
 AVAILABLE_DEVICES, _ = get_available_devices()
 TEST_SUITE = build_test_suite(ALL_TEST_CONFIGS, AVAILABLE_DEVICES)
 
@@ -65,7 +69,10 @@ if len(TEST_SUITE) == 0:
     exit()
 
 
-@pytest.mark.parametrize("ReferenceModuleCls, CompetitorModuleCls, test_case, device, run_filter", TEST_SUITE)
+@pytest.mark.parametrize(
+    "ReferenceModuleCls, CompetitorModuleCls, test_case, device, run_filter", 
+    TEST_SUITE
+)
 def test_bulk_module_correctness(
     ReferenceModuleCls: nn.Module, 
     CompetitorModuleCls: nn.Module, 
