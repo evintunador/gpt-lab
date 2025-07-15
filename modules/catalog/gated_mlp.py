@@ -85,7 +85,7 @@ This allows for us to support a variety of devices
 """
 
 try:
-    from modules.gated_mlp_kernel import _GatedMLPKernelFn
+    from modules.kernels.gated_mlp_kernel import _GatedMLPKernelFn
 
     class TritonGatedMLP(GatedMLP):
         def forward(self, x: torch.Tensor) -> torch.Tensor:
