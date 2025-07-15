@@ -119,7 +119,7 @@ def measure_performance(
     return {k: v for k, v in results.items() if v is not None}
 
 
-def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str = "modules/benchmarks"):
+def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str = "modules/bench_results"):
     os.makedirs(output_dir, exist_ok=True)
     device_type = torch.device(device).type
 
@@ -177,9 +177,12 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run bulk module benchmarks.")
+    parser = argparse.ArgumentParser(
+        description="Run bulk module benchmarks.",
+        add_help=True
+    )
     parser.add_argument(
-        '--module',
+        '-m', '--module',
         type=str,
         default=None,
         help="Run benchmark for a specific module by its module_name."

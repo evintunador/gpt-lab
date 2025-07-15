@@ -3,3 +3,4 @@ torch
 pandas
 pytest
 marimo
+plotly

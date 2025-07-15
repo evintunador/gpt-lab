@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.9"
+__generated_with = "0.14.10"
 app = marimo.App(width="full")
 
 
@@ -75,7 +75,7 @@ def _(df, mo):
     }
     print(filters)
 
-    filters_form = mo.md("{activation} {dtype} {competitor}").batch(**filters).form(show_clear_button=True)
+    filters_form = mo.md(" ".join(["{" + col + "}" for col in cols_to_filter])).batch(**filters).form(show_clear_button=True)
     return filters_form, x_axis_col
 
 

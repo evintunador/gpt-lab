@@ -124,6 +124,14 @@ def get_available_devices(exclude: List[str] = []) -> Tuple[List[str]]:
     return available_devices, available_devices_with_ranks
 
 
+def is_hopper_available() -> bool:
+    """Checks if a Hopper architecture GPU is available."""
+    if not torch.cuda.is_available():
+        return False
+    # Hopper GPUs have compute capability 9.0 or higher
+    return any(torch.cuda.get_device_capability(i)[0] >= 9 for i in range(torch.cuda.device_count()))
+
+
 def discover_dunder_objects(
         dunder: str, 
         object: Any,
