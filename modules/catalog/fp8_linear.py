@@ -99,7 +99,7 @@ def setup_context(ctx: torch.autograd.function.FunctionCtx, inputs, output):
 mm_op.register_autograd(backward, setup_context=setup_context)
 
 
-class CastedLinear(nn.Linear):
+class FP8Linear(nn.Linear):
     def __init__(self, in_features: int, out_features: int, fp8=False, x_s=1.0, w_s=1.0, grad_s=1.0):
         super().__init__(in_features, out_features, bias=False)
         self.fp8 = fp8
@@ -144,7 +144,7 @@ def output_validator(
     
 
 __competitors__ = {
-    'CastedLinear': Competitor(module_class=CastedLinear),
+    'FP8Linear': Competitor(module_class=FP8Linear),
 }
 
 
@@ -153,7 +153,7 @@ def input_args(dev, in_features, out_features, dtype):
 
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
-    reference_competitor='CastedLinear',
+    reference_competitor='FP8Linear',
     test_cases=[
         {
             'init_args': {'in_features': in_features, 'out_features': out_features, 'fp8': fp8},
@@ -181,7 +181,7 @@ def benchmark_input_provider(init_args: dict, device: str) -> tuple:
     return (torch.randn(1, 1, init_args['in_features'], device=device, dtype=torch.float32),)
 
 __benchmark_config__ = BenchmarkConfig(
-    module_name='CastedLinear',
+    module_name='FP8Linear',
     competitors=__competitors__,
     parameter_space={
         'dim': [32, 64, 128, 512, 1024, 2048, 4096],
