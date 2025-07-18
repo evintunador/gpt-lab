@@ -142,7 +142,7 @@ __test_config__ = ModuleTestConfig(
     reference_competitor='GatedMLP',
     test_cases=[
         {
-            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': dim * 4, 'activation': act, 'dtype': dt},
+            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': int((dim * 4) * (2/3)), 'activation': act, 'dtype': dt},
             'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
