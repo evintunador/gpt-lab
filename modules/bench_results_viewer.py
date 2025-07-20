@@ -27,6 +27,17 @@ def _(mo):
 
 
 @app.cell
+def _():
+    plot_titles = [
+        "Forward Time (ms)",
+        "Backward Time (ms)",
+        "Forward Peak Memory (GB)",
+        "Backward Peak Memory (GB)",
+    ]
+    return (plot_titles,)
+
+
+@app.cell
 def _(glob, mo, os):
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_files = glob.glob(os.path.join(current_dir, 'bench_results/*.csv'))
@@ -102,7 +113,7 @@ def _(df, filters_form):
 
 
 @app.cell
-def _(filtered_df, mo, px, x_axis_col):
+def _(filtered_df, mo, plot_titles, px, x_axis_col):
     if filtered_df.empty or not x_axis_col:
         mo.md("No data to plot. Adjust filters or select a different CSV.")
 
@@ -131,12 +142,6 @@ def _(filtered_df, mo, px, x_axis_col):
 
     plots = {}
     metrics = plot_df["measurement"].unique()
-    plot_titles = [
-        "Forward Time (ms)",
-        "Backward Time (ms)",
-        "Forward Peak Memory (GB)",
-        "Backward Peak Memory (GB)",
-    ]
 
     for metric in plot_titles:
         if metric in metrics:
@@ -183,7 +188,7 @@ def _(filtered_df, mo, px, x_axis_col):
         [plots.get(plot_titles[2]), plots.get(plot_titles[3])], justify="center"
     )
     mo.vstack([custom_legend, row1, row2])
-    return plot_titles, series_cols
+    return
 
 
 @app.cell
@@ -250,7 +255,7 @@ def _(csv_multiselector, dfs, mo, os, pd):
                 # Default to selecting all available options
                 value=options_,
             )
-    
+
         filters_form_ = mo.md(" ".join([f"{{{col_}}}" for col_ in cols_to_filter_])).batch(**filters_).form(show_clear_button=True)
     filters_form_
     return df_, filters_form_, x_axis_col_
@@ -274,10 +279,10 @@ def _(df_, filters_form_):
 
         # Only apply a filter if the user has selected any options for it.
         if selected_options__:
-        
+
             # Check if the user wants to include rows where this parameter is not applicable.
             include_na__ = 'N/A' in selected_options__
-        
+
             # Get the list of actual parameter values the user selected.
             standard_options__ = [opt__ for opt__ in selected_options__ if opt__ != 'N/A']
 
@@ -287,7 +292,7 @@ def _(df_, filters_form_):
                 filtered_df__ = filtered_df__[
                     filtered_df__[col__].isin(standard_options__) | filtered_df__[col__].isna()
                 ]
-        
+
             # Case 2: User selected only standard values.
             elif standard_options__:
                 filtered_df__ = filtered_df__[filtered_df__[col__].isin(standard_options__)]
@@ -302,7 +307,7 @@ def _(df_, filters_form_):
 
 
 @app.cell
-def _(filtered_df__, mo, plot_titles, px, series_cols, x_axis_col_):
+def _(filtered_df__, mo, plot_titles, px, x_axis_col_):
     # This code assumes `filtered_df_` (the filtered DataFrame) and 
     # `x_axis_col_` (the name of the x-axis column) are available from previous cells.
     plot_ = None
@@ -319,12 +324,12 @@ def _(filtered_df__, mo, plot_titles, px, series_cols, x_axis_col_):
         ]
 
         plot_df_ = filtered_df__.copy()
-    
+
         # Create the 'series' column for coloring the plots.
         # It will look like 'MLP-relu-float16', 'GatedMLP-relu-float16', etc.
         # The .astype(str) gracefully handles any lingering 'nan' values for the legend.
-        if series_cols:
-            plot_df_["series"] = plot_df_[series_cols].apply(
+        if series_cols_:
+            plot_df_["series"] = plot_df_[series_cols_].apply(
                 lambda row: "-".join(row.values.astype(str)), axis=1
             )
             color_arg_ = "series"
