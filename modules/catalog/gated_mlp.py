@@ -60,7 +60,7 @@ class PreCompiledGatedMLP(GatedMLP):
         return fwd(x, self.Wup, self.Wgate, self.Wdown, self.act_fn)
     
 
-def compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
+def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
     """
     Many custom modules are only appropriate for use under a subset of all the conditions where a regular pytorch nn.module can run.
     Use this function to ensure that testing is only attempted on that subset.
@@ -132,7 +132,7 @@ def output_validator(
 
 __competitors__ = {
     'GatedMLP': Competitor(module_class=GatedMLP),
-    'PreCompiledGatedMLP': Competitor(module_class=PreCompiledGatedMLP, run_filter=compiled_run_filter),
+    'PreCompiledGatedMLP': Competitor(module_class=PreCompiledGatedMLP, run_filter=pre_compiled_run_filter),
     'TritonGatedMLP': Competitor(module_class=TritonGatedMLP, run_filter=triton_run_filter),
 }
 

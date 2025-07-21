@@ -100,8 +100,10 @@ mm_op.register_autograd(backward, setup_context=setup_context)
 
 
 class FP8Linear(nn.Linear):
-    def __init__(self, in_features: int, out_features: int, fp8=False, x_s=1.0, w_s=1.0, grad_s=1.0):
-        super().__init__(in_features, out_features, bias=False)
+    def __init__(self, in_features: int, out_features: int,  
+                 fp8: bool, x_s: float = 1.0, w_s: float = 1.0, grad_s: float = 1.0,
+                 device: str = 'cpu', dtype: torch.dtype = torch.float32,):
+        super().__init__(in_features, out_features, bias=False, device=device, dtype=dtype)
         self.fp8 = fp8
         self.x_s = x_s
         self.w_s = w_s
@@ -156,15 +158,20 @@ __test_config__ = ModuleTestConfig(
     reference_competitor='FP8Linear',
     test_cases=[
         {
-            'init_args': {'in_features': in_features, 'out_features': out_features, 'fp8': fp8},
-            'input_args': lambda dev, in_features=in_features, out_features=out_features, dt=dt: input_args(dev, in_features, out_features, dt),
+            'init_args': {
+                'in_features': in_features, 
+                'out_features': out_features, 
+                'fp8': fp8,
+                'dtype': dtype,
+                },
+            'input_args': lambda dev, in_dim=in_features, out_dim=out_features, dt=dtype: input_args(dev, in_dim, out_dim, dt),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-1, 'rtol': 1},          # Optional
-            'case_descriptor': f'(in_features,out_features)=({in_features},{out_features})_fp8={fp8}',
+            'case_descriptor': f'(in_features,out_features)=({in_features},{out_features})_fp8={fp8}_dtype={dtype}',
         }
         for in_features, out_features in [(128, 128), (512, 2048), (1832, 4271)]
         for fp8 in ([True, False] if is_hopper_available() else [False])
-        for dt in [torch.float16, torch.bfloat16, torch.float32]
+        for dtype in [torch.float16, torch.bfloat16, torch.float32]
     ]
 )
 
