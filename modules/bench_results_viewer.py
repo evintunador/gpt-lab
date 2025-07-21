@@ -248,7 +248,7 @@ def _(csv_multiselector, dfs, mo, os, pd):
         filters_ = {}
         for col_ in cols_to_filter_:
             # Get unique values, filling NaNs with a string 'N/A'
-            options_ = sorted(df_[col_].fillna('N/A').unique().tolist())
+            options_ = sorted(df_[col_].fillna('N/A').unique().tolist(), key=str)
             filters_[col_] = mo.ui.multiselect(
                 options=options_,
                 label=f"Filter {col_}",
