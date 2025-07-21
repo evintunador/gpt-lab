@@ -9,7 +9,6 @@ from modules.base_test_bench_utils import (
     BenchmarkConfig, 
     Competitor,
     TensorParallelConfig,
-    is_hopper_available,
 )
 
 
@@ -17,8 +16,17 @@ from modules.base_test_bench_utils import (
 ### FP8 matmul by @YouJiacheng ####
 ###################################
 """
-NOTE: Only works on Hoppr GPUs; others will still pass tests but only because they skipped fp8=True case
+NOTE: Only works on Hopper GPUs; others will still pass tests but only because they skipped fp8=True case
 """
+
+
+def is_hopper_available() -> bool:
+    """Checks if a Hopper architecture GPU is available."""
+    if not torch.cuda.is_available():
+        return False
+    # Hopper GPUs have compute capability 9.0 or higher
+    return any(torch.cuda.get_device_capability(i)[0] >= 9 for i in range(torch.cuda.device_count()))
+
 
 @torch.library.custom_op("nanogpt::mm", mutates_args=())
 def mm_op(x: Tensor, w: Tensor, x_s: float, w_s: float, grad_s: float) -> tuple[Tensor, Tensor, Tensor]:
@@ -104,7 +112,7 @@ class FP8Linear(nn.Linear):
                  fp8: bool, x_s: float = 1.0, w_s: float = 1.0, grad_s: float = 1.0,
                  device: str = 'cpu', dtype: torch.dtype = torch.float32,):
         super().__init__(in_features, out_features, bias=False, device=device, dtype=dtype)
-        self.fp8 = fp8
+        self.fp8 = fp8 and is_hopper_available()
         self.x_s = x_s
         self.w_s = w_s
         self.grad_s = grad_s
