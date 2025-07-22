@@ -55,7 +55,7 @@ def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: Li
     return test_suite
 
 
-ALL_TEST_CONFIGS = discover_dunder_objects(
+ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects(
     dunder='__test_config__', 
     object=ModuleTestConfig,
     search_folders="modules/catalog/"
@@ -64,9 +64,21 @@ AVAILABLE_DEVICES, _ = get_available_devices()
 TEST_SUITE = build_test_suite(ALL_TEST_CONFIGS, AVAILABLE_DEVICES)
 
 # Add this to make pytest show more info about parameterized tests
-if len(TEST_SUITE) == 0:
+if len(TEST_SUITE) == 0 and not DISCOVERY_ERRORS:
     print("[ERROR] No tests generated!")
     exit()
+
+
+def test_module_discovery_errors():
+    if not DISCOVERY_ERRORS:
+        return
+
+    error_messages = [f"  - {file}: {err}" for file, err in DISCOVERY_ERRORS.items()]
+    report = (
+        "The following files failed to import during test discovery and were skipped:\n"
+        + "\n".join(error_messages)
+    )
+    pytest.fail(report, pytrace=False)
 
 
 @pytest.mark.parametrize(

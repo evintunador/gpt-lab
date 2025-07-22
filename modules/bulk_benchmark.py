@@ -189,19 +189,32 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    all_benchmark_configs = discover_dunder_objects(
+    all_benchmark_configs, discovery_errors = discover_dunder_objects(
         dunder='__benchmark_config__', 
         object=BenchmarkConfig,
         search_folders="modules/catalog/"
     )
 
-    if not all_benchmark_configs:
+    if discovery_errors:
+        print("[WARNING] The following files failed to import during discovery and were skipped:")
+        for file, err in discovery_errors.items():
+            print(f"  - {file}: {err}")
+        print("-" * 20)
+
+    if not all_benchmark_configs and not discovery_errors:
         print("No `__benchmark_config__` found in any module files. Nothing to do.")
         sys.exit(0)
 
     if args.module:
         benchmark_configs = [c for c in all_benchmark_configs if c.module_name == args.module]
         if not benchmark_configs:
+            # Check if the requested module failed to import
+            for file, err in discovery_errors.items():
+                if f"/{args.module}.py" in file or f"\\{args.module}.py" in file:
+                    print(f"Error: Could not load benchmark for '{args.module}' because the file '{file}' failed to import.")
+                    print(f"Import Error: {err}")
+                    sys.exit(1)
+
             print(f"Error: No benchmark config found with module_name='{args.module}'.")
             available_modules = sorted([c.module_name for c in all_benchmark_configs])
             print(f"Available modules are: {available_modules}")

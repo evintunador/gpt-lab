@@ -129,7 +129,7 @@ def discover_dunder_objects(
         object: Any,
         excluded_files: List[str] = [],
         search_folders: Union[None, str, List[str]] = None
-    ) -> List[Any]:
+    ) -> Tuple[List[Any], Dict[str, Exception]]:
     """
     Discover objects with a given dunder name in Python files within specified folders.
 
@@ -140,7 +140,9 @@ def discover_dunder_objects(
         search_folders: A folder path, or list of folder paths, to search. If None, uses the current directory.
 
     Returns:
-        List of discovered objects.
+        A tuple containing:
+        - A list of discovered objects.
+        - A dictionary mapping filenames to the exceptions that occurred while processing them.
     """
     import os
     import sys
@@ -167,6 +169,7 @@ def discover_dunder_objects(
     all_files = [f for f in all_files if os.path.basename(f) not in excluded_files]
 
     objects = []
+    errors = {}
     for file in all_files:
         try:
             # Figure out the correct module name for importlib
@@ -181,9 +184,9 @@ def discover_dunder_objects(
             if isinstance(obj, object):
                 objects.append(obj)
         except Exception as e:
-            print(f"[WARNING] Could not process {file}. Error: {e}. Skipping.")
+            errors[file] = e
 
-    return objects
+    return objects, errors
 
 
 def get_total_loss(outputs: Union[torch.Tensor, Sequence[torch.Tensor]]) -> torch.Tensor:
