@@ -8,12 +8,10 @@ from modules.base_test_bench_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,
-    TensorParallelConfig,
-    is_hopper_available,
+    TensorParallelConfig
 )
 from modules.catalog.utils import next_multiple
-from modules.catalog.relu2 import ReLU2
-from modules.catalog.fp8_linear import FP8Linear
+from modules.catalog.activations.relu2 import ReLU2
 
 
 ##################################################
@@ -21,9 +19,9 @@ from modules.catalog.fp8_linear import FP8Linear
 ##################################################
 
 
-class GatedFP8MLP(nn.Module):
+class GatedMLP(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, hidden_dim: int, activation: str, 
-                 dtype: torch.dtype = torch.float32, device: str = 'cpu', fp8 = False):
+                 dtype: torch.dtype = torch.float32, device: str = 'cpu'):
         super().__init__()
         self.in_dim = in_dim
         self.out_dim = out_dim
@@ -37,12 +35,16 @@ class GatedFP8MLP(nn.Module):
         }
         self.act_fn = act_registry[self.act_str]
 
-        self.Wup = FP8Linear(in_features=self.in_dim, out_features=self.hidden_dim, fp8=fp8)
-        self.Wgate = FP8Linear(in_features=self.in_dim, out_features=self.hidden_dim, fp8=fp8)
-        self.Wdown = FP8Linear(in_features=self.hidden_dim, out_features=self.out_dim, fp8=fp8)
+        self.Wup = nn.Parameter(torch.empty(size=(self.in_dim, self.hidden_dim), dtype=dtype, device=device))
+        self.Wgate = nn.Parameter(torch.empty(size=(self.in_dim, self.hidden_dim), dtype=dtype, device=device))
+        self.Wdown = nn.Parameter(torch.empty(size=(self.hidden_dim, self.out_dim), dtype=dtype, device=device))
+        
+        nn.init.kaiming_uniform_(self.Wup,  a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.Wgate, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.Wdown, a=math.sqrt(5))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.Wdown(self.Wup(x) * self.act_fn(self.Wgate(x)))
+        return ((x @ self.Wup) * self.act_fn(x @ self.Wgate)) @ self.Wdown
 
 
 ########################################################
@@ -51,9 +53,9 @@ class GatedFP8MLP(nn.Module):
 
 @torch.compile
 def fwd(inp, w_up, w_gate, w_down, act_fn):
-    return w_down(w_up(inp) * act_fn(w_gate(inp)))
+    return ((inp @ w_up) * act_fn(inp @ w_gate)) @ w_down
 
-class PreCompiledGatedFP8MLP(GatedFP8MLP):
+class PreCompiledGatedMLP(GatedMLP):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return fwd(x, self.Wup, self.Wgate, self.Wdown, self.act_fn)
     
@@ -66,6 +68,44 @@ def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
     """
     if 'cpu' in str(inputs[0].device):
         return False
+    return True
+
+
+##################################################
+######## EXAMPLE CUSTOM KERNEL VERSION ##########
+##################################################
+"""
+Please keep custom kernels in a separate file and load them in a try-except block.
+This allows for us to support a variety of devices 
+(eg. loading a Triton kernel on Apple silicon would otherwise throw an error).
+"""
+
+try:
+    from modules.kernels.gated_mlp_kernel import _GatedMLPKernelFn
+
+    class TritonGatedMLP(GatedMLP):
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return _GatedMLPKernelFn.apply(
+                x,
+                self.Wup, self.Wgate, self.Wdown,
+                self.act_str,
+            )
+
+except (ImportError, ModuleNotFoundError):
+    TritonGatedMLP = None
+
+
+def triton_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
+    """
+    Many custom kernels are only appropriate for use under a subset of all the conditions where a regular
+    pytorch nn.module can run.
+    Use this function to ensure that testing is only attempted on that subset.
+    """
+    if 'cuda' not in str(inputs[0].device):
+        return False
+    # some more examples of what checks for a kernel would look like:
+    #if inputs[0].dtype not in [torch.float16, torch.bfloat16, torch.float32]: return False
+    #if inputs[0].shape[-1] % 32 != 0: return False
     return True
 
 
@@ -91,17 +131,18 @@ def output_validator(
     
 
 __competitors__ = {
-    'GatedFP8MLP': Competitor(module_class=GatedFP8MLP),
-    'PreCompiledGatedFP8MLP': Competitor(module_class=PreCompiledGatedFP8MLP, run_filter=pre_compiled_run_filter),
+    'GatedMLP': Competitor(module_class=GatedMLP),
+    'PreCompiledGatedMLP': Competitor(module_class=PreCompiledGatedMLP, run_filter=pre_compiled_run_filter),
+    'TritonGatedMLP': Competitor(module_class=TritonGatedMLP, run_filter=triton_run_filter),
 }
 
 
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
-    reference_competitor='GatedFP8MLP',
+    reference_competitor='GatedMLP',
     test_cases=[
         {
-            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': int((dim * 4) * (2/3)), 'activation': act, 'dtype': dt, 'fp8': fp8},
+            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': int((dim * 4) * (2/3)), 'activation': act, 'dtype': dt},
             'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
@@ -109,7 +150,6 @@ __test_config__ = ModuleTestConfig(
         }
         for dim, dt in [(128, torch.float16), (512, torch.float32), (2048, torch.bfloat16)]
         for act in ['relu', 'relu2', 'silu']
-        for fp8 in ([True, False] if is_hopper_available() else [False])
     ]
 )
 
@@ -126,21 +166,19 @@ def benchmark_input_provider(init_args: dict, device: str) -> tuple:
     return (torch.randn(1, 1, init_args['in_dim'], device=device, dtype=dtype),)
 
 __benchmark_config__ = BenchmarkConfig(
-    module_name='GatedFP8MLP',
+    module_name='GatedMLP',
     competitors=__competitors__,
     parameter_space={
         'dim': [32, 64, 128, 512, 1024, 2048, 4096],
         'activation': ['relu', 'silu', 'relu2'],
         'dtype': [torch.float16, torch.bfloat16, torch.float32],
-        'fp8': ([True, False] if is_hopper_available() else [False])
     },
     init_arg_builder=lambda params: {
         'in_dim': params['dim'],
         'out_dim': params['dim'],
         'hidden_dim': params['dim'] * 4,
         'activation': params['activation'],
-        'dtype': params['dtype'],
-        'fp8': params['fp8']
+        'dtype': params['dtype']
     },
     input_provider=benchmark_input_provider,
 )

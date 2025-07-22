@@ -11,7 +11,7 @@ from modules.base_test_bench_utils import (
     TensorParallelConfig
 )
 from modules.catalog.utils import next_multiple
-from modules.catalog.relu2 import ReLU2
+from modules.catalog.activations.relu2 import ReLU2
 
 
 ##################################################
@@ -19,7 +19,7 @@ from modules.catalog.relu2 import ReLU2
 ##################################################
 
 
-class GatedMLP(nn.Module):
+class MLP(nn.Module):
     def __init__(self, in_dim: int, out_dim: int, hidden_dim: int, activation: str, 
                  dtype: torch.dtype = torch.float32, device: str = 'cpu'):
         super().__init__()
@@ -36,15 +36,13 @@ class GatedMLP(nn.Module):
         self.act_fn = act_registry[self.act_str]
 
         self.Wup = nn.Parameter(torch.empty(size=(self.in_dim, self.hidden_dim), dtype=dtype, device=device))
-        self.Wgate = nn.Parameter(torch.empty(size=(self.in_dim, self.hidden_dim), dtype=dtype, device=device))
         self.Wdown = nn.Parameter(torch.empty(size=(self.hidden_dim, self.out_dim), dtype=dtype, device=device))
         
         nn.init.kaiming_uniform_(self.Wup,  a=math.sqrt(5))
-        nn.init.kaiming_uniform_(self.Wgate, a=math.sqrt(5))
         nn.init.kaiming_uniform_(self.Wdown, a=math.sqrt(5))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return ((x @ self.Wup) * self.act_fn(x @ self.Wgate)) @ self.Wdown
+        return (self.act_fn(x @ self.Wup)) @ self.Wdown
 
 
 ########################################################
@@ -52,60 +50,22 @@ class GatedMLP(nn.Module):
 ########################################################
 
 @torch.compile
-def fwd(inp, w_up, w_gate, w_down, act_fn):
-    return ((inp @ w_up) * act_fn(inp @ w_gate)) @ w_down
+def fwd(inp, w_up, w_down, act_fn):
+    return (act_fn(inp @ w_up)) @ w_down
 
-class PreCompiledGatedMLP(GatedMLP):
+class PreCompiledMLP(MLP):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return fwd(x, self.Wup, self.Wgate, self.Wdown, self.act_fn)
+        return fwd(x, self.Wup, self.Wdown, self.act_fn)
     
 
 def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
     """
     Many custom modules are only appropriate for use under a subset of all the conditions where a regular pytorch nn.module can run.
     Use this function to ensure that testing is only attempted on that subset.
-    Here, for example, our PreCompiledGatedMLP should only be run on a GPU since it uses torch.compile.
+    Here, for example, our PreCompiledMLP should only be run on a GPU since it uses torch.compile.
     """
     if 'cpu' in str(inputs[0].device):
         return False
-    return True
-
-
-##################################################
-######## EXAMPLE CUSTOM KERNEL VERSION ##########
-##################################################
-"""
-Please keep custom kernels in a separate file and load them in a try-except block.
-This allows for us to support a variety of devices 
-(eg. loading a Triton kernel on Apple silicon would otherwise throw an error).
-"""
-
-try:
-    from modules.kernels.gated_mlp_kernel import _GatedMLPKernelFn
-
-    class TritonGatedMLP(GatedMLP):
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return _GatedMLPKernelFn.apply(
-                x,
-                self.Wup, self.Wgate, self.Wdown,
-                self.act_str,
-            )
-
-except (ImportError, ModuleNotFoundError):
-    TritonGatedMLP = None
-
-
-def triton_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
-    """
-    Many custom kernels are only appropriate for use under a subset of all the conditions where a regular
-    pytorch nn.module can run.
-    Use this function to ensure that testing is only attempted on that subset.
-    """
-    if 'cuda' not in str(inputs[0].device):
-        return False
-    # some more examples of what checks for a kernel would look like:
-    #if inputs[0].dtype not in [torch.float16, torch.bfloat16, torch.float32]: return False
-    #if inputs[0].shape[-1] % 32 != 0: return False
     return True
 
 
@@ -131,18 +91,17 @@ def output_validator(
     
 
 __competitors__ = {
-    'GatedMLP': Competitor(module_class=GatedMLP),
-    'PreCompiledGatedMLP': Competitor(module_class=PreCompiledGatedMLP, run_filter=pre_compiled_run_filter),
-    'TritonGatedMLP': Competitor(module_class=TritonGatedMLP, run_filter=triton_run_filter),
+    'MLP': Competitor(module_class=MLP),
+    'PreCompiledMLP': Competitor(module_class=PreCompiledMLP, run_filter=pre_compiled_run_filter),
 }
 
 
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
-    reference_competitor='GatedMLP',
+    reference_competitor='MLP',
     test_cases=[
         {
-            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': int((dim * 4) * (2/3)), 'activation': act, 'dtype': dt},
+            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': dim * 4, 'activation': act, 'dtype': dt},
             'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
@@ -166,7 +125,7 @@ def benchmark_input_provider(init_args: dict, device: str) -> tuple:
     return (torch.randn(1, 1, init_args['in_dim'], device=device, dtype=dtype),)
 
 __benchmark_config__ = BenchmarkConfig(
-    module_name='GatedMLP',
+    module_name='MLP',
     competitors=__competitors__,
     parameter_space={
         'dim': [32, 64, 128, 512, 1024, 2048, 4096],

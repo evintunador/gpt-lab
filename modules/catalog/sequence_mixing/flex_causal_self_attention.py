@@ -7,7 +7,7 @@ from torch import Tensor
 from torch.nn.attention.flex_attention import BlockMask, flex_attention
 
 from modules.catalog.fp8_linear import FP8Linear
-from modules.catalog.rms_norm import RMSNorm
+from modules.catalog.norms.rms_norm import RMSNorm
 
 
 class HalfTruncatedRotary(nn.Module):

@@ -2,9 +2,9 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from modules.catalog.flex_causal_self_attention import FlexCausalSelfAttention, BlockMask
-from modules.catalog.fp8_mlp import FP8MLP
-from modules.catalog.rms_norm import RMSNorm
+from modules.catalog.sequence_mixing.flex_causal_self_attention import FlexCausalSelfAttention, BlockMask
+from modules.catalog.channel_mixing.fp8_mlp import FP8MLP
+from modules.catalog.norms.rms_norm import RMSNorm
 
 
 class ModdedNanoGPTBlock(nn.Module):
