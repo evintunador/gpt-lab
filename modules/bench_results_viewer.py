@@ -5,6 +5,12 @@ app = marimo.App(width="full")
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""TODO: currently tool assumes first non-filter column it finds is the x-axis. we need the ability to switch between different columns as the x-axis. preferably also a 3D plot so we can see two axes at once. And preferably also sliders so we can move along even more axes""")
+    return
+
+
+@app.cell
 def _():
     import marimo as mo
     import pandas as pd
