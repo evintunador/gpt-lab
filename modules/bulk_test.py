@@ -105,6 +105,11 @@ def test_bulk_module_correctness(
     # Instantiate and validate the reference module
     ref_module = ReferenceModuleCls(**test_case['init_args']).to(device)
     ref_inputs = test_case['input_args'](device)
+
+    # Check if the competitor module should be run
+    if run_filter is not None and not run_filter(ref_inputs):
+        pytest.skip(f"Skipping {CompetitorModuleCls.__name__} on {device} due to run_filter()->False.")
+        return
     
     #if not all(isinstance(t, torch.Tensor) for t in ref_inputs):
         #raise TypeError("All inputs provided by 'input_args' must be torch.Tensors.")
@@ -114,11 +119,6 @@ def test_bulk_module_correctness(
     if 'output_validator' in test_case:
         outputs_for_validator = ref_outputs if isinstance(ref_outputs, tuple) else (ref_outputs,)
         test_case['output_validator'](ref_module, ref_inputs, outputs_for_validator)
-
-    # Check if the competitor module should be run
-    if run_filter is not None and not run_filter(ref_inputs):
-        pytest.skip(f"Skipping {CompetitorModuleCls.__name__} on {device} due to run_filter()->False.")
-        return
 
     # Instantiate the competitor module and copy weights
     competitor_module = CompetitorModuleCls(**test_case['init_args']).to(device)

@@ -1,12 +1,19 @@
+from typing import List, Union, Tuple, Any
 import math
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
-from torch.nn.attention.flex_attention import BlockMask, flex_attention
+from torch.nn.attention.flex_attention import BlockMask, flex_attention, create_block_mask
 
-from modules.catalog.fp8_linear import FP8Linear
+from modules.base_test_bench_utils import (
+    ModuleTestConfig, 
+    BenchmarkConfig, 
+    Competitor,
+    TensorParallelConfig
+)
+from modules.catalog.fp8_linear import FP8Linear, is_hopper_available
 from modules.catalog.norms.rms_norm import RMSNorm
 
 
@@ -35,7 +42,7 @@ class HalfTruncatedRotary(nn.Module):
         y2 = x1 * (-sin[..., :dim_half]) + x2 * cos[..., :dim_half]
         return torch.cat((y1, y2), 3).type_as(x_BTHD)
 
-class FlexCausalSelfAttention(nn.Module):
+class ModdedNanoGPTFlexSelfAttention(nn.Module):
     def __init__(self, dim: int, num_heads: int, max_seq_len: int, head_dim=None,
                  fp8: bool = True, device: str = 'cpu', dtype: torch.dtype = torch.float32,):
         super().__init__()
@@ -78,3 +85,103 @@ class FlexCausalSelfAttention(nn.Module):
         y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
+    
+
+def run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
+    if 'cuda' in str(inputs[0].device):
+        return True
+    return False
+
+
+##################################################
+#################### TESTING ####################
+##################################################
+
+
+def causal(b, h, q_idx, kv_idx):
+    return q_idx >= kv_idx
+
+block_mask = lambda seq: create_block_mask(causal, B=None, H=None, Q_LEN=seq, KV_LEN=seq)
+
+
+def output_validator(
+        module: nn.Module,
+        inputs: Tuple[Any],
+        outputs: Tuple[Any],
+) -> None:
+    """
+    Validates whether the base module output meets expectations.
+    Testing framework always passes in tuples even if there's only one input/output tensor
+    """
+    input_tensor = inputs[0] 
+    #ve_tensor = inputs[1]
+    #block_mask = inputs[2]
+    output_tensor = outputs[0]
+    assert output_tensor.shape == input_tensor.shape, f"Expected output shape {input_tensor.shape}, but got {output_tensor.shape}"
+    assert output_tensor.dtype == input_tensor.dtype
+    
+
+__competitors__ = {
+    'ModdedNanoGPTFlexSelfAttention': Competitor(module_class=ModdedNanoGPTFlexSelfAttention, run_filter=run_filter),
+}
+
+
+__test_config__ = ModuleTestConfig(
+    competitors=__competitors__,
+    reference_competitor='ModdedNanoGPTFlexSelfAttention',
+    test_cases=[
+        {
+            'init_args': {
+                'dim': dim, 
+                'num_heads': num_heads, 
+                'max_seq_len': max_seq_len, 
+                'fp8': fp8, 
+                'dtype': dtype
+            },
+            'input_args': lambda dev, d=dim, nh=num_heads, s=max_seq_len, fp8=fp8, dt=dtype: (
+                torch.randn(1, s, d, device=dev, dtype=dt, requires_grad=True), # x
+                torch.randn(s, d, device=dev, dtype=dt, requires_grad=True), # ve
+                block_mask
+            ),
+            'output_validator': output_validator,
+            'tolerances': {'atol': 1e-2, 'rtol': 1e-2}, # Optional
+            'case_descriptor': f'dim={dim}_num_heads={num_heads}_max_seq_len={max_seq_len}_fp8={fp8}_dtype={dtype}',
+        }
+        for dim in [512, 2048]
+        for num_heads in [4]
+        for max_seq_len in [2048, 16_384]
+        for fp8 in ([True, False] if is_hopper_available() else [False])
+        for dtype in [torch.float32, torch.float16, torch.bfloat16]
+    ]
+)
+
+
+##################################################
+################# BENCHMARKING ###################
+##################################################
+
+
+def benchmark_input_provider(init_args: dict, device: str) -> tuple:
+    """Generates a standard input for benchmarking."""
+    # input shape: (batch_size, sequence_length, dimension)
+    dtype = init_args.get('dtype', torch.float32)
+    return (torch.randn(1, 1, init_args['in_dim'], device=device, dtype=dtype),)
+
+
+__benchmark_config__ = BenchmarkConfig(
+    module_name='FlexCausalSelfAttention',
+    competitors=__competitors__,
+    parameter_space={
+        'dim': [32, 64, 128, 512, 1024, 2048, 4096],
+        'activation': ['relu', 'silu', 'relu2'],
+        'dtype': [torch.float16, torch.bfloat16, torch.float32],
+    },
+    init_arg_builder=lambda params: {
+        'in_dim': params['dim'],
+        'out_dim': params['dim'],
+        'hidden_dim': params['dim'] * 4,
+        'activation': params['activation'],
+        'dtype': params['dtype']
+    },
+    input_provider=benchmark_input_provider,
+)

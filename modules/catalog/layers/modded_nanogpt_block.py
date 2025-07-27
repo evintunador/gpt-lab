@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
-from modules.catalog.sequence_mixing.flex_causal_self_attention import FlexCausalSelfAttention, BlockMask
+from modules.catalog.sequence_mixing.modded_nanogpt_flex_self_attention import ModdedNanoGPTFlexSelfAttention, BlockMask
 from modules.catalog.channel_mixing.fp8_mlp import FP8MLP
 from modules.catalog.norms.rms_norm import RMSNorm
 
@@ -13,7 +13,7 @@ class ModdedNanoGPTBlock(nn.Module):
         # skip attention of blocks.7 (the 8th layer) by @YouJiacheng
         # Adjusted for smaller models - only skip if we have enough layers
         skip_attn = (layer_idx == 7) and (dim > 512)  # Only skip in larger models
-        self.attn = FlexCausalSelfAttention(dim, num_heads, max_seq_len) if not skip_attn else None
+        self.attn = ModdedNanoGPTFlexSelfAttention(dim, num_heads, max_seq_len) if not skip_attn else None
         self.mlp = FP8MLP(dim, mlp_ratio)
         self.lambdas = nn.Parameter(torch.tensor([1., 0.]))
         self.norm = RMSNorm()
