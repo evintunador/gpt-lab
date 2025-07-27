@@ -111,9 +111,6 @@ def test_bulk_module_correctness(
         pytest.skip(f"Skipping {CompetitorModuleCls.__name__} on {device} due to run_filter()->False.")
         return
     
-    #if not all(isinstance(t, torch.Tensor) for t in ref_inputs):
-        #raise TypeError("All inputs provided by 'input_args' must be torch.Tensors.")
-    
     # Run a validator on the reference implementation output to catch baseline bugs
     ref_outputs = ref_module(*ref_inputs)
     if 'output_validator' in test_case:
