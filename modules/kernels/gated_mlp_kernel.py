@@ -60,16 +60,7 @@ def _matmul(
     c_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N) 
     tl.store(c_ptr + c_offsets, accumulator, mask=c_mask) 
 
-autotune_configs = [
-    triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE': 8}, num_stages=3, num_warps=8),
-    triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2),
-    #triton.Config({'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2)
-]
+
 autotune_configs = [
     triton.Config({'BLOCK_SIZE_M': BSM, 'BLOCK_SIZE_K': BSK, 'BLOCK_SIZE_N': BSN, 'GROUP_SIZE': GS}, num_stages=ns, num_warps=nw)
     for BSM in [32]#, 64, 128]
@@ -88,8 +79,8 @@ def _fused_GLU(
     stride_wup_K, stride_wup_N, 
     stride_wgate_K, stride_wgate_N, 
     stride_up_M, stride_up_N,
-    stride_act_M, stride_act_N,
     stride_gate_M, stride_gate_N,
+    stride_gate_act_M, stride_gate_act_N,
     stride_hidden_M, stride_hidden_N,
     M, K, N,
     #dtype,
@@ -129,6 +120,13 @@ def _fused_GLU(
         wup_offsets += BLOCK_SIZE_K * stride_wup_K
         wgate_offsets += BLOCK_SIZE_K * stride_wgate_K
     
+    up_offsets = stride_up_M * offsets_M[:, None] + stride_up_N * offsets_N[None, :]
+    up_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N)
+    tl.store(up_ptr + up_offsets, up_accumulator.to(up_ptr.type.element_ty), mask=up_mask)
+    gate_offsets = stride_gate_M * offsets_M[:, None] + stride_gate_N * offsets_N[None, :]
+    gate_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N)
+    tl.store(gate_ptr + gate_offsets, gate_accumulator.to(gate_ptr.type.element_ty), mask=gate_mask)
+
     relu_lower: tl.constexpr = 0
     relu_upper: tl.constexpr = 1e6
     if act == "relu2":
@@ -138,12 +136,17 @@ def _fused_GLU(
         gate_accumulator = gate_accumulator * (1 / (1 + tl.exp(-gate_accumulator)))
     else: # defaults to relu
         gate_accumulator = tl.clamp(gate_accumulator, relu_lower, relu_upper)
+    gate_act = gate_accumulator
 
-    accumulator = up_accumulator * gate_accumulator
+    gate_act_offsets = stride_gate_act_M * offsets_M[:, None] + stride_gate_act_N * offsets_N[None, :]
+    gate_act_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N)
+    tl.store(gate_act_ptr + gate_act_offsets, gate_act.to(gate_act_ptr.type.element_ty), mask=gate_act_mask)
+
+    hidden = up_accumulator * gate_act
 
     hidden_offsets = stride_hidden_M * offsets_M[:, None] + stride_hidden_N * offsets_N[None, :]
     hidden_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N)
-    tl.store(hidden_ptr + hidden_offsets, accumulator.to(hidden_ptr.type.element_ty), mask=hidden_mask)
+    tl.store(hidden_ptr + hidden_offsets, hidden.to(hidden_ptr.type.element_ty), mask=hidden_mask)
 
 
 @torch.compile

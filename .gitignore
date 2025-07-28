@@ -12,3 +12,4 @@ temp_dir/
 .idea/workspace.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/workspace.xml
+modules/test_error_maps/
