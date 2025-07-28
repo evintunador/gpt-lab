@@ -1,4 +1,5 @@
 from typing import List, Dict, Any, Union, Sequence, Callable
+import copy
 
 import pytest
 import torch
@@ -121,7 +122,10 @@ def test_bulk_module_correctness(
     competitor_module = CompetitorModuleCls(**test_case['init_args']).to(device)
     competitor_module.load_state_dict(ref_module.state_dict())
     
-    competitor_inputs = [t.clone().detach().requires_grad_(t.requires_grad) for t in ref_inputs]
+    competitor_inputs = [
+        t.clone().detach().requires_grad_(t.requires_grad) if isinstance(t, torch.Tensor) else copy.deepcopy(t)
+        for t in ref_inputs
+    ]
     competitor_outputs = competitor_module(*competitor_inputs)
 
     # Test numerical equivalence
@@ -154,7 +158,10 @@ def test_bulk_module_correctness(
             )
 
     for i, (ref_in, comp_in) in enumerate(zip(ref_inputs, competitor_inputs)):
-        if ref_in.requires_grad and comp_in.requires_grad:
+        # Check for tensor inputs that require gradients
+        if isinstance(ref_in, torch.Tensor) and ref_in.requires_grad:
+            assert isinstance(comp_in, torch.Tensor) and comp_in.requires_grad, \
+                f"Competitor input {i} is not a tensor that requires grad while reference is."
             assert ref_in.grad is not None and comp_in.grad is not None, f"Gradient for input {i} is None in one of the modules"
             assert torch.allclose(ref_in.grad, comp_in.grad, **tolerances), \
                 (
@@ -164,3 +171,20 @@ def test_bulk_module_correctness(
                     f"Percent breaking tolerance: "
                     f"{((~torch.isclose(ref_in.grad, comp_in.grad, **tolerances)).float().mean().item() * 100):.5f}%"
                 )
+        # For non-tensor objects, check for equality only if the class has overridden python's default __eq__ method.
+        elif not isinstance(ref_in, torch.Tensor) and ref_in.__class__.__eq__ is not object.__eq__:
+            if ref_in != comp_in:
+                ref_str = str(ref_in) if hasattr(ref_in, '__str__') else None
+                comp_str = str(comp_in) if hasattr(comp_in, '__str__') else None
+                ref_repr = repr(ref_in) if hasattr(ref_in, '__repr__') else None
+                comp_repr = repr(comp_in) if hasattr(comp_in, '__repr__') else None
+                msg = (
+                    f"Non-tensor input {i} mismatch between reference and competitor.\n"
+                    f"ref_in == comp_in: {ref_in == comp_in}\n"
+                    f"ref_in type: {type(ref_in)}, comp_in type: {type(comp_in)}\n"
+                )
+                if ref_str is not None and comp_str is not None:
+                    msg += f"ref_in str: {ref_str}\ncomp_in str: {comp_str}\n"
+                if ref_repr is not None and comp_repr is not None:
+                    msg += f"ref_in repr: {ref_repr}\ncomp_in repr: {comp_repr}\n"
+                raise AssertionError(msg)
