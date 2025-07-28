@@ -70,31 +70,34 @@ autotune_configs = [
     #triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2),
     #triton.Config({'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2)
 ]
-@triton.autotune(configs = autotune_configs, key=['M', 'N', 'K'])
+autotune_configs = [
+    triton.Config({'BLOCK_SIZE_M': BSM, 'BLOCK_SIZE_K': BSK, 'BLOCK_SIZE_N': BSN, 'GROUP_SIZE': GS}, num_stages=ns, num_warps=nw)
+    for BSM in [32]#, 64, 128]
+    for BSK in [32]#, 64, 128, 256]
+    for BSN in [32]#, 64]
+    for GS in [8]
+    for ns in [3]#, 4, 5]
+    for nw in [2]#, 4, 8]
+]
+@triton.autotune(configs = autotune_configs, key=['M', 'N', 'K'])#, 'dtype'])
 @triton.jit
 def _fused_GLU(
     x_ptr, wup_ptr, wgate_ptr, 
-    up_ptr, act_ptr, gate_ptr, hidden_ptr,
-    stride_x_B, stride_x_K, # TODO: rewrite thinking of the input as a single vector
+    up_ptr, gate_ptr, gate_act_ptr, hidden_ptr,
+    stride_x_M, stride_x_K,
     stride_wup_K, stride_wup_N, 
     stride_wgate_K, stride_wgate_N, 
-    stride_up_B, stride_up_N,
-    stride_act_B, stride_act_M, stride_act_N,
-    stride_gate_B, stride_gate_M, stride_gate_N,
-    stride_hidden_B, stride_hidden_M, stride_hidden_N,
-    M, N, K,
+    stride_up_M, stride_up_N,
+    stride_act_M, stride_act_N,
+    stride_gate_M, stride_gate_N,
+    stride_hidden_M, stride_hidden_N,
+    M, K, N,
+    #dtype,
     act: tl.constexpr,
     BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
     GROUP_SIZE: tl.constexpr,
 ):
-    PID_B = tl.program_id(axis=0)
-    x_ptr += PID_B * stride_x_B
-    up_ptr += PID_B * stride_up_B
-    act_ptr += PID_B * stride_act_B
-    gate_ptr += PID_B * stride_gate_B
-    hidden_ptr += PID_B * stride_hidden_B
-    
-    PID = tl.program_id(axis=1) 
+    PID = tl.program_id(axis=0) 
     num_PID_along_M = tl.cdiv(M, BLOCK_SIZE_M)
     num_PID_along_N = tl.cdiv(N, BLOCK_SIZE_N)
     num_PID_in_group = GROUP_SIZE * num_PID_along_N
@@ -145,27 +148,29 @@ def _fused_GLU(
 
 @torch.compile
 def gated_mlp_bwd(x, Wup, Wgate, Wdown, up, gate, gate_act, hidden, out, dLdout, act: str):
-    dLdhidden = dLdout @ Wdown.T
-    dLdWdown = hidden.T @ dLdout
+    dLdhidden = dLdout @ Wdown.T # (B, D) @ (D, H) -> (B, H)
+    dLdWdown = hidden.T @ dLdout # (H, B) @ (B, D) -> (H, D)
 
-    dLdgate_act = dLdhidden * up
-    dLdup = dLdhidden * gate
+    dLdgate_act = dLdhidden * up # (B, D) * (B, D) -> (B, D)
+    dLdup = dLdhidden * gate # (B, D) * (B, D) -> (B, D)
 
     if act == "relu2":
-        dLdgate = torch.where(gate > 0, 2 * up * dLdgate_act, torch.zeros_like(gate))
+        dLdgate = torch.where(gate > 0, 2 * up * dLdgate_act, torch.zeros_like(gate)) # (B, D)
     elif act == "silu":
         sigmoid = 1 / (1 + torch.exp(-up))
-        dLdgate = (sigmoid + gate * sigmoid * (1 - sigmoid)) * dLdgate_act
-    else: # relu
-        dLdgate = torch.where(gate > 0, dLdgate_act, torch.zeros_like(gate))
+        dLdgate = (sigmoid + gate * sigmoid * (1 - sigmoid)) * dLdgate_act # (B, D)
+    elif act == "relu": # relu
+        dLdgate = torch.where(gate > 0, dLdgate_act, torch.zeros_like(gate)) # (B, D)
+    else:
+        raise ValueError()
         
-    dLdx_up_part = dLdup @ Wup.T
-    dLdWup = x.T @ dLdup
+    dLdx_up_part = dLdup @ Wup.T # (B, H) @ (H, D) -> (B, D)
+    dLdWup = x.T @ dLdup # (D, B) @ (B, H) -> (D, H)
 
-    dLdx_gate_part = dLdgate & Wgate.T
-    dLdWgate = x.T @ dLdgate
+    dLdx_gate_part = dLdgate @ Wgate.T # (B, H) @ (H, D) -> (B, D)
+    dLdWgate = x.T @ dLdgate # (D, B) @ (B, H) -> (D, H)
 
-    dLdx = dLdx_up_part + dLdx_gate_part
+    dLdx = dLdx_up_part + dLdx_gate_part # (B, D)
 
     return dLdx, dLdWup, dLdWgate, dLdWdown
 
@@ -194,18 +199,19 @@ class _GatedMLPKernelFn(torch.autograd.Function):
         gate_act = torch.empty((B, H), device=x.device, dtype=x.dtype)
         hidden = torch.empty((B, H), device=x.device, dtype=x.dtype)
 
-        grid = lambda meta: (triton.cdiv(S, meta['BLOCK_SIZE_M']) * triton.cdiv(H, meta['BLOCK_SIZE_N']), B)
+        grid = lambda meta: (triton.cdiv(B, meta['BLOCK_SIZE_M']) * triton.cdiv(H, meta['BLOCK_SIZE_N']), B)
         _fused_GLU[grid](
             x, Wup, Wgate, 
             up, gate, gate_act, hidden,
             x.stride(0), x.stride(1),
             Wup.stride(0), Wup.stride(1),
             Wgate.stride(0), Wgate.stride(1),
-            up.stride(0), up.stride(1), up.stride(2),
-            gate.stride(0), gate.stride(1), gate.stride(2),
-            gate_act.stride(0), gate_act.stride(1), gate_act.stride(2),
-            hidden.stride(0), hidden.stride(1), hidden.stride(2),
-            M=S, K=D, N=H,
+            up.stride(0), up.stride(1),
+            gate.stride(0), gate.stride(1),
+            gate_act.stride(0), gate_act.stride(1),
+            hidden.stride(0), hidden.stride(1),
+            M=B, K=D, N=H,
+            #dtype=x.dtype,
             act=act,
         )
 
