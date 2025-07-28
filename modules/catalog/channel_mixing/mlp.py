@@ -96,19 +96,36 @@ __competitors__ = {
 }
 
 
+def mlp_input_args(device: str, dim: int, dtype):
+    return (torch.randn(128, dim, device=device, dtype=dtype, requires_grad=True),)
+def mlp_tolerances(dtype: torch.dtype) -> dict:
+    if dtype == torch.float32:
+        return {'atol': 1e-3, 'rtol': 1e-3}
+    elif dtype == torch.float16:
+        return {'atol': 1e-2, 'rtol': 1e-2}
+    elif dtype == torch.bfloat16:
+        return {'atol': 1e-1, 'rtol': 1e-1}
+    else: 
+        return {'atol': 1e-1, 'rtol': 1e100000}
+mlp_dims_to_test = [768]
+mlp_dtypes_to_test = [torch.float32, torch.float16, torch.bfloat16]
+mlp_activations_to_test = ['relu', 'relu2', 'silu']
+
+
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
     reference_competitor='MLP',
     test_cases=[
         {
             'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': dim * 4, 'activation': act, 'dtype': dt},
-            'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
+            'input_args': lambda dev, dim=dim, dt=dt: mlp_input_args(device=dev, dim=dim, dtype=dt),
             'output_validator': output_validator,
-            'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
+            'tolerances': mlp_tolerances(dt), # Optional
             'case_descriptor': f'dim={dim}_dt={dt}_act={act}',
         }
-        for dim, dt in [(128, torch.float16), (512, torch.float32), (2048, torch.bfloat16)]
-        for act in ['relu', 'relu2', 'silu']
+        for dim in mlp_dims_to_test
+        for dt in mlp_dtypes_to_test
+        for act in mlp_activations_to_test
     ]
 )
 

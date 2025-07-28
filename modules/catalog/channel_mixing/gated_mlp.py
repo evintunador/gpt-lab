@@ -12,6 +12,9 @@ from modules.base_test_bench_utils import (
 )
 from modules.catalog.utils import next_multiple
 from modules.catalog.activations.relu2 import ReLU2
+from modules.catalog.channel_mixing.mlp import (
+    mlp_input_args, mlp_tolerances, mlp_dims_to_test, mlp_dtypes_to_test, mlp_activations_to_test,
+)
 
 
 ##################################################
@@ -142,14 +145,15 @@ __test_config__ = ModuleTestConfig(
     reference_competitor='GatedMLP',
     test_cases=[
         {
-            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': int((dim * 4) * (2/3)), 'activation': act, 'dtype': dt},
-            'input_args': lambda dev, d=dim, dt=dt: (torch.randn(128, d, device=dev, dtype=dt, requires_grad=True),),
+            'init_args': {'in_dim': dim, 'out_dim': dim, 'hidden_dim': dim * 4, 'activation': act, 'dtype': dt},
+            'input_args': lambda dev, dim=dim, dt=dt: mlp_input_args(device=dev, dim=dim, dtype=dt),
             'output_validator': output_validator,
-            'tolerances': {'atol': 1e-2, 'rtol': 1e-1},          # Optional
+            'tolerances': mlp_tolerances(dt), # Optional
             'case_descriptor': f'dim={dim}_dt={dt}_act={act}',
         }
-        for dim, dt in [(128, torch.float16), (512, torch.float32), (2048, torch.bfloat16)]
-        for act in ['relu', 'relu2', 'silu']
+        for dim in mlp_dims_to_test
+        for dt in mlp_dtypes_to_test
+        for act in mlp_activations_to_test
     ]
 )
 

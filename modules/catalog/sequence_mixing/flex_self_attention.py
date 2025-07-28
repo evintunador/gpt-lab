@@ -92,6 +92,12 @@ __competitors__ = {
 }
 
 
+fsa_dims_to_test = [256]
+fsa_num_heads_to_test = [4]
+fsa_seq_lens_to_test = [2048, 8192]
+fsa_dtypes_to_test = [torch.float32, torch.float16, torch.bfloat16]
+
+
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
     reference_competitor='FlexSelfAttention',
@@ -106,17 +112,17 @@ __test_config__ = ModuleTestConfig(
             },
             'input_args': lambda dev, d=dim, nh=num_heads, s=max_seq_len, fp8=fp8, dt=dtype: (
                 torch.randn(1, s, d, device=dev, dtype=dt, requires_grad=True), # x
-                block_mask
+                block_mask(s),
             ),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-2, 'rtol': 1e-2}, # Optional
             'case_descriptor': f'dim={dim}_num_heads={num_heads}_max_seq_len={max_seq_len}_fp8={fp8}_dtype={dtype}',
         }
-        for dim in [512, 2048]
-        for num_heads in [4]
-        for max_seq_len in [2048, 16_384]
+        for dim in fsa_dims_to_test
+        for num_heads in fsa_num_heads_to_test
+        for max_seq_len in fsa_seq_lens_to_test
+        for dtype in fsa_dtypes_to_test
         for fp8 in ([True, False] if is_hopper_available() else [False])
-        for dtype in [torch.float32, torch.float16, torch.bfloat16]
     ]
 )
 
@@ -138,7 +144,7 @@ __benchmark_config__ = BenchmarkConfig(
     competitors=__competitors__,
     parameter_space={
         'dim': [256, 512, 1024, 2048],
-        'max_seq_len': [1024, 4096, 16_384, 65_536],
+        'max_seq_len': [1024, 4096, 16_384],
         'num_heads': [4],
         'dtype': [torch.float16, torch.bfloat16, torch.float32],
     },

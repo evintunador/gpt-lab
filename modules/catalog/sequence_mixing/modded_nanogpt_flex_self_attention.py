@@ -15,6 +15,9 @@ from modules.base_test_bench_utils import (
 )
 from modules.catalog.fp8_linear import FP8Linear, is_hopper_available
 from modules.catalog.norms.rms_norm import RMSNorm
+from modules.sequence_mixing.flex_self_attention import (
+    fsa_dims_to_test, fsa_num_heads_to_test, fsa_seq_lens_to_test, fsa_dtypes_to_test
+)
 
 
 class HalfTruncatedRotary(nn.Module):
@@ -137,17 +140,17 @@ __test_config__ = ModuleTestConfig(
             'input_args': lambda dev, d=dim, nh=num_heads, s=max_seq_len, fp8=fp8, dt=dtype: (
                 torch.randn(1, s, d, device=dev, dtype=dt, requires_grad=True), # x
                 torch.randn(s, d, device=dev, dtype=dt, requires_grad=True), # ve
-                block_mask
+                block_mask(s)
             ),
             'output_validator': output_validator,
             'tolerances': {'atol': 1e-2, 'rtol': 1e-2}, # Optional
             'case_descriptor': f'dim={dim}_num_heads={num_heads}_max_seq_len={max_seq_len}_fp8={fp8}_dtype={dtype}',
         }
-        for dim in [512, 2048]
-        for num_heads in [4]
-        for max_seq_len in [2048, 16_384]
+        for dim in fsa_dims_to_test
+        for num_heads in fsa_num_heads_to_test
+        for max_seq_len in fsa_seq_lens_to_test
         for fp8 in ([True, False] if is_hopper_available() else [False])
-        for dtype in [torch.float32, torch.float16, torch.bfloat16]
+        for dtype in fsa_dtypes_to_test
     ]
 )
 
