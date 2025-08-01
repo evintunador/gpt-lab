@@ -7,61 +7,6 @@ import triton.language as tl
 
 
 autotune_configs = [
-    triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 64, 'GROUP_SIZE': 8}, num_stages=3, num_warps=8),
-    triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 256, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 128, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 128, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=4, num_warps=4),
-    #triton.Config({'BLOCK_SIZE_M': 64, 'BLOCK_SIZE_N': 32, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2),
-    #triton.Config({'BLOCK_SIZE_M': 32, 'BLOCK_SIZE_N': 64, 'BLOCK_SIZE_K': 32, 'GROUP_SIZE': 8}, num_stages=5, num_warps=2),
-]
-@triton.autotune(configs = autotune_configs, key=['M', 'N', 'K'])
-@triton.jit
-def _matmul(
-    a_ptr, b_ptr, c_ptr, 
-    M, N, K, 
-    stride_a_M, stride_a_K, 
-    stride_b_K, stride_b_N, 
-    stride_c_M, stride_c_N, 
-    # meta-parameters
-    BLOCK_SIZE_M: tl.constexpr, BLOCK_SIZE_N: tl.constexpr, BLOCK_SIZE_K: tl.constexpr,
-    GROUP_SIZE: tl.constexpr, 
-):
-    PID = tl.program_id(axis=0) 
-    num_PID_along_M = tl.cdiv(M, BLOCK_SIZE_M)
-    num_PID_along_N = tl.cdiv(N, BLOCK_SIZE_N)
-    num_PID_in_group = GROUP_SIZE * num_PID_along_N
-    group_id = PID // num_PID_in_group 
-    first_PID_in_group_along_M = group_id * GROUP_SIZE 
-    group_size_adj = min(num_PID_along_M - first_PID_in_group_along_M, GROUP_SIZE) 
-    PID_M = first_PID_in_group_along_M + ((PID % num_PID_in_group) % group_size_adj)
-    PID_N = (PID % num_PID_in_group) // group_size_adj
-    
-    offsets_M = PID_M * BLOCK_SIZE_M + tl.arange(0, BLOCK_SIZE_M)
-    offsets_N = PID_N * BLOCK_SIZE_N + tl.arange(0, BLOCK_SIZE_N)
-    offsets_K = tl.arange(0, BLOCK_SIZE_K)
-    a_offsets = offsets_M[:, None] * stride_a_M + offsets_K[None, :] * stride_a_K
-    b_offsets = offsets_K[:, None] * stride_b_K + offsets_N[None, :] * stride_b_N
-
-    accumulator = tl.zeros((BLOCK_SIZE_M, BLOCK_SIZE_N), dtype=tl.float32)
-        
-    for k in range(0, tl.cdiv(K, BLOCK_SIZE_K)):
-        mask = offsets_K < K - k * BLOCK_SIZE_K
-        a = tl.load(a_ptr + a_offsets, mask=mask[None, :], other=0.0)
-        b = tl.load(b_ptr + b_offsets, mask=mask[:, None], other=0.0) 
-        accumulator = tl.dot(a, b, acc=accumulator)
-        a_offsets += BLOCK_SIZE_K * stride_a_K
-        b_offsets += BLOCK_SIZE_K * stride_b_K
-
-    accumulator = accumulator.to(tl.float16)
-
-    c_offsets = stride_c_M * offsets_M[:, None] + stride_c_N * offsets_N[None, :]
-    c_mask = (offsets_M[:, None] < M) & (offsets_N[None, :] < N) 
-    tl.store(c_ptr + c_offsets, accumulator, mask=c_mask) 
-
-
-autotune_configs = [
     triton.Config({'BLOCK_SIZE_M': BSM, 'BLOCK_SIZE_K': BSK, 'BLOCK_SIZE_N': BSN, 'GROUP_SIZE': GS}, num_stages=ns, num_warps=nw)
     for BSM in [32]#, 64, 128]
     for BSK in [32]#, 64, 128, 256]
@@ -152,21 +97,19 @@ def _fused_GLU(
 @torch.compile
 def gated_mlp_bwd(x, Wup, Wgate, Wdown, up, gate, gate_act, hidden, out, dLdout, act: str):
     dLdhidden = dLdout @ Wdown.T # (B, D) @ (D, H) -> (B, H)
-    dLdWdown = hidden.T @ dLdout # (H, B) @ (B, D) -> (H, D)
-
-    dLdgate_act = dLdhidden * up # (B, D) * (B, D) -> (B, D)
-    dLdup = dLdhidden * gate # (B, D) * (B, D) -> (B, D)
+    dLdgate_act = dLdhidden * up # (B, H) * (B, H) -> (B, H)
 
     if act == "relu2":
-        dLdgate = torch.where(gate > 0, 2 * up * dLdgate_act, torch.zeros_like(gate)) # (B, D)
+        dLdgate = torch.where(gate > 0, 2 * gate * dLdgate_act, torch.zeros_like(gate)) # (B, H)
     elif act == "silu":
-        sigmoid = 1 / (1 + torch.exp(-up))
-        dLdgate = (sigmoid + gate * sigmoid * (1 - sigmoid)) * dLdgate_act # (B, D)
+        sigmoid = 1 / (1 + torch.exp(-gate))
+        dLdgate = dLdgate_act * (sigmoid + gate * sigmoid * (1 - sigmoid)) # (B, H)
     elif act == "relu": # relu
-        dLdgate = torch.where(gate > 0, dLdgate_act, torch.zeros_like(gate)) # (B, D)
+        dLdgate = torch.where(gate > 0, dLdgate_act, torch.zeros_like(gate)) # (B, H)
     else:
         raise ValueError()
-        
+
+    dLdup = dLdhidden * gate_act # (B, H) * (B, H) -> (B, H)
     dLdx_up_part = dLdup @ Wup.T # (B, H) @ (H, D) -> (B, D)
     dLdWup = x.T @ dLdup # (D, B) @ (B, H) -> (D, H)
 
@@ -174,6 +117,7 @@ def gated_mlp_bwd(x, Wup, Wgate, Wdown, up, gate, gate_act, hidden, out, dLdout,
     dLdWgate = x.T @ dLdgate # (D, B) @ (B, H) -> (D, H)
 
     dLdx = dLdx_up_part + dLdx_gate_part # (B, D)
+    dLdWdown = hidden.T @ dLdout # (H, B) @ (B, D) -> (H, D)
 
     return dLdx, dLdWup, dLdWgate, dLdWdown
 

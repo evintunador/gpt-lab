@@ -44,8 +44,8 @@ def _save_heatmaps(
       3) Relative tolerance failure mask (where abs diff > rtol * abs(expected))
     """
     # Convert to numpy arrays
-    actual = competitor_tensor.detach().cpu().numpy()
-    expected = torch_tensor.detach().cpu().numpy()
+    actual = competitor_tensor.detach().to(torch.float32).cpu().numpy()
+    expected = torch_tensor.detach().to(torch.float32).cpu().numpy()
 
     # Compute differences and masks
     abs_diff = np.abs(expected - actual)
