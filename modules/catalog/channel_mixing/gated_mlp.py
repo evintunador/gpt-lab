@@ -13,8 +13,20 @@ from modules.base_test_bench_utils import (
 from modules.catalog.utils import next_multiple
 from modules.catalog.activations.relu2 import ReLU2
 from modules.catalog.channel_mixing.mlp import (
-    mlp_input_args, mlp_tolerances, mlp_dims_to_test, mlp_dtypes_to_test, mlp_activations_to_test,
+    mlp_input_args, 
+    mlp_tolerances, 
+    mlp_dims_to_test, 
+    mlp_dtypes_to_test, 
+    mlp_activations_to_test,
+    output_validator,
+    mlp_dims_to_bench,
+    mlp_activations_to_bench,
+    mlp_dtypes_to_bench,
+    benchmark_input_provider,
 )
+
+torch.set_float32_matmul_precision('medium')
+torch._dynamo.config.recompile_limit = 100
 
 
 ##################################################
@@ -115,22 +127,6 @@ def triton_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
 ##################################################
 #################### TESTING ####################
 ##################################################
-
-
-def output_validator(
-        module: nn.Module,
-        inputs: Tuple[Any],
-        outputs: Tuple[Any],
-) -> None:
-    """
-    Validates whether the base module output meets expectations.
-    Testing framework always passes in tuples even if there's only one input/output tensor
-    """
-    input_tensor = inputs[0] 
-    output_tensor = outputs[0]
-    expected_shape = (*input_tensor.shape[:-1], module.out_dim)
-    assert output_tensor.shape == expected_shape, f"Expected output shape {expected_shape}, but got {output_tensor.shape}"
-    assert output_tensor.dtype == input_tensor.dtype
     
 
 __competitors__ = {
@@ -163,19 +159,13 @@ __test_config__ = ModuleTestConfig(
 ##################################################
 
 
-def benchmark_input_provider(init_args: dict, device: str) -> tuple:
-    """Generates a standard input for benchmarking."""
-    # input shape: (batch_size, sequence_length, dimension)
-    dtype = init_args.get('dtype', torch.float32)
-    return (torch.randn(1, 1, init_args['in_dim'], device=device, dtype=dtype),)
-
 __benchmark_config__ = BenchmarkConfig(
     module_name='GatedMLP',
     competitors=__competitors__,
     parameter_space={
-        'dim': [32, 64, 128, 512, 1024, 2048, 4096],
-        'activation': ['relu', 'silu', 'relu2'],
-        'dtype': [torch.float16, torch.bfloat16, torch.float32],
+        'dim': mlp_dims_to_bench,
+        'activation': mlp_activations_to_bench,
+        'dtype': mlp_dtypes_to_bench,
     },
     init_arg_builder=lambda params: {
         'in_dim': params['dim'],

@@ -11,6 +11,9 @@ from modules.base_test_bench_utils import (
     TensorParallelConfig,
 )
 
+torch.set_float32_matmul_precision('medium')
+torch._dynamo.config.recompile_limit = 100
+
 
 ###################################
 ### FP8 matmul by @YouJiacheng ####

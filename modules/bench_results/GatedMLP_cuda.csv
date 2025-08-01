@@ -1,0 +1,433 @@
+dim,activation,dtype,competitor,measurement,value
+128,relu,float32,GatedMLP,Forward Time (ms),0.2811903953552246
+128,relu,float32,GatedMLP,Backward Time (ms),1.1195232391357421
+128,relu,float32,GatedMLP,Forward Peak Memory (GB),0.021758464
+128,relu,float32,GatedMLP,Backward Peak Memory (GB),0.023856128
+128,relu,float32,PreCompiledGatedMLP,Forward Time (ms),0.43130879402160643
+128,relu,float32,PreCompiledGatedMLP,Backward Time (ms),1.0998783588409424
+128,relu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.021758464
+128,relu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.022807552
+128,relu,float32,TritonGatedMLP,Forward Time (ms),3.9891712188720705
+128,relu,float32,TritonGatedMLP,Backward Time (ms),0.15690231323242188
+128,relu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.02280704
+128,relu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.02595328
+128,relu,float16,GatedMLP,Forward Time (ms),0.30607359409332274
+128,relu,float16,GatedMLP,Backward Time (ms),1.1378687620162964
+128,relu,float16,GatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu,float16,GatedMLP,Backward Peak Memory (GB),0.020448256
+128,relu,float16,PreCompiledGatedMLP,Forward Time (ms),0.4730559825897217
+128,relu,float16,PreCompiledGatedMLP,Backward Time (ms),1.2049728870391845
+128,relu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,relu,float16,TritonGatedMLP,Forward Time (ms),2.000649642944336
+128,relu,float16,TritonGatedMLP,Backward Time (ms),0.009871864318847567
+128,relu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,relu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+128,relu,bfloat16,GatedMLP,Forward Time (ms),0.36880319118499755
+128,relu,bfloat16,GatedMLP,Backward Time (ms),1.1826848268508912
+128,relu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.020448256
+128,relu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.532969617843628
+128,relu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.3061439990997314
+128,relu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,relu,bfloat16,TritonGatedMLP,Forward Time (ms),1.963212776184082
+128,relu,bfloat16,TritonGatedMLP,Backward Time (ms),0.012185668945312367
+128,relu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,relu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+128,relu2,float32,GatedMLP,Forward Time (ms),0.5299200057983399
+128,relu2,float32,GatedMLP,Backward Time (ms),1.4684223175048827
+128,relu2,float32,GatedMLP,Forward Peak Memory (GB),0.023855616
+128,relu2,float32,GatedMLP,Backward Peak Memory (GB),0.02595328
+128,relu2,float32,PreCompiledGatedMLP,Forward Time (ms),0.5882527828216553
+128,relu2,float32,PreCompiledGatedMLP,Backward Time (ms),1.3918816089630126
+128,relu2,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.021758464
+128,relu2,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.022807552
+128,relu2,float32,TritonGatedMLP,Forward Time (ms),3.8942718505859375
+128,relu2,float32,TritonGatedMLP,Backward Time (ms),0.20584335327148473
+128,relu2,float32,TritonGatedMLP,Forward Peak Memory (GB),0.02280704
+128,relu2,float32,TritonGatedMLP,Backward Peak Memory (GB),0.02595328
+128,relu2,float16,GatedMLP,Forward Time (ms),0.45473599433898926
+128,relu2,float16,GatedMLP,Backward Time (ms),1.6412896633148195
+128,relu2,float16,GatedMLP,Forward Peak Memory (GB),0.020447744
+128,relu2,float16,GatedMLP,Backward Peak Memory (GB),0.021496832
+128,relu2,float16,PreCompiledGatedMLP,Forward Time (ms),0.4626431941986084
+128,relu2,float16,PreCompiledGatedMLP,Backward Time (ms),1.169091272354126
+128,relu2,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu2,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,relu2,float16,TritonGatedMLP,Forward Time (ms),2.112486457824707
+128,relu2,float16,TritonGatedMLP,Backward Time (ms),0.013747215270996094
+128,relu2,float16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,relu2,float16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+128,relu2,bfloat16,GatedMLP,Forward Time (ms),0.4353024005889893
+128,relu2,bfloat16,GatedMLP,Backward Time (ms),1.1493216037750242
+128,relu2,bfloat16,GatedMLP,Forward Peak Memory (GB),0.020447744
+128,relu2,bfloat16,GatedMLP,Backward Peak Memory (GB),0.021496832
+128,relu2,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.5038943767547608
+128,relu2,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.0581984043121337
+128,relu2,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,relu2,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,relu2,bfloat16,TritonGatedMLP,Forward Time (ms),2.115747261047363
+128,relu2,bfloat16,TritonGatedMLP,Backward Time (ms),0.009155082702636985
+128,relu2,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,relu2,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+128,silu,float32,GatedMLP,Forward Time (ms),0.41809921264648436
+128,silu,float32,GatedMLP,Backward Time (ms),1.2155679702758788
+128,silu,float32,GatedMLP,Forward Peak Memory (GB),0.02280704
+128,silu,float32,GatedMLP,Backward Peak Memory (GB),0.024904704
+128,silu,float32,PreCompiledGatedMLP,Forward Time (ms),0.5425312042236328
+128,silu,float32,PreCompiledGatedMLP,Backward Time (ms),1.2454368591308593
+128,silu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.021758464
+128,silu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.022807552
+128,silu,float32,TritonGatedMLP,Forward Time (ms),4.283084869384766
+128,silu,float32,TritonGatedMLP,Backward Time (ms),0.029798507690429688
+128,silu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.02280704
+128,silu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.02595328
+128,silu,float16,GatedMLP,Forward Time (ms),0.34611198902130125
+128,silu,float16,GatedMLP,Backward Time (ms),1.0260576009750366
+128,silu,float16,GatedMLP,Forward Peak Memory (GB),0.019923456
+128,silu,float16,GatedMLP,Backward Peak Memory (GB),0.020972544
+128,silu,float16,PreCompiledGatedMLP,Forward Time (ms),0.5383967876434326
+128,silu,float16,PreCompiledGatedMLP,Backward Time (ms),1.3284800052642822
+128,silu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,silu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,silu,float16,TritonGatedMLP,Forward Time (ms),2.001478385925293
+128,silu,float16,TritonGatedMLP,Backward Time (ms),0.1509696960449216
+128,silu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,silu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+128,silu,bfloat16,GatedMLP,Forward Time (ms),0.34383039474487304
+128,silu,bfloat16,GatedMLP,Backward Time (ms),0.9873600006103516
+128,silu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.019923456
+128,silu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.020972544
+128,silu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.5377024173736572
+128,silu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.319116735458374
+128,silu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.019399168
+128,silu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.019923968
+128,silu,bfloat16,TritonGatedMLP,Forward Time (ms),1.9975168228149414
+128,silu,bfloat16,TritonGatedMLP,Backward Time (ms),0.11796474456787132
+128,silu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.019923456
+128,silu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.021496832
+512,relu,float32,GatedMLP,Forward Time (ms),0.3033087968826294
+512,relu,float32,GatedMLP,Backward Time (ms),1.1242432355880738
+512,relu,float32,GatedMLP,Forward Peak Memory (GB),0.045351424
+512,relu,float32,GatedMLP,Backward Peak Memory (GB),0.056886272
+512,relu,float32,PreCompiledGatedMLP,Forward Time (ms),0.44615678787231444
+512,relu,float32,PreCompiledGatedMLP,Backward Time (ms),1.101516819000244
+512,relu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.045351424
+512,relu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.052691968
+512,relu,float32,TritonGatedMLP,Forward Time (ms),63.341058349609376
+512,relu,float32,TritonGatedMLP,Backward Time (ms),0.8544250488281264
+512,relu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.049545728
+512,relu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.063177728
+512,relu,float16,GatedMLP,Forward Time (ms),0.16117759943008422
+512,relu,float16,GatedMLP,Backward Time (ms),0.9467904448509216
+512,relu,float16,GatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu,float16,GatedMLP,Backward Peak Memory (GB),0.036963328
+512,relu,float16,PreCompiledGatedMLP,Forward Time (ms),0.30826559066772463
+512,relu,float16,PreCompiledGatedMLP,Backward Time (ms),1.0289759635925293
+512,relu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,relu,float16,TritonGatedMLP,Forward Time (ms),32.09461669921875
+512,relu,float16,TritonGatedMLP,Backward Time (ms),0.2784271240234375
+512,relu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,relu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+512,relu,bfloat16,GatedMLP,Forward Time (ms),0.17469439506530762
+512,relu,bfloat16,GatedMLP,Backward Time (ms),0.9429983615875245
+512,relu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.036963328
+512,relu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.288972806930542
+512,relu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),0.9872383594512939
+512,relu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,relu,bfloat16,TritonGatedMLP,Forward Time (ms),31.9067138671875
+512,relu,bfloat16,TritonGatedMLP,Backward Time (ms),0.17397766113281676
+512,relu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,relu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+512,relu2,float32,GatedMLP,Forward Time (ms),0.20039680004119872
+512,relu2,float32,GatedMLP,Backward Time (ms),1.2796927690505981
+512,relu2,float32,GatedMLP,Forward Peak Memory (GB),0.053740032
+512,relu2,float32,GatedMLP,Backward Peak Memory (GB),0.06527488
+512,relu2,float32,PreCompiledGatedMLP,Forward Time (ms),0.33533759117126466
+512,relu2,float32,PreCompiledGatedMLP,Backward Time (ms),1.0835168361663818
+512,relu2,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.045351424
+512,relu2,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.052691968
+512,relu2,float32,TritonGatedMLP,Forward Time (ms),63.797857666015624
+512,relu2,float32,TritonGatedMLP,Backward Time (ms),0.4186157226562486
+512,relu2,float32,TritonGatedMLP,Forward Peak Memory (GB),0.049545728
+512,relu2,float32,TritonGatedMLP,Backward Peak Memory (GB),0.063177728
+512,relu2,float16,GatedMLP,Forward Time (ms),0.22433600425720215
+512,relu2,float16,GatedMLP,Backward Time (ms),1.1885823726654052
+512,relu2,float16,GatedMLP,Forward Peak Memory (GB),0.035389952
+512,relu2,float16,GatedMLP,Backward Peak Memory (GB),0.041157632
+512,relu2,float16,PreCompiledGatedMLP,Forward Time (ms),0.3004447937011719
+512,relu2,float16,PreCompiledGatedMLP,Backward Time (ms),0.875008010864258
+512,relu2,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu2,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,relu2,float16,TritonGatedMLP,Forward Time (ms),32.266241455078124
+512,relu2,float16,TritonGatedMLP,Backward Time (ms),0.21237487792969034
+512,relu2,float16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,relu2,float16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+512,relu2,bfloat16,GatedMLP,Forward Time (ms),0.21697919368743895
+512,relu2,bfloat16,GatedMLP,Backward Time (ms),1.1810207605361938
+512,relu2,bfloat16,GatedMLP,Forward Peak Memory (GB),0.035389952
+512,relu2,bfloat16,GatedMLP,Backward Peak Memory (GB),0.041157632
+512,relu2,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.3111999988555908
+512,relu2,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.0278144359588621
+512,relu2,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,relu2,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,relu2,bfloat16,TritonGatedMLP,Forward Time (ms),31.88451232910156
+512,relu2,bfloat16,TritonGatedMLP,Backward Time (ms),0.198944091796875
+512,relu2,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,relu2,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+512,silu,float32,GatedMLP,Forward Time (ms),0.1824671983718872
+512,silu,float32,GatedMLP,Backward Time (ms),0.8882272481918335
+512,silu,float32,GatedMLP,Forward Peak Memory (GB),0.049545728
+512,silu,float32,GatedMLP,Backward Peak Memory (GB),0.061080576
+512,silu,float32,PreCompiledGatedMLP,Forward Time (ms),0.29438080787658694
+512,silu,float32,PreCompiledGatedMLP,Backward Time (ms),0.9427039623260497
+512,silu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.045351424
+512,silu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.052691968
+512,silu,float32,TritonGatedMLP,Forward Time (ms),64.08765258789063
+512,silu,float32,TritonGatedMLP,Backward Time (ms),0.7234558105468665
+512,silu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.049545728
+512,silu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.063177728
+512,silu,float16,GatedMLP,Forward Time (ms),0.17580800056457518
+512,silu,float16,GatedMLP,Backward Time (ms),0.8467584133148194
+512,silu,float16,GatedMLP,Forward Peak Memory (GB),0.0332928
+512,silu,float16,GatedMLP,Backward Peak Memory (GB),0.03906048
+512,silu,float16,PreCompiledGatedMLP,Forward Time (ms),0.30278720855712893
+512,silu,float16,PreCompiledGatedMLP,Backward Time (ms),0.8682656288146972
+512,silu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,silu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,silu,float16,TritonGatedMLP,Forward Time (ms),32.466226196289064
+512,silu,float16,TritonGatedMLP,Backward Time (ms),0.22958068847655966
+512,silu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,silu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+512,silu,bfloat16,GatedMLP,Forward Time (ms),0.17776639461517335
+512,silu,bfloat16,GatedMLP,Backward Time (ms),0.9125536203384399
+512,silu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.0332928
+512,silu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.03906048
+512,silu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.29675519466400146
+512,silu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),0.9226080179214478
+512,silu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.031195648
+512,silu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.034866176
+512,silu,bfloat16,TritonGatedMLP,Forward Time (ms),31.967422485351562
+512,silu,bfloat16,TritonGatedMLP,Backward Time (ms),0.3128204345703125
+512,silu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.0332928
+512,silu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.040109056
+1024,relu,float32,GatedMLP,Forward Time (ms),0.5133312225341797
+1024,relu,float32,GatedMLP,Backward Time (ms),0.9693183898925781
+1024,relu,float32,GatedMLP,Forward Peak Memory (GB),0.0988288
+1024,relu,float32,GatedMLP,Backward Peak Memory (GB),0.130286592
+1024,relu,float32,PreCompiledGatedMLP,Forward Time (ms),0.5103648185729981
+1024,relu,float32,PreCompiledGatedMLP,Backward Time (ms),1.0295231819152832
+1024,relu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.0988288
+1024,relu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.130286592
+1024,relu,float32,TritonGatedMLP,Forward Time (ms),263.7991943359375
+1024,relu,float32,TritonGatedMLP,Backward Time (ms),1.3877197265625227
+1024,relu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.107217408
+1024,relu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.15964672
+1024,relu,float16,GatedMLP,Forward Time (ms),0.2557823896408081
+1024,relu,float16,GatedMLP,Backward Time (ms),0.8228320360183715
+1024,relu,float16,GatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu,float16,GatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu,float16,PreCompiledGatedMLP,Forward Time (ms),0.309935998916626
+1024,relu,float16,PreCompiledGatedMLP,Backward Time (ms),0.9453823566436768
+1024,relu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu,float16,TritonGatedMLP,Forward Time (ms),128.89644775390624
+1024,relu,float16,TritonGatedMLP,Backward Time (ms),0.701708984375017
+1024,relu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,relu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+1024,relu,bfloat16,GatedMLP,Forward Time (ms),0.2554879903793335
+1024,relu,bfloat16,GatedMLP,Backward Time (ms),0.8607808351516724
+1024,relu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.3065792083740234
+1024,relu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),0.962566375732422
+1024,relu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu,bfloat16,TritonGatedMLP,Forward Time (ms),126.92366943359374
+1024,relu,bfloat16,TritonGatedMLP,Backward Time (ms),0.6644775390625028
+1024,relu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,relu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+1024,relu2,float32,GatedMLP,Forward Time (ms),0.5521408081054687
+1024,relu2,float32,GatedMLP,Backward Time (ms),1.0843135833740236
+1024,relu2,float32,GatedMLP,Forward Peak Memory (GB),0.115606016
+1024,relu2,float32,GatedMLP,Backward Peak Memory (GB),0.147063808
+1024,relu2,float32,PreCompiledGatedMLP,Forward Time (ms),0.516812801361084
+1024,relu2,float32,PreCompiledGatedMLP,Backward Time (ms),1.0381312370300293
+1024,relu2,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.0988288
+1024,relu2,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.130286592
+1024,relu2,float32,TritonGatedMLP,Forward Time (ms),263.5728759765625
+1024,relu2,float32,TritonGatedMLP,Backward Time (ms),1.5363037109374886
+1024,relu2,float32,TritonGatedMLP,Forward Peak Memory (GB),0.107217408
+1024,relu2,float32,TritonGatedMLP,Backward Peak Memory (GB),0.15964672
+1024,relu2,float16,GatedMLP,Forward Time (ms),0.27453439235687255
+1024,relu2,float16,GatedMLP,Backward Time (ms),1.1233984231948853
+1024,relu2,float16,GatedMLP,Forward Peak Memory (GB),0.066322944
+1024,relu2,float16,GatedMLP,Backward Peak Memory (GB),0.082052096
+1024,relu2,float16,PreCompiledGatedMLP,Forward Time (ms),0.3166656017303467
+1024,relu2,float16,PreCompiledGatedMLP,Backward Time (ms),1.1078176021575927
+1024,relu2,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu2,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu2,float16,TritonGatedMLP,Forward Time (ms),128.7256103515625
+1024,relu2,float16,TritonGatedMLP,Backward Time (ms),0.927050781250017
+1024,relu2,float16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,relu2,float16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+1024,relu2,bfloat16,GatedMLP,Forward Time (ms),0.275926399230957
+1024,relu2,bfloat16,GatedMLP,Backward Time (ms),1.1386272430419921
+1024,relu2,bfloat16,GatedMLP,Forward Peak Memory (GB),0.066322944
+1024,relu2,bfloat16,GatedMLP,Backward Peak Memory (GB),0.082052096
+1024,relu2,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.2952224016189575
+1024,relu2,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.1042112112045288
+1024,relu2,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,relu2,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,relu2,bfloat16,TritonGatedMLP,Forward Time (ms),126.951318359375
+1024,relu2,bfloat16,TritonGatedMLP,Backward Time (ms),0.69805908203125
+1024,relu2,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,relu2,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+1024,silu,float32,GatedMLP,Forward Time (ms),0.5185344219207764
+1024,silu,float32,GatedMLP,Backward Time (ms),0.9887936115264893
+1024,silu,float32,GatedMLP,Forward Peak Memory (GB),0.107217408
+1024,silu,float32,GatedMLP,Backward Peak Memory (GB),0.1386752
+1024,silu,float32,PreCompiledGatedMLP,Forward Time (ms),0.5076608180999755
+1024,silu,float32,PreCompiledGatedMLP,Backward Time (ms),0.9665567874908447
+1024,silu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.0988288
+1024,silu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.130286592
+1024,silu,float32,TritonGatedMLP,Forward Time (ms),264.40703125
+1024,silu,float32,TritonGatedMLP,Backward Time (ms),1.5328369140625
+1024,silu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.107217408
+1024,silu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.15964672
+1024,silu,float16,GatedMLP,Forward Time (ms),0.25864319801330565
+1024,silu,float16,GatedMLP,Backward Time (ms),0.8509824275970459
+1024,silu,float16,GatedMLP,Forward Peak Memory (GB),0.06212864
+1024,silu,float16,GatedMLP,Backward Peak Memory (GB),0.077857792
+1024,silu,float16,PreCompiledGatedMLP,Forward Time (ms),0.3065407991409302
+1024,silu,float16,PreCompiledGatedMLP,Backward Time (ms),1.1322944402694703
+1024,silu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,silu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,silu,float16,TritonGatedMLP,Forward Time (ms),129.49698486328126
+1024,silu,float16,TritonGatedMLP,Backward Time (ms),0.6780029296874943
+1024,silu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,silu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+1024,silu,bfloat16,GatedMLP,Forward Time (ms),0.2578399896621704
+1024,silu,bfloat16,GatedMLP,Backward Time (ms),0.8251424551010131
+1024,silu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.06212864
+1024,silu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.077857792
+1024,silu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.309113597869873
+1024,silu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.0887359619140624
+1024,silu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.057934336
+1024,silu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.073663488
+1024,silu,bfloat16,TritonGatedMLP,Forward Time (ms),127.735498046875
+1024,silu,bfloat16,TritonGatedMLP,Backward Time (ms),0.8180908203125057
+1024,silu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.06212864
+1024,silu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.088343552
+2048,relu,float32,GatedMLP,Forward Time (ms),1.882431983947754
+2048,relu,float32,GatedMLP,Backward Time (ms),3.930608177185059
+2048,relu,float32,GatedMLP,Forward Peak Memory (GB),0.281281024
+2048,relu,float32,GatedMLP,Backward Peak Memory (GB),0.444859392
+2048,relu,float32,PreCompiledGatedMLP,Forward Time (ms),1.861017608642578
+2048,relu,float32,PreCompiledGatedMLP,Backward Time (ms),3.7943710327148437
+2048,relu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.281281024
+2048,relu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.444859392
+2048,relu,float32,TritonGatedMLP,Forward Time (ms),1044.8970703125
+2048,relu,float32,TritonGatedMLP,Backward Time (ms),8.0107421875
+2048,relu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.29805824
+2048,relu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.503579648
+2048,relu,float16,GatedMLP,Forward Time (ms),0.9042943954467774
+2048,relu,float16,GatedMLP,Backward Time (ms),1.8613248825073243
+2048,relu,float16,GatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu,float16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu,float16,PreCompiledGatedMLP,Forward Time (ms),0.9074591636657715
+2048,relu,float16,PreCompiledGatedMLP,Backward Time (ms),1.8393183708190919
+2048,relu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu,float16,TritonGatedMLP,Forward Time (ms),533.507666015625
+2048,relu,float16,TritonGatedMLP,Backward Time (ms),2.84619140625
+2048,relu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,relu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016
+2048,relu,bfloat16,GatedMLP,Forward Time (ms),0.9012255668640137
+2048,relu,bfloat16,GatedMLP,Backward Time (ms),1.8311137199401855
+2048,relu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.9030655860900879
+2048,relu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.826412868499756
+2048,relu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu,bfloat16,TritonGatedMLP,Forward Time (ms),527.110107421875
+2048,relu,bfloat16,TritonGatedMLP,Backward Time (ms),3.0147949218750227
+2048,relu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,relu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016
+2048,relu2,float32,GatedMLP,Forward Time (ms),1.9583999633789062
+2048,relu2,float32,GatedMLP,Backward Time (ms),4.286463928222656
+2048,relu2,float32,GatedMLP,Forward Peak Memory (GB),0.314835456
+2048,relu2,float32,GatedMLP,Backward Peak Memory (GB),0.444859392
+2048,relu2,float32,PreCompiledGatedMLP,Forward Time (ms),1.8777088165283202
+2048,relu2,float32,PreCompiledGatedMLP,Backward Time (ms),3.831599807739258
+2048,relu2,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.281281024
+2048,relu2,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.444859392
+2048,relu2,float32,TritonGatedMLP,Forward Time (ms),1047.00302734375
+2048,relu2,float32,TritonGatedMLP,Backward Time (ms),5.756249999999909
+2048,relu2,float32,TritonGatedMLP,Forward Peak Memory (GB),0.29805824
+2048,relu2,float32,TritonGatedMLP,Backward Peak Memory (GB),0.503579648
+2048,relu2,float16,GatedMLP,Forward Time (ms),0.9375328063964844
+2048,relu2,float16,GatedMLP,Backward Time (ms),1.9526782989501954
+2048,relu2,float16,GatedMLP,Forward Peak Memory (GB),0.165937664
+2048,relu2,float16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu2,float16,PreCompiledGatedMLP,Forward Time (ms),0.9088255882263183
+2048,relu2,float16,PreCompiledGatedMLP,Backward Time (ms),1.7828352928161622
+2048,relu2,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu2,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu2,float16,TritonGatedMLP,Forward Time (ms),534.8279296875
+2048,relu2,float16,TritonGatedMLP,Backward Time (ms),2.5560058593749773
+2048,relu2,float16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,relu2,float16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016
+2048,relu2,bfloat16,GatedMLP,Forward Time (ms),0.9331711769104004
+2048,relu2,bfloat16,GatedMLP,Backward Time (ms),1.9521536827087402
+2048,relu2,bfloat16,GatedMLP,Forward Peak Memory (GB),0.165937664
+2048,relu2,bfloat16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu2,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.9065567970275878
+2048,relu2,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.8135968208312987
+2048,relu2,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,relu2,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,relu2,bfloat16,TritonGatedMLP,Forward Time (ms),527.43017578125
+2048,relu2,bfloat16,TritonGatedMLP,Backward Time (ms),3.1557128906249545
+2048,relu2,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,relu2,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016
+2048,silu,float32,GatedMLP,Forward Time (ms),1.9007488250732423
+2048,silu,float32,GatedMLP,Backward Time (ms),4.037120056152343
+2048,silu,float32,GatedMLP,Forward Peak Memory (GB),0.29805824
+2048,silu,float32,GatedMLP,Backward Peak Memory (GB),0.444859392
+2048,silu,float32,PreCompiledGatedMLP,Forward Time (ms),1.859872055053711
+2048,silu,float32,PreCompiledGatedMLP,Backward Time (ms),3.804281616210937
+2048,silu,float32,PreCompiledGatedMLP,Forward Peak Memory (GB),0.281281024
+2048,silu,float32,PreCompiledGatedMLP,Backward Peak Memory (GB),0.444859392
+2048,silu,float32,TritonGatedMLP,Forward Time (ms),1049.4962890625
+2048,silu,float32,TritonGatedMLP,Backward Time (ms),5.42822265625
+2048,silu,float32,TritonGatedMLP,Forward Peak Memory (GB),0.29805824
+2048,silu,float32,TritonGatedMLP,Backward Peak Memory (GB),0.503579648
+2048,silu,float16,GatedMLP,Forward Time (ms),0.9236448287963868
+2048,silu,float16,GatedMLP,Backward Time (ms),1.901980781555176
+2048,silu,float16,GatedMLP,Forward Peak Memory (GB),0.157549056
+2048,silu,float16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,silu,float16,PreCompiledGatedMLP,Forward Time (ms),0.9228032112121582
+2048,silu,float16,PreCompiledGatedMLP,Backward Time (ms),1.8100672721862792
+2048,silu,float16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,silu,float16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,silu,float16,TritonGatedMLP,Forward Time (ms),535.063232421875
+2048,silu,float16,TritonGatedMLP,Backward Time (ms),2.7332519531249773
+2048,silu,float16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,silu,float16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016
+2048,silu,bfloat16,GatedMLP,Forward Time (ms),0.9061408042907715
+2048,silu,bfloat16,GatedMLP,Backward Time (ms),1.9123232841491697
+2048,silu,bfloat16,GatedMLP,Forward Peak Memory (GB),0.157549056
+2048,silu,bfloat16,GatedMLP,Backward Peak Memory (GB),0.230949888
+2048,silu,bfloat16,PreCompiledGatedMLP,Forward Time (ms),0.9050111770629883
+2048,silu,bfloat16,PreCompiledGatedMLP,Backward Time (ms),1.8398399353027344
+2048,silu,bfloat16,PreCompiledGatedMLP,Forward Peak Memory (GB),0.149160448
+2048,silu,bfloat16,PreCompiledGatedMLP,Backward Peak Memory (GB),0.230949888
+2048,silu,bfloat16,TritonGatedMLP,Forward Time (ms),528.47021484375
+2048,silu,bfloat16,TritonGatedMLP,Backward Time (ms),2.7389160156250227
+2048,silu,bfloat16,TritonGatedMLP,Forward Peak Memory (GB),0.157549056
+2048,silu,bfloat16,TritonGatedMLP,Backward Peak Memory (GB),0.260310016

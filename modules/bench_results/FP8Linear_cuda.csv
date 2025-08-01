@@ -1,0 +1,85 @@
+dim,dtype,fp8,competitor,measurement,value
+32,float16,False,FP8Linear,Forward Time (ms),0.06523839831352234
+32,float16,False,FP8Linear,Backward Time (ms),1.5619743168354034
+32,float16,False,FP8Linear,Forward Peak Memory (GB),0.017045504
+32,float16,False,FP8Linear,Backward Peak Memory (GB),0.017050112
+32,bfloat16,False,FP8Linear,Forward Time (ms),0.07550079822540283
+32,bfloat16,False,FP8Linear,Backward Time (ms),0.2900480031967163
+32,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.017045504
+32,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.017050112
+32,float32,False,FP8Linear,Forward Time (ms),0.0729088008403778
+32,float32,False,FP8Linear,Backward Time (ms),0.29708159565925596
+32,float32,False,FP8Linear,Forward Peak Memory (GB),0.017045504
+32,float32,False,FP8Linear,Backward Peak Memory (GB),0.017050112
+64,float16,False,FP8Linear,Forward Time (ms),0.06995199918746949
+64,float16,False,FP8Linear,Backward Time (ms),0.31261759996414185
+64,float16,False,FP8Linear,Forward Peak Memory (GB),0.017057792
+64,float16,False,FP8Linear,Backward Peak Memory (GB),0.017074688
+64,bfloat16,False,FP8Linear,Forward Time (ms),0.07323520183563233
+64,bfloat16,False,FP8Linear,Backward Time (ms),0.32359678745269777
+64,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.017057792
+64,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.017074688
+64,float32,False,FP8Linear,Forward Time (ms),0.07240639925003052
+64,float32,False,FP8Linear,Backward Time (ms),0.33866881132125853
+64,float32,False,FP8Linear,Forward Peak Memory (GB),0.017057792
+64,float32,False,FP8Linear,Backward Peak Memory (GB),0.017074688
+128,float16,False,FP8Linear,Forward Time (ms),0.07110400199890136
+128,float16,False,FP8Linear,Backward Time (ms),0.3542943954467773
+128,float16,False,FP8Linear,Forward Peak Memory (GB),0.017106944
+128,float16,False,FP8Linear,Backward Peak Memory (GB),0.017172992
+128,bfloat16,False,FP8Linear,Forward Time (ms),0.07598080039024353
+128,bfloat16,False,FP8Linear,Backward Time (ms),0.3726304113864899
+128,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.017106944
+128,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.017172992
+128,float32,False,FP8Linear,Forward Time (ms),0.07526400089263915
+128,float32,False,FP8Linear,Backward Time (ms),0.3918847799301147
+128,float32,False,FP8Linear,Forward Peak Memory (GB),0.017106944
+128,float32,False,FP8Linear,Backward Peak Memory (GB),0.017172992
+512,float16,False,FP8Linear,Forward Time (ms),0.07741119861602783
+512,float16,False,FP8Linear,Backward Time (ms),0.4231199979782104
+512,float16,False,FP8Linear,Forward Peak Memory (GB),0.018094592
+512,float16,False,FP8Linear,Backward Peak Memory (GB),0.01914368
+512,bfloat16,False,FP8Linear,Forward Time (ms),0.07342079877853394
+512,bfloat16,False,FP8Linear,Backward Time (ms),0.465510380268097
+512,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.018094592
+512,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.01914368
+512,float32,False,FP8Linear,Forward Time (ms),0.07741439938545228
+512,float32,False,FP8Linear,Backward Time (ms),0.46254078745841987
+512,float32,False,FP8Linear,Forward Peak Memory (GB),0.018094592
+512,float32,False,FP8Linear,Backward Peak Memory (GB),0.01914368
+1024,float16,False,FP8Linear,Forward Time (ms),0.06819519996643067
+1024,float16,False,FP8Linear,Backward Time (ms),0.4421664237976074
+1024,float16,False,FP8Linear,Forward Peak Memory (GB),0.021246464
+1024,float16,False,FP8Linear,Backward Peak Memory (GB),0.02544128
+1024,bfloat16,False,FP8Linear,Forward Time (ms),0.06945919990539551
+1024,bfloat16,False,FP8Linear,Backward Time (ms),0.4426623821258545
+1024,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.021246464
+1024,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.02544128
+1024,float32,False,FP8Linear,Forward Time (ms),0.06657599806785583
+1024,float32,False,FP8Linear,Backward Time (ms),0.44238401055335996
+1024,float32,False,FP8Linear,Forward Peak Memory (GB),0.021246464
+1024,float32,False,FP8Linear,Backward Peak Memory (GB),0.02544128
+2048,float16,False,FP8Linear,Forward Time (ms),0.062140798568725585
+2048,float16,False,FP8Linear,Backward Time (ms),0.4630784034729004
+2048,float16,False,FP8Linear,Forward Peak Memory (GB),0.033841664
+2048,float16,False,FP8Linear,Backward Peak Memory (GB),0.050619392
+2048,bfloat16,False,FP8Linear,Forward Time (ms),0.05695679783821106
+2048,bfloat16,False,FP8Linear,Backward Time (ms),0.4468320071697235
+2048,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.033841664
+2048,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.050619392
+2048,float32,False,FP8Linear,Forward Time (ms),0.05724160075187683
+2048,float32,False,FP8Linear,Backward Time (ms),0.45188158154487607
+2048,float32,False,FP8Linear,Forward Peak Memory (GB),0.033841664
+2048,float32,False,FP8Linear,Backward Peak Memory (GB),0.050619392
+4096,float16,False,FP8Linear,Forward Time (ms),0.15063040256500243
+4096,float16,False,FP8Linear,Backward Time (ms),0.5896191835403441
+4096,float16,False,FP8Linear,Forward Peak Memory (GB),0.084197888
+4096,float16,False,FP8Linear,Backward Peak Memory (GB),0.151307264
+4096,bfloat16,False,FP8Linear,Forward Time (ms),0.15654079914093016
+4096,bfloat16,False,FP8Linear,Backward Time (ms),0.5644767999649047
+4096,bfloat16,False,FP8Linear,Forward Peak Memory (GB),0.084197888
+4096,bfloat16,False,FP8Linear,Backward Peak Memory (GB),0.151307264
+4096,float32,False,FP8Linear,Forward Time (ms),0.15513919591903685
+4096,float32,False,FP8Linear,Backward Time (ms),0.592688000202179
+4096,float32,False,FP8Linear,Forward Peak Memory (GB),0.084197888
+4096,float32,False,FP8Linear,Backward Peak Memory (GB),0.151307264

@@ -1,12 +1,19 @@
 import marimo
 
-__generated_with = "0.14.10"
+__generated_with = "0.14.13"
 app = marimo.App(width="full")
 
 
 @app.cell
 def _(mo):
-    mo.md(r"""TODO: currently tool assumes first non-filter column it finds is the x-axis. we need the ability to switch between different columns as the x-axis. preferably also a 3D plot so we can see two axes at once. And preferably also sliders so we can move along even more axes""")
+    mo.md(
+        r"""
+    TODO: 
+    - [ ] currently tool assumes first non-filter column it finds is the x-axis. we need the ability to switch between different columns as the x-axis. preferably also a 3D plot so we can see two axes at once. And preferably also sliders so we can move along even more axes
+    - [ ] tool gets confused when comparing csvs made from same module but two different devices. need to add in device to the columns when running benchmarks
+    - [ ] default to select all or select first entry so that i can immediately see something
+    """
+    )
     return
 
 
