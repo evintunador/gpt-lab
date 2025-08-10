@@ -1,8 +1,9 @@
 from typing import List, Dict, Optional, Type, Callable, Any, Union, Tuple, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import os
 import sys
 import importlib
+import inspect
 
 import torch
 import torch.nn as nn
@@ -60,6 +61,35 @@ class BenchmarkConfig:
     init_arg_builder: Callable[[Dict[str, Any]], Dict[str, Any]]
     # A function that provides the input tensors for the module, given the init_args.
     input_provider: Callable[[Dict[str, Any], str], tuple]
+
+    # Use a backing field that is not part of the constructor
+    _source_module_id: str = field(init=False, repr=False, default="")
+
+    @property
+    def source_module_id(self) -> str:
+        return self._source_module_id
+
+    @source_module_id.setter
+    def source_module_id(self, value: str):
+        marker = os.path.join("modules", "catalog") + os.sep
+        _, _, tail = value.partition(marker)
+        source_file = tail if tail else value
+        self._source_module_id = os.path.splitext(source_file)[0].replace(os.path.sep, '_')
+
+
+##################################################
+######## TOOLS THE USER MIGHT WANT TO USE ########
+##################################################
+
+
+class SkipModuleException(Exception):
+    """A special exception used to signal that a module should be skipped during test discovery."""
+    pass
+
+def ignore_test_if_no_cuda():
+    if not torch.cuda.is_available():
+        raise SkipModuleException("Module requires CUDA, but it is not available.")
+    return
 
 
 ##################################################
@@ -181,8 +211,13 @@ def discover_dunder_objects(
             module = importlib.import_module(module_name)
 
             obj = getattr(module, dunder, None)
+            if isinstance(obj, BenchmarkConfig):
+                obj.source_module_id = abs_file_path
             if isinstance(obj, object):
                 objects.append(obj)
+        except SkipModuleException:
+            # This is a graceful skip, not an error.
+            continue
         except Exception as e:
             errors[file] = e
 

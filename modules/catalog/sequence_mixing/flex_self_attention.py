@@ -1,3 +1,6 @@
+from modules.base_test_bench_utils import ignore_test_if_no_cuda
+ignore_test_if_no_cuda()
+
 from typing import List, Union, Tuple, Any
 import math
 
@@ -11,7 +14,7 @@ from modules.base_test_bench_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,
-    TensorParallelConfig
+    TensorParallelConfig,
 )
 from modules.catalog.fp8_linear import FP8Linear, is_hopper_available
 from modules.catalog.norms.rms_norm import RMSNorm
@@ -77,12 +80,6 @@ class FlexSelfAttention(nn.Module):
         y = y.contiguous().view(B, T, self.num_heads * self.head_dim) # re-assemble all head outputs side by side
         y = self.c_proj(y)
         return y
-    
-
-def run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
-    if 'cuda' in str(inputs[0].device):
-        return True
-    return False
 
 
 ##################################################
@@ -113,7 +110,7 @@ def output_validator(
     
 
 __competitors__ = {
-    'FlexSelfAttention': Competitor(module_class=FlexSelfAttention, run_filter=run_filter),
+    'FlexSelfAttention': Competitor(module_class=FlexSelfAttention),
 }
 
 
