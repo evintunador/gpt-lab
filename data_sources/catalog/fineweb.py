@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 import random
 
+from data_sources.dataset_utils import Split
 from data_sources.pre_caching_tokens import PrecachedDatasetMixin
 
 
@@ -35,11 +36,6 @@ class FineWebSize(Enum):
     v10B = "10BT"
     v100B = "100BT"
     v350B = "350BT"
-
-class Split(Enum):
-    TRAIN = "train"
-    VAL = "val"
-    TEST = "test"
 
 
 class FineWebDataset(Dataset):
