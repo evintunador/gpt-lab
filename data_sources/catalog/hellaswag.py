@@ -1,10 +1,11 @@
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+from typing import Dict, Any, Optional, Callable
 import json
 import os
 import requests
 
 from tqdm import tqdm
+import numpy as np
+import torch
 from torch.utils.data import Dataset
 from datasets import load_dataset
 
@@ -92,6 +93,11 @@ class HellaSwagDataset(Dataset):
         self.streaming = streaming
         self.limit = min(int(limit), 1024) if limit is not None else limit
         
+        # Set up cache path
+        if cache_dir is None:
+            cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "hellaswag")
+        self.cache_path = os.path.join(cache_dir, f"hellaswag_{split.value}.jsonl")
+        
         # Check if we have cached data for non-streaming mode
         if not streaming and self._has_cached_data():
             self._load_from_cache()
@@ -108,10 +114,11 @@ class HellaSwagDataset(Dataset):
             
             # Convert to list if not streaming and apply limit
             if streaming:
-                self.data = self.dataset if limit is None else self.data.take(limit)
+                self.data = self.dataset if limit is None else self.dataset.take(limit)
             else:
                 self.data = list(self.dataset) if limit is None else list(self.dataset.take(limit))
-                self._save_to_cache(self.cache_dir)
+                if cache_dir:
+                    self._save_to_cache()
                     
         except Exception as e:
             # Fallback to manual download if HuggingFace fails
@@ -176,27 +183,27 @@ class HellaSwagDataset(Dataset):
             "label": self.data[idx]["label"],
         }
     
-    def _save_to_cache(self, cache_path: str):
+    def _save_to_cache(self):
         """Save the current dataset to a cache file."""
         if self.streaming:
             raise ValueError("Cannot save streaming dataset to cache")
         
-        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-        with open(cache_path, 'w') as f:
+        os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
+        with open(self.cache_path, 'w') as f:
             for example in self.data:
                 f.write(json.dumps(example) + '\n')
     
-    def _has_cached_data(self, cache_path: str) -> bool:
+    def _has_cached_data(self) -> bool:
         """Check if cache file exists."""
-        return os.path.exists(cache_path)
+        return os.path.exists(self.cache_path)
     
-    def _load_from_cache(self, cache_path: str):
+    def _load_from_cache(self):
         """Load dataset from a cache file."""
-        if not self._has_cached_data(cache_path):
-            raise FileNotFoundError(f"Cache file not found: {cache_path}")
+        if not self._has_cached_data():
+            raise FileNotFoundError(f"Cache file not found: {self.cache_path}")
         
         self.data = []
-        with open(cache_path, 'r') as f:
+        with open(self.cache_path, 'r') as f:
             for i, line in enumerate(f):
                 if self.limit is not None and i >= self.limit:
                     break
@@ -206,7 +213,6 @@ class HellaSwagDataset(Dataset):
         self.streaming = False
 
 
-import torch
 def render_hellaswag_example(example, tokenizer_encode_fn):
     """
     Given the example as a dictionary, render it as three torch tensors:
@@ -236,3 +242,19 @@ def render_hellaswag_example(example, tokenizer_encode_fn):
         mask[i, :len(mask_row)] = torch.tensor(mask_row)
 
     return tokens, mask, label
+
+
+class TokenizedHellaSwagDataset(HellaSwagDataset):
+    def __init__(
+            self, 
+            tokenizer_encode_fn: Callable[[str], np.ndarray],
+            **kwargs
+        ):
+        super().__init__(**kwargs)
+        self.tokenizer_encode_fn = tokenizer_encode_fn
+
+    def __getitem__(self, idx: int) -> Dict[str, np.ndarray]:
+        return render_hellaswag_example(
+            super().__getitem__(idx), 
+            self.tokenizer_encode_fn
+        )
