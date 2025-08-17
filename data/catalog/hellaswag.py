@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import Dataset
 from datasets import load_dataset
 
-from data_sources.dataset_utils import Split
+from data.utils import Split
 
 
 """

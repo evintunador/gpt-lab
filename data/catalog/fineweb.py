@@ -9,8 +9,8 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 import random
 
-from data_sources.dataset_utils import Split
-from data_sources.pre_caching_tokens import PrecachedDatasetMixin
+from data.utils import Split
+from data.pre_caching_tokens import PrecachedDatasetMixin
 
 
 """
@@ -52,7 +52,8 @@ class FineWebDataset(Dataset):
             "HuggingFaceFW/fineweb" + ("-edu" if edu else ""), 
             name="sample-" + size.value, 
             split=split.value, 
-            streaming=streaming
+            streaming=streaming,
+            cache_dir='./data/temp/',
         )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
 

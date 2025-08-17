@@ -2,8 +2,7 @@ __pycache__/
 venv/
 .venv/
 scratch.py
-temp_dir/
-**/temp_dir/
+**/temp/
 *.pt # for saving pytorch models
 *.bin # for pre-caching tokens
 .idea/gpt-lab.iml
