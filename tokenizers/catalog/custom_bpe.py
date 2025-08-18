@@ -13,37 +13,31 @@ from tqdm import tqdm
 import torch
 import torch.distributed as dist
 
-from data.catalog.fineweb import FineWebDataset
+from data_sources.catalog.fineweb import FineWebDataset
 from tokenizers.visualise import visualise_tokens
 
 
-if torch.cuda.is_available():
-    # Check if environment variables are set by torchrun, otherwise default to single GPU
-    if "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ:
-        rank = int(os.environ["RANK"])
-        world_size = int(os.environ["WORLD_SIZE"])
-        local_rank = int(os.environ["LOCAL_RANK"])
-    else:
-        rank = 0
-        world_size = 1
-        local_rank = 0
-        os.environ["RANK"] = str(rank)
-        os.environ["WORLD_SIZE"] = str(world_size)
-        os.environ["LOCAL_RANK"] = str(local_rank)
-        os.environ["MASTER_ADDR"] = "127.0.0.1"
-        os.environ["MASTER_PORT"] = "29500"
-    device = torch.device("cuda", local_rank)
-    torch.cuda.set_device(device)
-    if world_size > 1:
-        dist.init_process_group(backend="nccl", device_id=device)
-        dist.barrier()
-    master_process = (rank == 0)
-elif torch.backends.mps.is_available():
-    device = "mps"
-    world_size = 1
+assert torch.cuda.is_available():
+# Check if environment variables are set by torchrun, otherwise default to single GPU
+if "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ:
+    rank = int(os.environ["RANK"])
+    world_size = int(os.environ["WORLD_SIZE"])
+    local_rank = int(os.environ["LOCAL_RANK"])
+else:
     rank = 0
+    world_size = 1
     local_rank = 0
-    master_process = True
+    os.environ["RANK"] = str(rank)
+    os.environ["WORLD_SIZE"] = str(world_size)
+    os.environ["LOCAL_RANK"] = str(local_rank)
+    os.environ["MASTER_ADDR"] = "127.0.0.1"
+    os.environ["MASTER_PORT"] = "29500"
+device = torch.device("cuda", local_rank)
+torch.cuda.set_device(device)
+if world_size > 1:
+    dist.init_process_group(backend="nccl", device_id=device)
+    dist.barrier()
+master_process = (rank == 0)
 
 
 def nat2int(num: int):
@@ -93,7 +87,7 @@ def slow_merge(words, most_common_pair, token_bytes):
 
 
 def prepare_data_tensors(n: int, dtype: torch.dtype, separator_flag: int, seed: int = random.randint(0, 2**32)):
-    dataset = FineWebDataset(streaming=False, seed=seed)
+    dataset = FineWebDataset(streaming=True, seed=seed)
     if world_size > 1:
         dataset = dist.DistributedSampler(dataset)
     data_buffer = []
@@ -105,7 +99,7 @@ def prepare_data_tensors(n: int, dtype: torch.dtype, separator_flag: int, seed: 
     i = 0
     while tot_ct < n:
         try:
-            doc = iter(dataset)
+            doc = next(dataset)
         except Exception:
             break
         data_buffer.append(doc)
@@ -243,7 +237,7 @@ def bpe_train(
 
 def save_tokenizer(enc, name, vocab_size, sample_size):
     os.makedirs('tokenizers', exist_ok=True)
-    full_filename = f"tokenizers/{name}_v{vocab_size}_n{sample_size}.pkl"
+    full_filename = f"tokenizers/trained/{name}_v{vocab_size}_n{sample_size}.pkl"
     with open(__file__, 'r') as f:
         script_content = f.read()
     tokenizer_data = {
@@ -258,7 +252,7 @@ def save_tokenizer(enc, name, vocab_size, sample_size):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
-    parser.add_argument("-n", "--samples_per_gpus", type=int, default=2**27, 
+    parser.add_argument("-n", "--samples_per_gpu", type=int, default=2**27, 
         help="Maximum number of text characters to use on each GPU during training (default 2^27 should fit on single GPU with 8gb of VRAM)")
     parser.add_argument("-v", "--vocab_size", type=int, default=2**16-2, 
         help="Size of the vocabulary to train (default 2**16-2)")
@@ -274,7 +268,7 @@ if __name__ == "__main__":
     dtype = torch.int16 if args.vocab_size <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
 
-    data, ranks = prepare_data_tensors(n=args.sample_size, dtype=dtype, separator_flag=separator_flag)
+    data, ranks = prepare_data_tensors(n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag)
 
     pat_str_dict = {
         "gpt2": (r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s"""),
@@ -291,7 +285,13 @@ if __name__ == "__main__":
     }
     pat_str = pat_str_dict[args.pat_str] if args.pat_str in pat_str_dict.keys() else args.pat_str
 
-    mergeable_ranks = bpe_train(ids=data, vocab_size=args.vocab_size, pat_str=pat_str, k=args.k)
+    mergeable_ranks = bpe_train(
+        ids=data, 
+        ranks=ranks, 
+        vocab_size=args.vocab_size, 
+        separator_flag=separator_flag, 
+        k=args.k
+    )
 
     if master_process:
         enc = tiktoken.Encoding(
@@ -308,5 +308,5 @@ if __name__ == "__main__":
             pat_str, 
             args.name, 
             args.vocab_size, 
-            args.samples
+            args.samples_per_gpu,
         )
