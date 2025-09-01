@@ -17,7 +17,7 @@ from data_sources.catalog.fineweb import FineWebDataset
 from tokenizers.visualise import visualise_tokens
 
 
-assert torch.cuda.is_available():
+assert torch.cuda.is_available()
 # Check if environment variables are set by torchrun, otherwise default to single GPU
 if "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ:
     rank = int(os.environ["RANK"])
@@ -28,7 +28,7 @@ else:
     world_size = 1
     local_rank = 0
     os.environ["RANK"] = str(rank)
-    os.environ["WORLD_SIZE"] = str(world_size)
+    os.environ["WORLD_SIZE"] = str(world_size) 
     os.environ["LOCAL_RANK"] = str(local_rank)
     os.environ["MASTER_ADDR"] = "127.0.0.1"
     os.environ["MASTER_PORT"] = "29500"
