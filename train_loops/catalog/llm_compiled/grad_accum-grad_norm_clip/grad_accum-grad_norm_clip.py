@@ -1,0 +1,60 @@
+from typing import Optional, Dict, Any
+import torch
+import torch.nn as nn
+from torch.nn.utils import clip_grad_norm_
+
+
+def run_training(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    loss_fn,
+    train_loader,
+    *,
+    # grad accum knobs
+    accum_steps: int = 4,
+    # grad norm clipping knobs
+    norm_clip_value: Optional[float] = 1.0,
+    # misc
+    **kwargs,
+) -> Dict[str, Any]:
+    """Training loop with gradient accumulation and gradient norm clipping."""
+    model.train()
+
+    if accum_steps is None or accum_steps < 1:
+        accum_steps = 1
+
+    micro_idx = 0
+    optimizer.zero_grad(set_to_none=True)
+
+    for batch in train_loader:
+        xb, yb = batch
+        logits = model(xb)
+        loss = loss_fn(logits, yb)
+
+        if accum_steps > 1:
+            loss = loss / float(accum_steps)
+
+        loss.backward()
+        micro_idx += 1
+
+        if micro_idx % accum_steps == 0:
+            # gradient clipping before optimizer step
+            if norm_clip_value is not None:
+                params = [p for p in model.parameters() if p.grad is not None]
+                if params:
+                    clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+
+            optimizer.step()
+            optimizer.zero_grad(set_to_none=True)
+
+    # Handle case where last accumulation window is incomplete
+    if micro_idx % accum_steps != 0:
+        # gradient clipping before optimizer step
+        if norm_clip_value is not None:
+            params = [p for p in model.parameters() if p.grad is not None]
+            if params:
+                clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+
+        optimizer.step()
+
+    return {"model": model}

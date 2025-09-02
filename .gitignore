@@ -12,3 +12,4 @@ scratch.py
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/workspace.xml
 modules/test_error_maps/
+.env

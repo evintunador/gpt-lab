@@ -1,0 +1,12 @@
+{
+  "name": "grad_accum-grad_norm_clip",
+  "atomic_features": [
+    "grad_accum",
+    "grad_norm_clip"
+  ],
+  "metrics": {
+    "pre_loss": 0.7123866081237793,
+    "post_loss": 0.5551749467849731
+  },
+  "device": "mps"
+}
