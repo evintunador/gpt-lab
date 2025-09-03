@@ -14,7 +14,7 @@ import torch
 import torch.distributed as dist
 
 from data_sources.catalog.fineweb import FineWebDataset
-from tokenizers.visualise import visualise_tokens
+from models.catalog.tokenizers.visualise import visualise_tokens
 
 
 assert torch.cuda.is_available()

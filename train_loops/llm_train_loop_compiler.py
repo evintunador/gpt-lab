@@ -17,7 +17,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from llm_compiler.llm_interface import LLMClient, DummyLLM, create_llm
+from llm_compiler import LLMClient, DummyLLM, create_llm
 from utils import best_device
 
 
@@ -37,7 +37,7 @@ Constraints:
 - Provide a function with EXACT signature:
   def run_training(model, optimizer, loss_fn, train_loader, **kwargs) -> dict:
     - Train IN-PLACE on train_loader.
-    - Return a dict with at least keys: {'model': nn.Module}.
+    - Return a dict with at least keys: {'model': nn.Module}; depending on the atomic feature examples provided there my be others which are relevant.
 - Avoid introducing new external dependencies; those used by example scripts are allowed.
 - Keep code deterministic where feasible (set seeds when creating schedulers, etc.).
 - Do not rely on global variables; everything must be self-contained in this file. Those used by example scripts are exceptions.
