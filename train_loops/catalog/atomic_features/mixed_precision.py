@@ -2,6 +2,18 @@ from typing import Optional, Dict, Any
 import torch
 import torch.nn as nn
 
+from utils.device import best_device as device
+
+
+def _is_amp_compatible(device_str: str) -> bool:
+    """Check if device supports AMP properly."""
+    if device_str.startswith('cuda'):
+        return True
+    elif device_str == 'mps':
+        # MPS has issues with GradScaler in certain PyTorch versions
+        return False
+    return False
+
 
 def run_training(
     model: nn.Module,
@@ -10,25 +22,41 @@ def run_training(
     train_loader,
     *,
     # mixed precision knobs
-    use_amp: bool = True,
+    use_amp: Optional[bool] = None,  # None = auto-detect
     loss_scale: Optional[float] = None,
+    device: str = device,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
     """Atomic training loop demonstrating automatic mixed precision (AMP)."""
     model.train()
     
-    # Create GradScaler for AMP if enabled
-    scaler = torch.cuda.amp.GradScaler() if use_amp else None
+    # Auto-detect AMP compatibility if not explicitly set
+    if use_amp is None:
+        use_amp = _is_amp_compatible(device)
+    
+    # Force disable AMP on incompatible devices
+    if use_amp and not _is_amp_compatible(device):
+        print(f"Warning: AMP requested but not compatible with {device}. Falling back to FP32.")
+        use_amp = False
+    
+    # Create GradScaler for AMP if enabled and compatible
+    scaler = None
+    if use_amp:
+        try:
+            scaler = torch.amp.GradScaler(device)
+        except Exception as e:
+            print(f"Warning: Failed to create GradScaler for {device}: {e}. Falling back to FP32.")
+            use_amp = False
     
     for batch in train_loader:
         xb, yb = batch
         
         optimizer.zero_grad(set_to_none=True)
         
-        if use_amp:
+        if use_amp and scaler is not None:
             # Forward pass with autocast
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast(device):
                 logits = model(xb)
                 loss = loss_fn(logits, yb)
             
@@ -43,4 +71,4 @@ def run_training(
             loss.backward()
             optimizer.step()
 
-    return {"model": model}
+    return {"model": model, "used_amp": use_amp}

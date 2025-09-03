@@ -76,7 +76,3 @@ def run_training(
                 break
 
     return {"model": model}
-```
-
-```
-

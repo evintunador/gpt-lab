@@ -8,7 +8,7 @@ def run_training(
     optimizer: torch.optim.Optimizer,
     loss_fn,
     train_loader,
-    *,
+    #*, # feature-specific arguments should follow *
     **kwargs,
 ) -> Dict[str, Any]:
     """A base 'zero feature' training loop to build your new atomic feature loop off of."""

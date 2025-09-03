@@ -5,20 +5,16 @@ import time
 import itertools
 import argparse
 
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
 from tqdm import tqdm
 import torch
 import pandas as pd
 
 from modules.base_test_bench_utils import (
     BenchmarkConfig, 
-    discover_dunder_objects, 
-    get_available_devices,
     get_total_loss,
 )
+from utils.device import get_available_devices
+from utils.testing import discover_dunder_objects
 
 
 def measure_performance(
@@ -172,7 +168,7 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str 
         if 'dtype' in df.columns:
             df['dtype'] = df['dtype'].apply(lambda x: str(x).split('.')[-1])
 
-        csv_filename = f"{config.source_module_id}_{device_type}.csv"
+        csv_filename = f"{config.module_name}_{device_type}.csv"
         csv_path = os.path.join(output_dir, csv_filename)
         df.to_csv(csv_path, index=False)
         tqdm.write(f"Saved benchmark data for {config.module_name} to {csv_path}")

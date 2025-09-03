@@ -3,10 +3,10 @@ import os
 
 from litellm import completion
 
-from llm_code_compiler.llm_interface import _strip_code_fences, refine_user_prompt
+from utils.llm_code_compiler.catalog import BaseLLMClient
 
 
-class OpenAILLM:
+class OpenAILLM(BaseLLMClient):
     """
     OpenAI LLM client using litellm for completion.
     Accepts 'model' like 'gpt-4o' or 'openai/gpt-4o'.
@@ -24,7 +24,7 @@ class OpenAILLM:
             {"role": "user", "content": user_prompt},
         ]
         resp = completion(model=self.model, messages=messages)
-        return _strip_code_fences(resp.choices[0].message.content)
+        return self.strip_code_fences(resp.choices[0].message.content)
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
         return self._chat(system_prompt, user_prompt)
@@ -32,7 +32,7 @@ class OpenAILLM:
     def refine(self, system_prompt: str, user_prompt: str, prior_code: str, error_summary: str) -> str:
         return self._chat(
             system_prompt, 
-            refine_user_prompt.format(
+            self.refine_user_prompt.format(
                 user_prompt=user_prompt, 
                 error_summary=error_summary, 
                 prior_code=prior_code

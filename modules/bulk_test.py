@@ -11,10 +11,10 @@ import matplotlib.pyplot as plt
 
 from modules.base_test_bench_utils import (
     ModuleTestConfig, 
-    get_available_devices,
-    discover_dunder_objects,
     get_total_loss,
 )
+from utils.device import get_available_devices
+from utils.testing import discover_dunder_objects
 
 
 @pytest.fixture(scope="session", autouse=True)

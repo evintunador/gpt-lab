@@ -50,7 +50,3 @@ def run_training(
             step_count += 1
 
     return {"model": model}
-```
-
-```
-

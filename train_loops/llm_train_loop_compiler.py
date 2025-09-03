@@ -1,24 +1,17 @@
 # Inspired by discussions similar to
 # https://medium.com/redsquirrel-tech/llm-as-compiler-2a2f79d30f0b
 
-import hashlib
-import importlib.util
-import io
-import json
-import os
 import sys
-import textwrap
+import json
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
-
-from llm_compiler import LLMClient, DummyLLM, create_llm
-from utils import best_device
+from train_loops.bulk_test import universal_learning_test
+from utils.llm_code_compiler import LLMClient, DummyLLM, create_llm
+from utils.device import best_device
+from utils.testing import import_module_from_path
 
 
 @dataclass
@@ -80,16 +73,6 @@ def _write_file(path: Path, content: str):
         f.write(content)
 
 
-def _import_module_from_path(module_name: str, file_path: Path):
-    spec = importlib.util.spec_from_file_location(module_name, str(file_path))
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Cannot load module from {file_path}")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 def _filter_traceback_for_paths(tb: traceback.TracebackException, focus_paths: List[str]) -> str:
     focus_paths = [str(Path(p)) for p in focus_paths]
     filtered = []
@@ -111,44 +94,6 @@ def _summarize_exception_filtered(focus_paths: List[str], phase: str) -> str:
         # fallback to last few lines of full traceback
         return header + "\n" + "".join(tbe.format())[-2000:]
     return header + "\n" + focused
-
-
-def _universal_learning_test(run_training_fn, device: str = best_device) -> Dict[str, Any]:
-    """
-    Build a tiny task and ensure real learning happened (loss drops).
-    """
-    torch.manual_seed(0)
-    X = torch.randn(2048, 32).to(device)
-    y = (X.sum(dim=1) > 0).long().to(device)
-    ds = TensorDataset(X, y)
-    dl = DataLoader(ds, batch_size=64, shuffle=True)
-
-    model = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
-    loss_fn = nn.CrossEntropyLoss()
-    optim = torch.optim.AdamW(model.parameters(), lr=3e-3)
-
-    model.to(device)
-    # Measure pre-training loss
-    with torch.no_grad():
-        pre = loss_fn(model(X.to(device)), y.to(device)).item()
-
-    result = run_training_fn(
-        model=model,
-        optimizer=optim,
-        loss_fn=loss_fn,
-        train_loader=dl,
-    )
-
-    # Measure post-training loss
-    with torch.no_grad():
-        post = loss_fn(model(X.to(device)), y.to(device)).item()
-
-    if not isinstance(result, dict):
-        raise AssertionError("run_training(...) must return dict metrics.")
-    if not (post < pre * 0.9):  # at least 10% relative improvement
-        raise AssertionError(f"Training did not sufficiently improve loss: pre={pre:.4f}, post={post:.4f}")
-
-    return {"pre_loss": pre, "post_loss": post, **result}
 
 
 def _atomic_dir() -> Path:
@@ -264,7 +209,7 @@ def compile_loop(
             # Write and import
             _write_file(code_path, code)
             try:
-                module = _import_module_from_path(f"compiled_loop", code_path)
+                module = import_module_from_path(f"compiled_loop", code_path)
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[import]")
                 raise RuntimeError(err)
@@ -275,7 +220,7 @@ def compile_loop(
 
             # Test
             try:
-                metrics = _universal_learning_test(run_training_fn, device=cfg.device)
+                metrics = universal_learning_test(run_training_fn, device=cfg.device)
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[test]")
                 raise RuntimeError(err)
@@ -305,7 +250,7 @@ def compile_loop(
                     code = llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=err)
                     _write_file(code_path, code)
                     try:
-                        module = _import_module_from_path(f"compiled_loop", code_path)
+                        module = import_module_from_path(f"compiled_loop", code_path)
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[import]")
                         raise RuntimeError(err)
@@ -313,7 +258,7 @@ def compile_loop(
                         raise AssertionError("Generated file must define function 'run_training'.")
                     run_training_fn = getattr(module, "run_training")
                     try:
-                        metrics = _universal_learning_test(run_training_fn, device=cfg.device)
+                        metrics = universal_learning_test(run_training_fn, device=cfg.device)
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[test]")
                         raise RuntimeError(err)
