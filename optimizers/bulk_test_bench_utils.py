@@ -18,6 +18,27 @@ class OptimizerConfig:
 
 
 @dataclass
+class OptimizerBenchmarkConfig:
+    """Configuration for optimizer benchmarking (similar to BenchmarkConfig for modules)"""
+    # A friendly name for the optimizer, used for filenaming
+    optimizer_name: str
+    # A dictionary mapping competitor names to their optimizer classes
+    competitors: Dict[str, Dict[str, Any]]  # {'Adam': {'class': Adam}, 'AdamW': {'class': AdamW}}
+    # The parameter space to sweep
+    parameter_space: Dict[str, List[Any]]
+    # A function that takes a parameter combination and returns optimizer_kwargs
+    optimizer_kwargs_builder: Callable[[Dict[str, Any]], Dict[str, Any]]
+    # Optional parameter filter for mixed optimizers
+    param_filter: Optional[Callable[[nn.Parameter], bool]] = None
+    # Fallback configuration
+    fallback_optimizer_class: Type[torch.optim.Optimizer] = torch.optim.AdamW
+    fallback_kwargs: Dict[str, Any] = field(default_factory=lambda: {'lr': 1e-3})
+
+    def __post_init__(self):
+        self.optimizer_name = self.optimizer_name.replace('/', '_').replace('\\', '_')
+
+
+@dataclass
 class ParameterConstraints:
     """Discovered constraints for an optimizer"""
     min_ndim: Optional[int] = None
@@ -164,7 +185,6 @@ def discover_parameter_constraints(
     This function creates parameters with different properties and tests
     which combinations work, then infers the constraints.
     """
-    print(f"[INFO] Discovering constraints for {optimizer_class.__name__}...")
     
     test_params = create_test_parameters(device)
     
@@ -183,7 +203,6 @@ def discover_parameter_constraints(
         return ParameterConstraints()
     
     if not failing_params:
-        print(f"[INFO] All parameters work for {optimizer_class.__name__}")
         return ParameterConstraints()
     
     constraints = ParameterConstraints()
@@ -237,7 +256,6 @@ def discover_parameter_constraints(
                 print(f"[INFO] Mixed parameters fail for {optimizer_class.__name__}, constraints may be more complex")
                 break
     
-    print(f"[INFO] Discovered constraints for {optimizer_class.__name__}: {constraints}")
     return constraints
 
 

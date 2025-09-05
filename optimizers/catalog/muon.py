@@ -1,9 +1,11 @@
+from typing import Type
+
 import torch
 from torch.optim import Optimizer
 import torch.distributed as dist
 import torch.nn as nn
 
-from optimizers.bulk_test_bench_utils import OptimizerConfig
+from optimizers.bulk_test_bench_utils import OptimizerConfig, OptimizerBenchmarkConfig
 
 
 class Muon(Optimizer):
@@ -136,10 +138,49 @@ class Muon(Optimizer):
 
 def muon_param_filter(param: nn.Parameter) -> bool:
     """Filter for parameters suitable for Muon (2D or higher dimensional)"""
-    # Device filter - uncomment when using CUDA
-    #if 'cuda' not in str(param.device) and 'cpu' not in str(param.device):
-    #    return False
     return param.ndim >= 2
+
+
+def apply_muon_to_model(
+    model: nn.Module, 
+    config: OptimizerConfig, 
+    backup_optimizer_class: Type[torch.optim.Optimizer] = torch.optim.AdamW
+) -> torch.optim.Optimizer:
+    """
+    Apply the Muon optimizer to all parameters in the model that satisfy the muon_param_filter,
+    and apply a backup optimizer to all other parameters.
+    
+    Args:
+        model (nn.Module): The model containing parameters to optimize.
+        config (OptimizerConfig): Configuration for the optimizer.
+        backup_optimizer_class (Type[torch.optim.Optimizer]): The backup optimizer class to use for parameters
+                                                              that do not satisfy the muon_param_filter.
+        
+    Returns:
+        torch.optim.Optimizer: An instance of a combined optimizer.
+    """
+    # Separate parameters based on the muon_param_filter
+    muon_params = [p for p in model.parameters() if config.param_filter(p)]
+    backup_params = [p for p in model.parameters() if not config.param_filter(p)]
+    
+    optimizers = []
+    
+    # Apply Muon optimizer to the filtered parameters
+    if muon_params:
+        muon_optimizer = Muon(muon_params, **config.optimizer_kwargs)
+        optimizers.append(muon_optimizer)
+    
+    # Apply backup optimizer to the remaining parameters
+    if backup_params:
+        backup_optimizer = backup_optimizer_class(backup_params, **config.fallback_kwargs)
+        optimizers.append(backup_optimizer)
+    
+    # If only one optimizer is needed, return it directly
+    if len(optimizers) == 1:
+        return optimizers[0]
+    
+    # Return a combined optimizer if both are used
+    return torch.optim.Optimizer(optimizers)
 
 
 __default_config__ = OptimizerConfig(
@@ -152,4 +193,26 @@ __default_config__ = OptimizerConfig(
     param_filter=muon_param_filter,
     fallback_optimizer_class=torch.optim.AdamW,
     fallback_kwargs={'lr': 1e-3}
+)
+
+# Benchmark configuration with parameter sweeps
+__benchmark_config__ = OptimizerBenchmarkConfig(
+    optimizer_name='Muon',
+    competitors={
+        'Muon': {'class': Muon}
+    },
+    parameter_space={
+        'lr': [1e-1, 1e-2, 1e-3, 1e-4],
+        'momentum': [0.9, 0.99, 0.999],
+        'ns_steps': [3, 5, 7]
+    },
+    optimizer_kwargs_builder=lambda params: {
+        'lr': params['lr'],
+        'momentum': params['momentum'],
+        'nesterov': True,
+        'ns_steps': params['ns_steps']
+    },
+    param_filter=muon_param_filter,
+    fallback_optimizer_class=torch.optim.AdamW,
+    fallback_kwargs={'lr': 3e-4, 'weight_decay': 1e-4}
 )
