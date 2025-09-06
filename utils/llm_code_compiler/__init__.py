@@ -1,13 +1,13 @@
-from llm_interface import LLMClient, DummyLLM, create_llm
+from .llm_interface import create_llm
 from .catalog import (
+    LLMClient,
     OpenAILLM, 
     AnthropicLLM,
 )
 
 __all__ = [
-    "LLMClient",
-    "DummyLLM",
     "create_llm",
+    "LLMClient",
     "OpenAILLM",
     "AnthropicLLM",
 ]

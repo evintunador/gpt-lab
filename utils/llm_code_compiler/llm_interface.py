@@ -1,9 +1,9 @@
 from typing import Optional
 
-from llm_code_compiler.catalog import BaseLLMClient, OpenAILLM, AnthropicLLM
+from .catalog import LLMClient, OpenAILLM, AnthropicLLM
 
 
-def create_llm(model: str, api_key: Optional[str] = None) -> BaseLLMClient:
+def create_llm(model: str, api_key: Optional[str] = None) -> LLMClient:
     """
     Factory that picks a client from a single model string.
     Supports:

@@ -3,10 +3,10 @@ import os
 
 from litellm import completion
 
-from utils.llm_code_compiler.catalog import BaseLLMClient
+from .abstract_base import LLMClient
 
 
-class OpenAILLM(BaseLLMClient):
+class OpenAILLM(LLMClient):
     """
     OpenAI LLM client using litellm for completion.
     Accepts 'model' like 'gpt-4o' or 'openai/gpt-4o'.

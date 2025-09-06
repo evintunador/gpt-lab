@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
 
-class BaseLLMClient(ABC):
+class LLMClient(ABC):
     """
     Minimal LLM protocol. Plug in any provider that returns a string completion.
     """
