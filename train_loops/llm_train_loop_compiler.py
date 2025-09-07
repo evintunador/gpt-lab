@@ -3,14 +3,37 @@
 
 import sys
 import traceback
+import inspect
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Callable
 
-from train_loops.bulk_test import test_universal_learning
+from train_loops.bulk_test import universal_learning_test, discover_specific_tests
 from utils.llm_code_compiler import LLMClient, create_llm
 from utils.device import best_device as device
 from utils.testing import import_module_from_path
+
+# Global verbose flag
+VERBOSE = False
+
+def vprint(*args, **kwargs):
+    """Verbose print - only prints if VERBOSE is True"""
+    if VERBOSE:
+        print(*args, **kwargs)
+
+def vprint_section(title: str):
+    """Print a section header for verbose output"""
+    if VERBOSE:
+        print(f"\n{'='*60}")
+        print(f" {title}")
+        print(f"{'='*60}")
+
+def vprint_subsection(title: str):
+    """Print a subsection header for verbose output"""
+    if VERBOSE:
+        print(f"\n{'-'*40}")
+        print(f" {title}")
+        print(f"{'-'*40}")
 
 
 SYSTEM_PROMPT = \
@@ -27,6 +50,11 @@ Constraints:
 - Assume caller moves/creates model/optimizer/loss/data; you just train.
 - Err on the side of setting default arguments when reasonable; kwargs should have defaults.
 
+Testing Requirements:
+- Your code will be tested with a universal learning test (loss must decrease by at least 10%)
+- Your code will also be tested with specific feature tests described below
+- Make sure your implementation correctly handles all the specific behaviors being tested
+
 Notes:
 - You may add helper functions/classes if needed.
 """
@@ -34,6 +62,8 @@ Notes:
 USER_PROMPT_TEMPLATE = \
 """Combine the following atomic features into a single training loop:
 {atomic_features}
+
+{test_descriptions}
 """
 
 
@@ -118,7 +148,7 @@ def _get_atomic_files(atomic_features: List[str]) -> List[Path]:
     return paths
 
 
-def _read_atomic_examples_text(paths: List[Path], char_budget: int = 8000) -> str:
+def _read_atomic_examples_text(paths: List[Path], char_budget: int = 100_000) -> str:
     """
     Read selected atomic files and assemble a prompt appendix with fenced examples.
     Truncates if needed to stay within a rough character budget.
@@ -139,9 +169,76 @@ def _read_atomic_examples_text(paths: List[Path], char_budget: int = 8000) -> st
     return "\n".join(chunks)
 
 
+def _extract_test_descriptions(atomic_features: List[str]) -> str:
+    """Extract test descriptions from specific test functions for the given atomic features."""
+    specific_tests = discover_specific_tests()
+    test_descriptions = []
+    
+    for feature in atomic_features:
+        clean_feature = feature.replace('.py', '')
+        if clean_feature in specific_tests:
+            test_descriptions.append(f"\n=== Tests for {feature} ===")
+            for test_func in specific_tests[clean_feature]:
+                # Get function name and docstring
+                func_name = test_func.__name__
+                docstring = inspect.getdoc(test_func) or "No description available"
+                
+                # Try to get a simplified version of the test logic
+                try:
+                    source_lines = inspect.getsourcelines(test_func)[0]
+                    # Extract key assertions and logic (simplified)
+                    key_lines = []
+                    for line in source_lines:
+                        line = line.strip()
+                        if (line.startswith('assert ') or 
+                            'torch.allclose' in line or
+                            'accum_steps' in line or
+                            'batch_size' in line or
+                            'scheduler' in line or
+                            'clip_grad' in line or
+                            line.startswith('# Test') or
+                            line.startswith('"""')):
+                            key_lines.append(f"    {line}")
+                    
+                    if key_lines:
+                        test_descriptions.append(f"""
+Test: {func_name}
+Description: {docstring}
+Key test logic:
+{''.join(key_lines[:10])}  # ... (truncated for brevity)
+""")
+                    else:
+                        test_descriptions.append(f"""
+Test: {func_name}
+Description: {docstring}
+""")
+                except:
+                    # Fallback if source inspection fails
+                    test_descriptions.append(f"""
+Test: {func_name}
+Description: {docstring}
+""")
+    
+    if test_descriptions:
+        header = """
+IMPORTANT: Your generated code will be tested with the following specific tests.
+Make sure your implementation satisfies these requirements:
+"""
+        return header + "\n".join(test_descriptions) + "\n"
+    else:
+        return ""
+
+
 def _build_user_prompt(atomic_features: List[str]) -> str:
     atomic_features_str = ", ".join(atomic_features)
-    base = USER_PROMPT_TEMPLATE.format(atomic_features=atomic_features_str)
+    
+    # Get test descriptions
+    test_descriptions = _extract_test_descriptions(atomic_features)
+    
+    base = USER_PROMPT_TEMPLATE.format(
+        atomic_features=atomic_features_str,
+        test_descriptions=test_descriptions
+    )
     
     try:
         paths = _get_atomic_files(atomic_features)
@@ -158,6 +255,8 @@ def _build_user_prompt(atomic_features: List[str]) -> str:
 
 def _add_metadata_to_code(code: str, atomic_features: List[str], device: str) -> str:
     """Add metadata as comments and dunder variables to the generated code."""
+    # Clean the feature names to remove .py extension for consistent storage
+    clean_features = [f.replace('.py', '') for f in atomic_features]
     metadata_header = f'''"""
 LLM-compiled training loop combining atomic features: {', '.join(atomic_features)}
 Generated by gpt-lab LLM compiler
@@ -165,11 +264,23 @@ Device: {device}
 """
 
 # Metadata for discovery and testing
-__atomic_features__ = {atomic_features!r}
+__atomic_features__ = {clean_features!r}
 __llm_compiled__ = True
 
 '''
     return metadata_header + code
+
+
+def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_features: List[str]):
+    """Run all applicable specific tests during compilation - validation only."""
+    specific_tests = discover_specific_tests()
+    
+    for feature in atomic_features:
+        clean_feature = feature.replace('.py', '')  # Handle both formats
+        if clean_feature in specific_tests:
+            for test_func in specific_tests[clean_feature]:
+                # Just run the test - if it fails, compilation fails
+                test_func(run_training_fn)
 
 
 def compile_loop(
@@ -185,10 +296,18 @@ def compile_loop(
     name = _make_descriptive_name(atomic_features)
     code_path = Path("train_loops/catalog/llm_compiled") / f"{name}.py"
 
+    vprint_section("LLM TRAINING LOOP COMPILATION")
+    vprint(f"Atomic features: {atomic_features}")
+    vprint(f"Generated name: {name}")
+    vprint(f"Output path: {code_path}")
+
     # Cached success path
     if code_path.exists():
+        vprint_subsection("CACHE CHECK")
+        vprint(f"Found existing file at {code_path}")
         try:
             module = import_module_from_path(f"cached_loop", code_path)
+            vprint("✓ Successfully loaded cached loop")
             print(f"[cache] Using cached compiled loop at {code_path}")
             return {
                 "name": name, 
@@ -196,42 +315,92 @@ def compile_loop(
                 "atomic_features": atomic_features,
             }
         except Exception as e:
+            vprint(f"✗ Failed to load cached loop: {e}")
             print(f"[warning] Failed to load cached loop {code_path}: {e}")
             print("[info] Will regenerate...")
 
     # Build prompts
+    vprint_subsection("PROMPT CONSTRUCTION")
     user_prompt = _build_user_prompt(atomic_features)
+    
+    vprint("System prompt:")
+    vprint(f"```\n{SYSTEM_PROMPT}\n```")
+    vprint("\nUser prompt:")
+    vprint(f"```\n{user_prompt}\n```")
 
     # Generate + refine loop
     restarts_left = max_restarts
     last_error_summary = ""
     code = ""
+    attempt_num = 1
+    
+    vprint_subsection("CODE GENERATION AND VALIDATION")
+    
     while restarts_left >= 0:
         try:
-            code = llm.generate(SYSTEM_PROMPT, user_prompt) if not last_error_summary \
-                else llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=last_error_summary)
+            if not last_error_summary:
+                vprint(f"\n🚀 ATTEMPT {attempt_num}: Initial generation")
+                vprint("Calling LLM.generate()...")
+                code = llm.generate(SYSTEM_PROMPT, user_prompt)
+            else:
+                vprint(f"\n🔄 ATTEMPT {attempt_num}: Refinement")
+                vprint("Calling LLM.refine()...")
+                vprint(f"Error to fix: {last_error_summary}")
+                code = llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=last_error_summary)
+            
+            vprint("✓ LLM response received")
+            vprint(f"Generated code length: {len(code)} characters")
+            if VERBOSE:
+                print("Generated code preview:")
+                print(f"```python\n{code[:5000]}{'...' if len(code) > 5000 else ''}\n```")
 
             # Add metadata and write
+            vprint("\n📝 Adding metadata and writing file...")
             code_with_metadata = _add_metadata_to_code(code, atomic_features, device)
             _write_file(code_path, code_with_metadata)
+            vprint(f"✓ File written to {code_path}")
             
+            vprint("\n🔍 Testing generated code...")
+            
+            # Import test
+            vprint("Testing import...")
             try:
                 module = import_module_from_path(f"compiled_loop", code_path)
+                vprint("✓ Import successful")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[import]")
+                vprint(f"✗ Import failed: {err}")
                 raise RuntimeError(err)
 
+            # Function signature test
+            vprint("Checking for run_training function...")
             if not hasattr(module, "run_training"):
+                vprint("✗ Missing run_training function")
                 raise AssertionError("Generated file must define function 'run_training' with the required signature.")
             run_training_fn = getattr(module, "run_training")
+            vprint("✓ run_training function found")
 
-            # Test
+            # Universal test
+            vprint("Running universal learning test...")
             try:
-                test_universal_learning(run_training_fn)
+                universal_learning_test(run_training_fn)
+                vprint("✓ Universal test passed")
             except Exception:
-                err = _summarize_exception_filtered([str(code_path)], phase="[test]")
+                err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
+                vprint(f"✗ Universal test failed: {err}")
                 raise RuntimeError(err)
 
+            # Specific tests
+            vprint("Running specific feature tests...")
+            try:
+                run_specific_tests_for_compilation(run_training_fn, atomic_features)
+                vprint("✓ All specific tests passed")
+            except Exception:
+                err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")
+                vprint(f"✗ Specific tests failed: {err}")
+                raise RuntimeError(err)
+
+            vprint_section("COMPILATION SUCCESSFUL")
             print(f"[ok] Compiled and validated. Cached at {code_path}")
             return {
                 "name": name, 
@@ -242,27 +411,56 @@ def compile_loop(
         except Exception as e:
             # Pass only focused, phase-tagged errors into refine loop
             err = str(e)
+            vprint(f"\n❌ ATTEMPT {attempt_num} FAILED: {err}")
             print(f"[compile/test error]\n{err}")
+            
             # Try refine attempts first
-            for _ in range(max_refine_attempts):
+            vprint(f"\n🔧 Starting {max_refine_attempts} refinement attempts...")
+            for refine_attempt in range(max_refine_attempts):
                 try:
+                    vprint(f"\n🔧 REFINEMENT {refine_attempt + 1}/{max_refine_attempts}")
                     last_error_summary = err
+                    vprint("Calling LLM.refine()...")
                     code = llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=err)
+                    vprint("✓ Refinement response received")
+                    
                     code_with_metadata = _add_metadata_to_code(code, atomic_features, device)
                     _write_file(code_path, code_with_metadata)
+                    vprint(f"✓ Refined code written to {code_path}")
+                    
+                    # Test refined code
+                    vprint("Testing refined code...")
                     try:
                         module = import_module_from_path(f"compiled_loop", code_path)
+                        vprint("✓ Import successful")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[import]")
+                        vprint(f"✗ Import failed: {err}")
                         raise RuntimeError(err)
+                        
                     if not hasattr(module, "run_training"):
+                        vprint("✗ Missing run_training function")
                         raise AssertionError("Generated file must define function 'run_training'.")
                     run_training_fn = getattr(module, "run_training")
+                    vprint("✓ run_training function found")
+                    
                     try:
-                        test_universal_learning(run_training_fn)
+                        universal_learning_test(run_training_fn)
+                        vprint("✓ Universal test passed")
                     except Exception:
-                        err = _summarize_exception_filtered([str(code_path)], phase="[test]")
+                        err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
+                        vprint(f"✗ Universal test failed: {err}")
                         raise RuntimeError(err)
+                        
+                    try:
+                        run_specific_tests_for_compilation(run_training_fn, atomic_features)
+                        vprint("✓ All specific tests passed")
+                    except Exception:
+                        err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")
+                        vprint(f"✗ Specific tests failed: {err}")
+                        raise RuntimeError(err)
+                        
+                    vprint_section("REFINEMENT SUCCESSFUL")
                     print(f"[ok after refine] Cached at {code_path}")
                     return {
                         "name": name, 
@@ -271,12 +469,17 @@ def compile_loop(
                     }
                 except Exception as e2:
                     err = str(e2)
+                    vprint(f"✗ REFINEMENT {refine_attempt + 1} FAILED: {err}")
                     print(f"[refine error]\n{err}")
                     continue
+                    
             # Restart from scratch
             restarts_left -= 1
+            attempt_num += 1
             if restarts_left < 0:
+                vprint_section("COMPILATION FAILED - NO MORE RESTARTS")
                 raise
+            vprint(f"\n🔄 RESTART {max_restarts - restarts_left}/{max_restarts}")
             print("[restart] Starting a fresh attempt...")
             last_error_summary = ""
 
@@ -290,7 +493,19 @@ if __name__ == "__main__":
     parser.add_argument("--api_key", type=str, default=None, help="Optional API key; otherwise use env vars.")
     parser.add_argument("--max_refine_attempts", type=int, default=3, help="Maximum number of refine attempts.")
     parser.add_argument("--max_restarts", type=int, default=3, help="Maximum number of restarts.")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output showing prompts, LLM responses, and detailed compilation progress.")
     args = parser.parse_args()
+
+    # Set global verbose flag
+    VERBOSE = args.verbose
+
+    if VERBOSE:
+        vprint_section("STARTING LLM TRAIN LOOP COMPILER")
+        vprint(f"Model: {args.model}")
+        vprint(f"API Key: {'***' if args.api_key else 'from environment'}")
+        vprint(f"Max refine attempts: {args.max_refine_attempts}")
+        vprint(f"Max restarts: {args.max_restarts}")
+        vprint(f"Atomic features: {args.atomic_features}")
 
     llm = create_llm(args.model, api_key=args.api_key)
     compile_loop(

@@ -113,7 +113,7 @@ mm_op.register_autograd(backward, setup_context=setup_context)
 class FP8Linear(nn.Linear):
     def __init__(self, in_features: int, out_features: int,  
                  fp8: bool, x_s: float = 1.0, w_s: float = 1.0, grad_s: float = 1.0,
-                 device: str = 'cpu', dtype: torch.dtype = torch.float32,):
+                 device: str = None, dtype: torch.dtype = torch.float32,):
         super().__init__(in_features, out_features, bias=False, device=device, dtype=dtype)
         self.fp8 = fp8 and is_hopper_available()
         self.x_s = x_s

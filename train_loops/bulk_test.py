@@ -71,10 +71,10 @@ def generate_compiled_loop_specific_tests():
     return params
 
 
-@pytest.mark.parametrize("run_training_fn", all_loop_functions)
-def test_universal_learning(run_training_fn):
+def universal_learning_test(run_training_fn):
     """
     Build a tiny task and ensure real learning happened (loss drops).
+    This is a standalone function for use by the LLM compiler.
     """
     torch.manual_seed(0)
     X = torch.randn(2048, 32).to(device)
@@ -110,9 +110,17 @@ def test_universal_learning(run_training_fn):
         raise AssertionError(f"Training did not sufficiently improve loss: pre={pre:.4f}, post={post:.4f}")
 
 
+@pytest.mark.parametrize("run_training_fn", all_loop_functions)
+def test_universal_learning_pytest(run_training_fn):
+    """
+    Pytest wrapper for the universal learning test.
+    """
+    universal_learning_test(run_training_fn)
+
+
 # Add new parameterized test for compiled loops
 @pytest.mark.parametrize("test_func,run_training_fn,loop_file,source_feature", 
                         generate_compiled_loop_specific_tests())
 def test_compiled_loop_specific_behaviors(test_func, run_training_fn, loop_file, source_feature):
     """Run specific tests from atomic features on compiled loops that use them."""
-    test_func(run_training_fn, device)
+    test_func(run_training_fn)
