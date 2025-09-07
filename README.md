@@ -28,3 +28,22 @@ This is the root directory of a PyTorch research repository focused on helping M
 3. Run tests: `pytest`
 4. Start adding to the various component catalogues.
 5. Write and run your experiment over in `experiments/`
+
+## TODO
+
+- [ ] write an auto-documentation system that checks for differences in files in most recent git commit, cross-references the docs to find places where they need to be edited, makes the edits, and does another git commit. probably set this up with a hook for whenever a new git commit is logged, or maybe instead whenever a new git push is done to make it a bit less frequent. needs to support custom extra docs for describing specific features. maybe parse out a mapping between all docs and all python files that they reference and create a cascading update tool that travels the graph until changes stop? i guess it would also traverse reference docs that reference each other
+- [ ] designa nd build a user-facing API for the [`train_loops/](src/train_loops/) folder that intelligently picks which training loop features to use based on input arguments
+- [ ] add more atomic feature training loops
+- [ ] build tools to allow experiment makers to be blissfully unaware of the difference between slurm vs torchrun vs single gpu, or at least get as close to that as possible
+- [ ] bulid tools for model checkpointing
+- [ ] make muon faster
+- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
+- [ ] design and build benchmarking system where a benchmark type can be defined and models & datasets swapped out
+- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
+- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real.
+- [ ] add FSDP as an ability somewhere in here, not sure where
+- [ ] find other features to help with our experiments
+- [ ] do first DAGSeq2DAGSeq experiment
+- [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
+- [ ] implement tensorparallel abilities for [`modules/`](src/modules/) testing and benchmarking (low priority)
+- [ ] auto preprint latex generator (low priority, if ever)
