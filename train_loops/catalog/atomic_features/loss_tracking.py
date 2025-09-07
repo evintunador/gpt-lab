@@ -10,7 +10,7 @@ def run_training(
     train_loader,
     *,
     # loss tracking knobs
-    track_loss: bool = True,
+    track_loss: bool = False,
     log_interval: int = 1,  # track every batch by default
     # misc
     **kwargs,

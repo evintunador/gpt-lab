@@ -1,5 +1,5 @@
 from torch.optim import AdamW
-from optimizers.bulk_test_bench_utils import OptimizerConfig, OptimizerBenchmarkConfig
+from optimizers.utils import OptimizerConfig, OptimizerBenchmarkConfig
 
 __default_config__ = OptimizerConfig(
     optimizer_kwargs={

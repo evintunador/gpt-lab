@@ -22,7 +22,7 @@ def run_training(
     train_loader,
     *,
     # mixed precision knobs
-    use_amp: Optional[bool] = None,  # None = auto-detect
+    use_amp: Optional[bool] = False,  # False = disabled by default
     loss_scale: Optional[float] = None,
     device: str = device,
     # misc

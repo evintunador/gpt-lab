@@ -116,7 +116,7 @@ def test_loss_tracking_log_interval(run_training_fn):
         f"Expected {expected_entries} loss entries with log_interval=3, got {actual_entries}"
 
 
-# Export the test functions for discovery by bulk_test.py and llm_train_loop_compiler.py
+# Export the test functions for discovery by catalog_test.py and catalog_llm_compiler.py
 __specific_tests__ = [
     test_loss_tracking_returns_history,
     test_loss_tracking_disabled,

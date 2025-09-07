@@ -131,7 +131,7 @@ def test_validation_interval(run_training_fn):
         f"Expected at least {expected_min_entries} validation entries with val_interval=3, got {actual_entries}"
 
 
-# Export the test functions for discovery by bulk_test.py and llm_train_loop_compiler.py
+# Export the test functions for discovery by catalog_test.py and catalog_llm_compiler.py
 __specific_tests__ = [
     test_validation_with_loader,
     test_validation_without_loader,

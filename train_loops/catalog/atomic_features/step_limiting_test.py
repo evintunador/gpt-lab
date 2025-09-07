@@ -164,7 +164,7 @@ def test_step_limiting_single_step(run_training_fn):
         "Model parameters should have changed after single step"
 
 
-# Export the test functions for discovery by bulk_test.py and llm_train_loop_compiler.py
+# Export the test functions for discovery by catalog_test.py and catalog_llm_compiler.py
 __specific_tests__ = [
     test_step_limiting_no_limit,
     test_step_limiting_with_limit, 

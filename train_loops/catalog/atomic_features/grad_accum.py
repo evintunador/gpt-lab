@@ -10,7 +10,7 @@ def run_training(
     train_loader,
     *,
     # grad accum knobs
-    accum_steps: int = 4,
+    accum_steps: int = 1,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:

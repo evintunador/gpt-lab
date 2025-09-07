@@ -13,7 +13,7 @@ import pandas as pd
 
 from utils.device import get_available_devices
 from utils.testing import discover_dunder_objects
-from optimizers.bulk_test_bench_utils import OptimizerConfig, OptimizerBenchmarkConfig, create_smart_optimizer
+from optimizers.utils import OptimizerConfig, OptimizerBenchmarkConfig, create_smart_optimizer
 
 
 def create_complex_synthetic_dataset(

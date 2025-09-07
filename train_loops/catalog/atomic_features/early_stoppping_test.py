@@ -149,7 +149,7 @@ def test_early_stopping_parameter_handling(run_training_fn):
         assert "model" in result, f"Result must contain 'model' for config {config}"
 
 
-# Export the test functions for discovery by bulk_test.py and llm_train_loop_compiler.py
+# Export the test functions for discovery by catalog_test.py and catalog_llm_compiler.py
 __specific_tests__ = [
     test_early_stopping_without_val_loader,
     test_early_stopping_with_val_loader,

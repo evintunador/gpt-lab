@@ -56,7 +56,7 @@ def test_accumulation_correctness(run_training_fn):
         assert torch.allclose(final_params1[key], final_params2[key], atol=1e-2), f"Mismatch in parameter: {key}"
 
 
-# Registry for discovery by bulk_test.py and llm_train_loop_compiler.py
+# Registry for discovery by catalog_test.py and catalog_llm_compiler.py
 __specific_tests__ = [
     test_accumulation_correctness,
 ]

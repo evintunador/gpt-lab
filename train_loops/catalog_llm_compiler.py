@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
 
-from train_loops.bulk_test import universal_learning_test, discover_specific_tests
+from train_loops.catalog_test import universal_learning_test, discover_specific_tests
 from utils.llm_code_compiler import LLMClient, create_llm
 from utils.device import best_device as device
 from utils.testing import import_module_from_path
@@ -48,15 +48,17 @@ Constraints:
 - Keep code deterministic where feasible (set seeds when creating schedulers, etc.).
 - Do not rely on global variables; everything must be self-contained in this file. Those used by example scripts are exceptions.
 - Assume caller moves/creates model/optimizer/loss/data; you just train.
-- Err on the side of setting default arguments when reasonable; kwargs should have defaults.
+- Err on the side of setting default arguments when reasonable; kwargs should have defaults. 
+- All kwarg defaults should be set to values that ensure numerical equivalence with `base_loop.py`.
 
 Testing Requirements:
 - Your code will be tested with a universal learning test (loss must decrease by at least 10%)
+- Your code will be tested to be numerically equivalent to `base_loop.py` (shown below) when default kwargs values are used.
 - Your code will also be tested with specific feature tests described below
 - Make sure your implementation correctly handles all the specific behaviors being tested
 
 Notes:
-- You may add helper functions/classes if needed.
+- You may add helper functions/classes if needed, or, if re-using, import directly from one of the atomic features by using `from train_loops.catalog.atomic_features.<feature_name> import <function/class_name>`.
 """
 
 USER_PROMPT_TEMPLATE = \
@@ -65,6 +67,27 @@ USER_PROMPT_TEMPLATE = \
 
 {test_descriptions}
 """
+
+
+def _build_system_prompt_with_base_loop() -> str:
+    """Build the system prompt including base_loop.py content for reference."""
+    base_loop_path = Path("train_loops/catalog/atomic_features/base_loop.py")
+    
+    try:
+        base_loop_content = base_loop_path.read_text(encoding="utf-8")
+        base_loop_section = f"""
+
+Base Loop Reference (base_loop.py):
+Your generated code must be numerically equivalent to this when default kwargs are used:
+
+```python
+{base_loop_content}
+```
+"""
+    except Exception:
+        base_loop_section = "\n(Note: Could not load base_loop.py for reference)"
+    
+    return SYSTEM_PROMPT + base_loop_section
 
 
 def _slugify(text: str) -> str:
@@ -283,6 +306,15 @@ def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_feature
                 test_func(run_training_fn)
 
 
+def run_base_loop_compliance_test_for_compilation(run_training_fn: Callable, atomic_features: List[str]):
+    """Run base_loop compliance test during compilation."""
+    from train_loops.catalog_test import base_loop_compliance_test
+    
+    # For compiled loops, we use a representative name from the atomic features
+    feature_name = f"compiled_loop_{'-'.join(sorted([f.replace('.py', '') for f in atomic_features]))}"
+    base_loop_compliance_test(run_training_fn, feature_name)
+
+
 def compile_loop(
     atomic_features: List[str],
     llm: Optional[LLMClient] = None,
@@ -321,10 +353,11 @@ def compile_loop(
 
     # Build prompts
     vprint_subsection("PROMPT CONSTRUCTION")
+    system_prompt = _build_system_prompt_with_base_loop()
     user_prompt = _build_user_prompt(atomic_features)
     
     vprint("System prompt:")
-    vprint(f"```\n{SYSTEM_PROMPT}\n```")
+    vprint(f"```\n{system_prompt}\n```")
     vprint("\nUser prompt:")
     vprint(f"```\n{user_prompt}\n```")
 
@@ -341,12 +374,12 @@ def compile_loop(
             if not last_error_summary:
                 vprint(f"\n🚀 ATTEMPT {attempt_num}: Initial generation")
                 vprint("Calling LLM.generate()...")
-                code = llm.generate(SYSTEM_PROMPT, user_prompt)
+                code = llm.generate(system_prompt, user_prompt)
             else:
                 vprint(f"\n🔄 ATTEMPT {attempt_num}: Refinement")
                 vprint("Calling LLM.refine()...")
                 vprint(f"Error to fix: {last_error_summary}")
-                code = llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=last_error_summary)
+                code = llm.refine(system_prompt, user_prompt, prior_code=code, error_summary=last_error_summary)
             
             vprint("✓ LLM response received")
             vprint(f"Generated code length: {len(code)} characters")
@@ -390,6 +423,16 @@ def compile_loop(
                 vprint(f"✗ Universal test failed: {err}")
                 raise RuntimeError(err)
 
+            # Base loop compliance test
+            vprint("Running base_loop compliance test...")
+            try:
+                run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features)
+                vprint("✓ Base loop compliance test passed")
+            except Exception:
+                err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
+                vprint(f"✗ Base loop compliance test failed: {err}")
+                raise RuntimeError(err)
+
             # Specific tests
             vprint("Running specific feature tests...")
             try:
@@ -421,7 +464,7 @@ def compile_loop(
                     vprint(f"\n🔧 REFINEMENT {refine_attempt + 1}/{max_refine_attempts}")
                     last_error_summary = err
                     vprint("Calling LLM.refine()...")
-                    code = llm.refine(SYSTEM_PROMPT, user_prompt, prior_code=code, error_summary=err)
+                    code = llm.refine(system_prompt, user_prompt, prior_code=code, error_summary=err)
                     vprint("✓ Refinement response received")
                     
                     code_with_metadata = _add_metadata_to_code(code, atomic_features, device)
@@ -450,6 +493,14 @@ def compile_loop(
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
                         vprint(f"✗ Universal test failed: {err}")
+                        raise RuntimeError(err)
+                    
+                    try:
+                        run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features)
+                        vprint("✓ Base loop compliance test passed")
+                    except Exception:
+                        err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
+                        vprint(f"✗ Base loop compliance test failed: {err}")
                         raise RuntimeError(err)
                         
                     try:

@@ -10,7 +10,7 @@ import pytest
 
 from utils.device import best_device as device
 from utils.testing import list_all_files_in_folder_and_subdirs, import_module_from_path
-from optimizers.bulk_test_bench_utils import OptimizerConfig, create_smart_optimizer
+from optimizers.utils import OptimizerConfig, create_smart_optimizer
 
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))

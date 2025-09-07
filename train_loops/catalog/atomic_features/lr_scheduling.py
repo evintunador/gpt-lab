@@ -10,7 +10,7 @@ def run_training(
     train_loader,
     *,
     # learning rate scheduling knobs
-    lr_scheduler_type: str = "cosine",
+    lr_scheduler_type: Optional[str] = None,
     warmup_steps: int = 0,
     max_lr: Optional[float] = None,
     min_lr: float = 0.0,

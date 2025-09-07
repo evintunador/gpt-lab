@@ -11,7 +11,7 @@ def run_training(
     train_loader,
     *,
     # grad norm clipping knobs
-    norm_clip_value: Optional[float] = 1.0,
+    norm_clip_value: Optional[float] = None,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:

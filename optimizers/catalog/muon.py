@@ -5,10 +5,10 @@ from torch.optim import Optimizer
 import torch.distributed as dist
 import torch.nn as nn
 
-from optimizers.bulk_test_bench_utils import OptimizerConfig, OptimizerBenchmarkConfig
+from optimizers.utils import OptimizerConfig, OptimizerBenchmarkConfig
 
 
-@torch.compie
+#@torch.compile
 def zeropower_via_newtonschulz5(G: torch.tensor, steps: int) -> torch.tensor:
     """
     Newton-Schulz iteration to compute the zeroth power / orthogonalization of G. We opt to use a
