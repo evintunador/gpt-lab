@@ -22,7 +22,7 @@ def clear_test_error_maps():
     """
     Clears the test error maps directory before the test session starts.
     """
-    folder = "modules/test_error_maps"
+    folder = "src/modules/test_error_maps"
     if os.path.exists(folder):
         shutil.rmtree(folder)
     os.makedirs(folder)
@@ -116,7 +116,7 @@ def _assert_tensors_close_and_generate_heatmaps(
     tensor_groups: Dict[str, Dict[str, Union[List[torch.Tensor], List[str]]]],
     test_id: str,
     tolerances: Dict[str, float],
-    base_folder: str = "modules/test_error_maps",
+    base_folder: str = "src/modules/test_error_maps",
 ):
     failures = []
     has_failed = False
@@ -216,7 +216,7 @@ def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: Li
 ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects(
     dunder='__test_config__', 
     object=ModuleTestConfig,
-    search_folders="modules/catalog/"
+    search_folders="src/modules/catalog/"
 )
 AVAILABLE_DEVICES, _ = get_available_devices()
 TEST_SUITE = build_test_suite(ALL_TEST_CONFIGS, AVAILABLE_DEVICES)

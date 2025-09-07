@@ -115,7 +115,7 @@ def measure_performance(
     return {k: v for k, v in results.items() if v is not None}
 
 
-def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str = "modules/bench_results"):
+def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: str = "src/modules/bench_results"):
     os.makedirs(output_dir, exist_ok=True)
     device_type = torch.device(device).type
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -190,7 +190,7 @@ if __name__ == "__main__":
     all_benchmark_configs, discovery_errors = discover_dunder_objects(
         dunder='__benchmark_config__', 
         object=BenchmarkConfig,
-        search_folders="modules/catalog/"
+        search_folders="src/modules/catalog/"
     )
 
     if discovery_errors:

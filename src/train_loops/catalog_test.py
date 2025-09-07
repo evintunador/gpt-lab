@@ -31,7 +31,7 @@ for loop_file in all_loop_files:
 def discover_specific_tests() -> Dict[str, List[Callable]]:
     """Discover all specific test functions for atomic features."""
     specific_tests = {}
-    atomic_features_dir = Path("train_loops/catalog/atomic_features")
+    atomic_features_dir = Path("src/train_loops/catalog/atomic_features")
     
     for test_file in atomic_features_dir.glob("*_test.py"):
         feature_name = test_file.stem.replace("_test", "")
@@ -47,7 +47,7 @@ def discover_specific_tests() -> Dict[str, List[Callable]]:
 
 def discover_atomic_features() -> List[Callable]:
     """Discover all atomic feature run_training functions."""
-    atomic_features_dir = Path("train_loops/catalog/atomic_features")
+    atomic_features_dir = Path("src/train_loops/catalog/atomic_features")
     atomic_functions = []
     
     for feature_file in atomic_features_dir.glob("*.py"):
@@ -70,7 +70,7 @@ def discover_atomic_features() -> List[Callable]:
 def generate_compiled_loop_specific_tests():
     """Generate pytest parameters for specific tests on compiled loops."""
     specific_tests = discover_specific_tests()
-    compiled_dir = Path("train_loops/catalog/llm_compiled")
+    compiled_dir = Path("src/train_loops/catalog/llm_compiled")
     params = []
     
     for compiled_loop_file in compiled_dir.glob("*.py"):
@@ -99,7 +99,7 @@ def base_loop_compliance_test(run_training_fn, feature_name: str):
     This ensures all atomic features maintain backward compatibility and follow the standard.
     """
     # Import base_loop for comparison
-    base_loop_path = Path("train_loops/catalog/atomic_features/base_loop.py")
+    base_loop_path = Path("src/train_loops/catalog/atomic_features/base_loop.py")
     base_module = import_module_from_path("base_loop_ref", base_loop_path)
     base_run_training = base_module.run_training
     

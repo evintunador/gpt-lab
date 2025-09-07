@@ -1,20 +1,25 @@
 # GPT-Lab Repository
 
-This is the root directory of a PyTorch research repository focused on helping ML researchers create modular, testable code and highly reproducible experiments.
+This is the root directory of a PyTorch research repository focused on helping ML researchers create modular, testable code and highly reproducible experiments. It's designed to be a holding place of catalogs of different core components of an experiment (eg. training loops, `nn.Module`'s, etc.) in use by a given research group. It was designed with the ability to have some participants completely ignore the many features of the harness if they want, and compliance to generally be easy to add on later. Each catalog has some combination of unit tests and/or performance benchmarks that vary in their capabilities depending on the particulars of what that directory is cataloguing. 
 
 ## Directory Structure
 
-- `train_loops/` - Catalog of training loops and tools relevant to training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Planned features include 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
-- `modules/` - Catalog of `nn.Module`'s with bulk testing and bulk runtime/memory benchmarking frameworks. The structure is designed to allow for the integration of new `nn.Module`'s into the testing & benchmarking frameworks to be entirely optional
-- `utils/` - Shared utilities across the project
-    - `llm_code_compiler/` - LLM interface for code generation. Currently used to "compile" individual "atomic feature" training loops into multi-feature versions
-    - `reproducibility/` - Tools for reproducible research (planned)
-    - `distributed.py` - Tools to make other scripts agnostic single gpu vs torchrun vs slurm (planned)
-- `data_sources/` - Data loading and preprocessing components
-- `models/` - Catalog of models. Might in the future create tests specific to different types of models (llms, lvlms, autoencoders, etc)
-- `optimizers/` - Catalog of optimizers. Includes a simple benchmarking tool.
-- `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models (planned)
-- `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility.
+- `docs/` - A full mirror of the `src/` repo with documentation about the user-facing API of each corresponding file.
+- `src/`
+    - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Planned features include 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
+    - `modules/` - Catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
+    - `utils/` - Shared utilities across the project
+        - `llm_code_compiler/` - LLM interface for code generation. Currently used to "compile" individual "atomic feature" training loops into multi-feature versions
+        - `reproducibility/` - Tools for reproducible research (planned)
+        - `distributed.py` - Tools to make other scripts agnostic single gpu vs torchrun vs slurm (planned)
+        - `device.py`
+        - `benchmarking.py`
+        - `testing.py`
+    - `data_sources/` - Data loading and preprocessing components
+    - `models/` - Catalog of models. 
+    - `optimizers/` - Catalog of optimizers. Includes simple testing and benchmarking tools.
+    - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models (planned)
+    - `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
 
 ## Getting Started
 
