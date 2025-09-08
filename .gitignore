@@ -13,3 +13,4 @@ scratch.py
 .idea/workspace.xml
 modules/test_error_maps/
 .env
+.DS_store
