@@ -3,6 +3,11 @@ import torch
 import torch.nn as nn
 from torch.nn.utils import clip_grad_norm_
 
+# Optional metadata for smart_train conflict detection
+__smart_train_metadata__ = {
+    "conflicts_with": ["elem_grad_clip"],  # Cannot use both gradient clipping methods
+}
+
 
 def run_training(
     model: nn.Module,

@@ -323,7 +323,21 @@ def compile_loop(
 ) -> Dict[str, Any]:
     """
     Main entry: ask LLM for a bespoke training loop combining atomic features, test it, cache it.
+    
+    Note: This function is designed for combining multiple atomic features. For single features,
+    use the atomic feature directly for better performance and reliability.
     """
+    # Validate input
+    if not atomic_features:
+        raise ValueError("No atomic features provided for compilation")
+    
+    if len(atomic_features) == 1:
+        raise ValueError(
+            f"Compilation not recommended for single atomic feature '{atomic_features[0]}'. "
+            f"Use the atomic feature directly instead for better performance. "
+            f"File: src/train_loops/catalog/atomic_features/{atomic_features[0]}.py"
+        )
+    
     llm = llm or LLMClient()
     name = _make_descriptive_name(atomic_features)
     code_path = Path("src/train_loops/catalog/llm_compiled") / f"{name}.py"
