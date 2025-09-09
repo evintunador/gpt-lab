@@ -1,12 +1,15 @@
 # GPT-Lab Repository
 
-This is the root directory of a PyTorch research repository focused on helping ML researchers create modular, testable code and highly reproducible experiments. It's designed to be a holding place of catalogs of different core components of an experiment (eg. training loops, `nn.Module`'s, etc.) in use by a given research group. It was designed with the ability to have some participants completely ignore the many features of the harness if they want, and compliance to generally be easy to add on later. Each catalog has some combination of unit tests and/or performance benchmarks that vary in their capabilities depending on the particulars of what that directory is cataloguing. 
+This is the root directory of a PyTorch research repository focused on helping ML researchers create modular, testable code and highly reproducible experiments. 
+It's purpose is to be a holding place of catalogs of different core components of an experiment (eg. training loops, `nn.Module`'s, etc.) in use by a given research group. 
+It was designed with the ability to have some participants completely ignore the many features of the harness if they want, and compliance to generally be easy to add on later. 
+Each catalog has some combination of unit tests and/or performance benchmarks that vary in their capabilities depending on the particulars of what that directory is cataloging. 
 
 ## Directory Structure
 
 - `docs/` - A full mirror of the `src/` repo with documentation about the user-facing API of each corresponding file (planned)
 - `src/`
-    - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) (planned) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
+    - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
     - `modules/` - Catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
     - `utils/` - Shared utilities across the project
         - `llm_code_compiler/` - LLM interface for code generation. Currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later
@@ -32,9 +35,9 @@ This is the root directory of a PyTorch research repository focused on helping M
 ## TODO
 
 - [x] designa and build a user-facing API for the [`train_loops/](src/train_loops/) folder that intelligently picks which training loop features to use based on input arguments
-    - [ ] remove the current behavior of allowing None to be passed in and not trigger that feature
+    - [ ] ~~remove the current behavior of allowing None to be passed in and not trigger that feature~~
+- [x] add more atomic feature training loops
 - [ ] write an auto-documentation system that checks for differences in files in most recent git commit, cross-references the docs to find places where they need to be edited, makes the edits, and does another git commit. probably set this up with a hook for whenever a new git commit is logged, or maybe instead whenever a new git push is done to make it a bit less frequent. needs to support custom extra docs for describing specific features. maybe parse out a mapping between all docs and all python files that they reference and create a cascading update tool that travels the graph until changes stop? i guess it would also traverse reference docs that reference each other
-- [ ] add more atomic feature training loops
 - [ ] build tools to allow experiment makers to be blissfully unaware of the difference between slurm vs torchrun vs single gpu, or at least get as close to that as possible
 - [ ] bulid tools for model checkpointing
 - [ ] make muon faster
