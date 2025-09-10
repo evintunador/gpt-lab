@@ -138,44 +138,6 @@ def create_benchmark_model(
     return model
 
 
-def measure_loss_and_accuracy(model: nn.Module, dataloader: DataLoader) -> Tuple[float, float]:
-    """Measure average loss and accuracy on a dataset"""
-    model.eval()
-    total_loss = 0.0
-    total_samples = 0
-    correct_predictions = 0
-    loss_fn = nn.CrossEntropyLoss()
-    
-    # Create compiled evaluation function for better performance
-    @torch.compile(mode='max-autotune')
-    def eval_step(model, batch_X, batch_y, loss_fn):
-        outputs = model(batch_X)
-        loss = loss_fn(outputs, batch_y)
-        _, predicted = torch.max(outputs, 1)
-        correct = (predicted == batch_y).sum().item()
-        return loss.item(), correct
-    
-    with torch.no_grad():
-        for batch_X, batch_y in dataloader:
-            try:
-                loss_val, correct = eval_step(model, batch_X, batch_y, loss_fn)
-            except Exception:
-                # Fallback to non-compiled version if compilation fails
-                outputs = model(batch_X)
-                loss = loss_fn(outputs, batch_y)
-                loss_val = loss.item()
-                _, predicted = torch.max(outputs, 1)
-                correct = (predicted == batch_y).sum().item()
-            
-            total_loss += loss_val * batch_X.size(0)
-            total_samples += batch_X.size(0)
-            correct_predictions += correct
-    
-    avg_loss = total_loss / total_samples
-    accuracy = correct_predictions / total_samples
-    return avg_loss, accuracy
-
-
 def benchmark_optimizer(
     optimizer_class: Type[torch.optim.Optimizer],
     config: OptimizerConfig,
@@ -185,7 +147,7 @@ def benchmark_optimizer(
     """
     Benchmark a single optimizer configuration.
     
-    Returns metrics including timing, memory usage, and convergence behavior.
+    Returns metrics including timing and memory usage.
     """
     torch.manual_seed(42)  # Ensure reproducible results
     
@@ -206,7 +168,7 @@ def benchmark_optimizer(
         except Exception as e:
             print(f"[WARNING] Could not compile model: {e}. Proceeding without compilation.")
     
-    train_dl, val_dl = create_complex_synthetic_dataset(
+    train_dl, _ = create_complex_synthetic_dataset(
         device=device, 
         input_dim=model_config['input_dim'],
         num_classes=model_config['num_classes']
@@ -223,9 +185,6 @@ def benchmark_optimizer(
     
     loss_fn = nn.CrossEntropyLoss()
     device_type = torch.device(device).type
-    
-    # Measure initial performance
-    initial_loss, initial_acc = measure_loss_and_accuracy(model, val_dl)
     
     # Memory tracking (CUDA only)
     if device_type == 'cuda':
@@ -294,17 +253,11 @@ def benchmark_optimizer(
             step_times.append(step_time)
             total_steps += 1
     
-    # Final measurements
-    final_loss, final_acc = measure_loss_and_accuracy(model, val_dl)
-    
     # Memory measurement (CUDA only)
     peak_memory_gb = None
     if device_type == 'cuda':
         peak_memory_gb = torch.cuda.max_memory_allocated(device) / 1e9
         torch.cuda.empty_cache()
-    
-    # Calculate convergence metrics
-    loss_reduction = (initial_loss - final_loss) / initial_loss
     
     return {
         # Timing metrics
@@ -312,12 +265,6 @@ def benchmark_optimizer(
         
         # Memory metrics
         'peak_memory_gb': peak_memory_gb,
-        
-        # Convergence metrics
-        'loss_reduction_pct': loss_reduction * 100,
-        
-        # Training efficiency
-        'loss_reduction_per_ms': loss_reduction / sum(step_times) * 1000 if sum(step_times) > 0 else 0,
     }
 
 
