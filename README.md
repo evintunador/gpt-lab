@@ -39,7 +39,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [x] add more atomic feature training loops
 - [ ] build tools to allow experiment makers to be blissfully unaware of the difference between slurm vs torchrun vs single gpu, or at least get as close to that as possible
 - [ ] bulid tools for model checkpointing
-- [ ] make muon faster
+- [x] make muon faster
 - [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
 - [ ] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out
 - [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
