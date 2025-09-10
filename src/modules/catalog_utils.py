@@ -78,6 +78,10 @@ def ignore_test_if_no_cuda():
     return
 
 
+def next_multiple(x, n):
+    return int(((int(x) + n - 1) // n) * n)
+
+
 ##################################################
 ### TOOLS THE USER DOESN'T HAVE TO WORRY ABOUT ###
 ##################################################

@@ -9,10 +9,7 @@ from tqdm import tqdm
 import torch
 import pandas as pd
 
-from modules.base_test_bench_utils import (
-    BenchmarkConfig, 
-    get_total_loss,
-)
+from modules.catalog_utils import BenchmarkConfig, get_total_loss
 from utils.device import get_available_devices
 from utils.testing import discover_dunder_objects
 

@@ -13,7 +13,7 @@ import pandas as pd
 
 from utils.device import get_available_devices
 from utils.testing import discover_dunder_objects
-from optimizers.utils import OptimizerConfig, OptimizerBenchmarkConfig, create_smart_optimizer
+from optimizers.catalog_utils import OptimizerConfig, OptimizerBenchmarkConfig, create_smart_optimizer
 
 
 def create_complex_synthetic_dataset(
@@ -399,7 +399,7 @@ if __name__ == "__main__":
 
     all_benchmark_configs, discovery_errors = discover_dunder_objects(
         dunder='__benchmark_config__', 
-        object=OptimizerBenchmarkConfig,  # Changed from OptimizerConfig
+        object=OptimizerBenchmarkConfig,
         search_folders="src/optimizers/catalog/"
     )
 

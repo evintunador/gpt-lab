@@ -1,6 +1,3 @@
-from modules.base_test_bench_utils import ignore_test_if_no_cuda
-ignore_test_if_no_cuda()
-
 from typing import List, Union, Tuple, Any
 import math
 
@@ -10,14 +7,18 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.attention.flex_attention import BlockMask, flex_attention, create_block_mask
 
-from modules.base_test_bench_utils import (
+from modules.catalog_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,
     TensorParallelConfig,
+    ignore_test_if_no_cuda,
 )
 from modules.catalog.fp8_linear import FP8Linear, is_hopper_available
 from modules.catalog.norms.rms_norm import RMSNorm
+
+
+ignore_test_if_no_cuda()
 
 
 class HalfTruncatedRotary(nn.Module):

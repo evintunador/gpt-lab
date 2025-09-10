@@ -37,7 +37,6 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [x] designa and build a user-facing API for the [`train_loops/](src/train_loops/) folder that intelligently picks which training loop features to use based on input arguments
     - [ ] ~~remove the current behavior of allowing None to be passed in and not trigger that feature~~
 - [x] add more atomic feature training loops
-- [ ] write an auto-documentation system that checks for differences in files in most recent git commit, cross-references the docs to find places where they need to be edited, makes the edits, and does another git commit. probably set this up with a hook for whenever a new git commit is logged, or maybe instead whenever a new git push is done to make it a bit less frequent. needs to support custom extra docs for describing specific features. maybe parse out a mapping between all docs and all python files that they reference and create a cascading update tool that travels the graph until changes stop? i guess it would also traverse reference docs that reference each other
 - [ ] build tools to allow experiment makers to be blissfully unaware of the difference between slurm vs torchrun vs single gpu, or at least get as close to that as possible
 - [ ] bulid tools for model checkpointing
 - [ ] make muon faster

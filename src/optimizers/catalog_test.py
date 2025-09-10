@@ -10,7 +10,7 @@ import pytest
 
 from utils.device import best_device as device
 from utils.testing import list_all_files_in_folder_and_subdirs, import_module_from_path
-from optimizers.utils import OptimizerConfig, create_smart_optimizer
+from optimizers.catalog_utils import OptimizerConfig, create_smart_optimizer
 
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -35,13 +35,22 @@ for optimizer_file in all_optimizer_files:
                 obj != torch.optim.Optimizer):
                 
                 # Get default config if available, otherwise None for auto-detection
-                default_config = getattr(module, '__default_config__', None)
+                test_config = getattr(module, '__test_config__', None)
                 
                 all_optimizer_classes.append(obj)
-                all_optimizer_configs.append(default_config)
+                all_optimizer_configs.append(test_config)
                 break
     except Exception as e:
         print(f"[WARNING] Failed to import optimizer from {optimizer_file}: {e}")
+
+
+def test_optimizer_discovery():
+    """Test that we successfully discovered optimizers from the catalog."""
+    if not all_optimizer_classes:
+        pytest.fail(
+            f"No optimizer classes discovered from {len(all_optimizer_files)} files in catalog/. "
+            f"Files found: {all_optimizer_files}"
+        )
 
 
 def universal_optimizer_test(
@@ -168,20 +177,3 @@ def test_universal_optimizer_learning(optimizer_class, config):
     
     # Run the universal test
     result = universal_optimizer_test(optimizer_class, config)
-    
-    # Print results for debugging
-    print(f"\n[SUCCESS] {result['optimizer_info']}: "
-          f"{result['loss_reduction']*100:.1f}% loss reduction "
-          f"({result['pre_loss']:.3f} → {result['post_loss']:.3f})")
-
-
-def test_optimizer_discovery():
-    """Test that we successfully discovered optimizers from the catalog."""
-    if not all_optimizer_classes:
-        pytest.fail(
-            f"No optimizer classes discovered from {len(all_optimizer_files)} files in catalog/. "
-            f"Files found: {all_optimizer_files}"
-        )
-    
-    print(f"\n[INFO] Discovered {len(all_optimizer_classes)} optimizer(s): "
-          f"{[cls.__name__ for cls in all_optimizer_classes]}")

@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 import random
 
-from data_sources.utils import Split
+from data_sources.catalog_utils import Split
 from data_sources.pre_caching_tokens import PrecachedDatasetMixin
 
 

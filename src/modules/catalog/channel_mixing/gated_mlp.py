@@ -4,13 +4,13 @@ import math
 import torch
 import torch.nn as nn
 
-from modules.base_test_bench_utils import (
+from modules.catalog_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,
-    TensorParallelConfig
+    TensorParallelConfig,
+    next_multiple,
 )
-from modules.catalog.utils import next_multiple
 from modules.catalog.activations.relu2 import ReLU2
 from modules.catalog.fp8_linear import FP8Linear, is_hopper_available
 from modules.catalog.channel_mixing.mlp import (

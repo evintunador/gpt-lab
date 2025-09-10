@@ -1,7 +1,7 @@
 from torch.optim import AdamW
-from optimizers.utils import OptimizerConfig, OptimizerBenchmarkConfig
+from optimizers.catalog_utils import OptimizerConfig, OptimizerBenchmarkConfig
 
-__default_config__ = OptimizerConfig(
+__test_config__ = OptimizerConfig(
     optimizer_kwargs={
         'lr': 1e-3,
         'betas': (0.9, 0.999),

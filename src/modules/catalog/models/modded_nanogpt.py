@@ -7,7 +7,7 @@ from torch.nn.attention.flex_attention import create_block_mask
 from modules.catalog.layers.modded_nanogpt_block import ModdedNanoGPTBlock
 from modules.catalog.fp8_linear import FP8Linear
 from modules.catalog.norms.rms_norm import RMSNorm
-from modules.catalog.utils import next_multiple
+from modules.catalog_utils import next_multiple
 
 
 

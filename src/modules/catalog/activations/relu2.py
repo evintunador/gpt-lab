@@ -4,7 +4,7 @@ import math
 import torch
 import torch.nn as nn
 
-from modules.base_test_bench_utils import (
+from modules.catalog_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,

@@ -4,7 +4,7 @@ import torch
 from torch import Tensor, nn
 import torch.nn.functional as F
 
-from modules.base_test_bench_utils import (
+from modules.catalog_utils import (
     ModuleTestConfig, 
     BenchmarkConfig, 
     Competitor,
