@@ -41,7 +41,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] bulid tools for model checkpointing
 - [x] make muon faster
 - [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
-- [ ] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out
+- [ ] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out. should be able to designate prior experiment as baseline
 - [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real.
 - [ ] add FSDP as an ability somewhere in here, not sure where
@@ -50,4 +50,4 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] do first DAGSeq2DAGSeq experiment
 - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 - [ ] implement tensorparallel abilities for [`modules/`](src/modules/) testing and benchmarking (low priority)
-- [ ] auto preprint latex generator (low priority, if ever)
+- [ ] tool for forking repo with specific experiment as the only one to carry over into fork (or i guess a tool to run after you've forked)

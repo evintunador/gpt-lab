@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 
 from data_sources.catalog_utils import Split
+from src.benchmarks.protocols import LogitMultipleChoiceItem
 
 
 """
@@ -68,7 +69,8 @@ def download_file(url: str, fname: str, chunk_size=1024):
 
 
 class HellaSwagDataset(Dataset):
-    """Raw HellaSwag dataset - no tokenization.
+    """
+    HellaSwag dataset that yields standardized LogitMultipleChoiceItem objects.
     
     Supports both streaming and downloading modes with flexible caching.
     """
@@ -164,24 +166,25 @@ class HellaSwagDataset(Dataset):
             return float('inf') if self.limit is None else self.limit
         return len(self.data)
     
-    def __getitem__(self, idx: int) -> Dict[str, Any]:
+    def __getitem__(self, idx: int) -> LogitMultipleChoiceItem:
         """Get a single example from the dataset."""
         if self.streaming:
             # For streaming, we need to handle indexing differently
             for i, example in enumerate(self.data):
                 if i == idx:
-                    return {
-                        "ctx": example["ctx"],
-                        "endings": example["endings"],
-                        "label": example["label"],
-                    }
+                    return LogitMultipleChoiceItem(
+                        context=example["ctx"],
+                        choices=example["endings"],
+                        label=example["label"],
+                    )
             raise IndexError(f"Index {idx} out of range")
         
-        return {
-            "ctx": self.data[idx]["ctx"],
-            "endings": self.data[idx]["endings"], 
-            "label": self.data[idx]["label"],
-        }
+        example = self.data[idx]
+        return LogitMultipleChoiceItem(
+            context=example["ctx"],
+            choices=example["endings"], 
+            label=example["label"],
+        )
     
     def _save_to_cache(self):
         """Save the current dataset to a cache file."""
