@@ -1,4 +1,16 @@
 from enum import Enum
+from typing import Optional, Union, Callable, Iterable, Tuple, List
+from pathlib import Path
+import os
+import importlib
+import multiprocessing as mp
+from functools import partial
+import requests
+
+import torch
+import numpy as np
+from tqdm import tqdm
+
 
 class Split(Enum):
     TRAIN = "train"
@@ -6,16 +18,20 @@ class Split(Enum):
     TEST = "test"
 
 
-from typing import Optional, Union, Callable, Iterable, Tuple, List
-from pathlib import Path
-import os
-import importlib
-import multiprocessing as mp
-from functools import partial
-
-import torch
-import numpy as np
-from tqdm import tqdm
+def download_file(url: str, fname: str, chunk_size=1024):
+    """Helper function to download a file from a given url"""
+    resp = requests.get(url, stream=True)
+    total = int(resp.headers.get("content-length", 0))
+    with open(fname, "wb") as file, tqdm(
+        desc=fname,
+        total=total,
+        unit="iB",
+        unit_scale=True,
+        unit_divisor=1024,
+    ) as bar:
+        for data in resp.iter_content(chunk_size=chunk_size):
+            size = file.write(data)
+            bar.update(size)
 
 
 class PrecachedDatasetMixin:

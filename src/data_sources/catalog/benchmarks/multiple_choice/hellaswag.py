@@ -1,7 +1,6 @@
 from typing import Dict, Any, Optional, Callable
 import json
 import os
-import requests
 
 from tqdm import tqdm
 import numpy as np
@@ -9,7 +8,7 @@ import torch
 from torch.utils.data import Dataset
 from datasets import load_dataset
 
-from data_sources.catalog_utils import Split
+from data_sources.catalog_utils import Split, download_file
 from src.benchmarks.protocols import LogitMultipleChoiceItem
 
 
@@ -50,22 +49,6 @@ gpt2-xl (1558M)
 
 The validation set of HellaSwag has a total of 10,042 examples.
 """
-
-
-def download_file(url: str, fname: str, chunk_size=1024):
-    """Helper function to download a file from a given url"""
-    resp = requests.get(url, stream=True)
-    total = int(resp.headers.get("content-length", 0))
-    with open(fname, "wb") as file, tqdm(
-        desc=fname,
-        total=total,
-        unit="iB",
-        unit_scale=True,
-        unit_divisor=1024,
-    ) as bar:
-        for data in resp.iter_content(chunk_size=chunk_size):
-            size = file.write(data)
-            bar.update(size)
 
 
 class HellaSwagDataset(Dataset):
@@ -214,50 +197,3 @@ class HellaSwagDataset(Dataset):
                 self.data.append(example)
         
         self.streaming = False
-
-
-def render_hellaswag_example(example, tokenizer_encode_fn):
-    """
-    Given the example as a dictionary, render it as three torch tensors:
-    - tokens (the tokens of context + completion, of size 4xN, as there are always 4 candidates)
-    - mask (is 1 in the region of the candidate completion, where we evaluate likelihoods)
-    - label (the index of the correct completion, which we hope has the highest likelihood)
-    """
-    ctx = example["ctx"]
-    label = example["label"]
-    endings = example["endings"]
-
-    # gather up all the tokens
-    ctx_tokens = tokenizer_encode_fn(ctx)
-    tok_rows = []
-    mask_rows = []
-    for end in endings:
-        end_tokens = tokenizer_encode_fn(" " + end)  # NOTE: prepending " " assuming GPT-2 based tokenizer
-        tok_rows.append(ctx_tokens + end_tokens)
-        mask_rows.append([0]*len(ctx_tokens) + [1]*len(end_tokens))
-
-    # have to be careful during the collation because the number of tokens in each row can differ
-    max_len = max(len(row) for row in tok_rows)
-    tokens = torch.zeros((4, max_len), dtype=torch.int32)
-    mask = torch.zeros((4, max_len), dtype=torch.int32)
-    for i, (tok_row, mask_row) in enumerate(zip(tok_rows, mask_rows)):
-        tokens[i, :len(tok_row)] = torch.tensor(tok_row)
-        mask[i, :len(mask_row)] = torch.tensor(mask_row)
-
-    return tokens, mask, label
-
-
-class TokenizedHellaSwagDataset(HellaSwagDataset):
-    def __init__(
-            self, 
-            tokenizer_encode_fn: Callable[[str], np.ndarray],
-            **kwargs
-        ):
-        super().__init__(**kwargs)
-        self.tokenizer_encode_fn = tokenizer_encode_fn
-
-    def __getitem__(self, idx: int) -> Dict[str, np.ndarray]:
-        return render_hellaswag_example(
-            super().__getitem__(idx), 
-            self.tokenizer_encode_fn
-        )

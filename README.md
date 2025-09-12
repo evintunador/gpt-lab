@@ -21,7 +21,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - `data_sources/` - Data loading and preprocessing components
     - `models/` - Catalog of models. 
     - `optimizers/` - Catalog of optimizers. Includes simple testing and benchmarking tools.
-    - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models (planned)
+    - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
     - `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
 
 ## Getting Started
@@ -41,7 +41,8 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] bulid tools for model checkpointing
 - [x] make muon faster
 - [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
-- [ ] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out. should be able to designate prior experiment as baseline
+- [x] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out
+- [ ] design and build a system for comparing performance between two models (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
 - [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real.
 - [ ] add FSDP as an ability somewhere in here, not sure where
