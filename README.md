@@ -8,6 +8,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## Directory Structure
 
 - `docs/` - A full mirror of the `src/` repo with documentation about the user-facing API of each corresponding file (planned)
+- `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
 - `src/`
     - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
     - `modules/` - Catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
@@ -22,7 +23,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - `models/` - Catalog of models. 
     - `optimizers/` - Catalog of optimizers. Includes simple testing and benchmarking tools.
     - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
-    - `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
+d
 
 ## Getting Started
 
@@ -32,23 +33,38 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 4. Start adding to the various component catalogues.
 5. Write and run your experiment over in `experiments/`
 
-## TODO
+## todo
+### important / urgent
 
-- [x] designa and build a user-facing API for the [`train_loops/](src/train_loops/) folder that intelligently picks which training loop features to use based on input arguments
-    - [ ] ~~remove the current behavior of allowing None to be passed in and not trigger that feature~~
-- [x] add more atomic feature training loops
-- [ ] build tools to allow experiment makers to be blissfully unaware of the difference between slurm vs torchrun vs single gpu, or at least get as close to that as possible
-- [ ] bulid tools for model checkpointing
-- [x] make muon faster
-- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
-- [x] design and build model accuracy benchmarking system where a benchmark type can be defined and models & datasets swapped out
-- [ ] design and build a system for comparing performance between two models (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
-- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
-- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real.
-- [ ] add FSDP as an ability somewhere in here, not sure where
-- [ ] find other features to help with our experiments
-- [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out and put into `utils/`
 - [ ] do first DAGSeq2DAGSeq experiment
-- [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
-- [ ] implement tensorparallel abilities for [`modules/`](src/modules/) testing and benchmarking (low priority)
-- [ ] tool for forking repo with specific experiment as the only one to carry over into fork (or i guess a tool to run after you've forked)
+
+    - [ ] - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
+
+- [ ] build tools to allow experiment makers to be blissfully unaware of the difference between torchrun vs single gpu, or at least get as close to that as possible
+
+    - [ ] vs slurm as well (less urgent, but please make it general enough to generalize to this feature)
+
+- broadly "the experiment folder utilities" (working name; functions & anstractions TBD)
+
+    - [ ] bulid tools for model checkpointing
+    - [ ] design and build a system for comparing performance between two models (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
+
+- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
+
+### important / not-urgent
+- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
+- [ ] add FSDP as an ability somewhere in here, not sure where
+- [ ] find other desirable features to help with our experiments
+- [ ] implement more advanced parallel abilities for [`modules/`](src/modules/) testing and benchmarking
+
+### not important / urgent
+
+
+### not important / not urgent
+
+- [ ] add more atomic feature training loops
+- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
+- [ ] add more benchmark datasets
+- [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out and put into `utils/`
+- [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
+- [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `mdoules/`)
