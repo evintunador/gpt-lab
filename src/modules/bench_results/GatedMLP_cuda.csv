@@ -1,0 +1,865 @@
+dim,hidden_mult,activation,dtype,fp8,class,device,measurement,value
+128,2,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.16752640008926392
+128,2,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.7342080473899841
+128,2,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018809344
+128,2,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019137536
+128,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2880608081817627
+128,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5091231822967529
+128,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018809344
+128,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018875392
+128,2,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.19856959581375122
+128,2,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.7277408480644226
+128,2,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018220032
+128,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4556608200073242
+128,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4779199600219727
+128,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,2,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.19517439603805542
+128,2,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.716595184803009
+128,2,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018220032
+128,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4509568214416504
+128,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4819071769714356
+128,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,2,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.17571840286254883
+128,2,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.7624704360961915
+128,2,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.019333632
+128,2,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019661824
+128,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3544960021972656
+128,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.42302718162536623
+128,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018809344
+128,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018875392
+128,2,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.4517888069152832
+128,2,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.7908351898193359
+128,2,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018317824
+128,2,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018482176
+128,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.23552000522613525
+128,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.39538238048553465
+128,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4261792182922363
+128,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6628447532653807
+128,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018317824
+128,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018482176
+128,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2357248067855835
+128,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.40878078937530515
+128,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,2,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.14499839544296264
+128,2,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5088256001472473
+128,2,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.019071488
+128,2,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.01939968
+128,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.18350080251693726
+128,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.36495357751846313
+128,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018809344
+128,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018875392
+128,2,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.20234239101409912
+128,2,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.7441408395767212
+128,2,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018186752
+128,2,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018351104
+128,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.39823360443115235
+128,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5548031806945801
+128,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,2,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.384716796875
+128,2,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6883328437805176
+128,2,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018186752
+128,2,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.018351104
+128,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4459519863128662
+128,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.47011837959289554
+128,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.01805568
+128,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018121728
+128,4,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.32727038860321045
+128,4,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5242688417434692
+128,4,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.019792384
+128,4,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0207104
+128,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.22087678909301758
+128,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3517440319061279
+128,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019792384
+128,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.020186112
+128,4,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.21770238876342773
+128,4,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.47450561523437496
+128,4,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019137536
+128,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.24545280933380126
+128,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.401203179359436
+128,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,4,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.21535999774932862
+128,4,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.39863040447235104
+128,4,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019137536
+128,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.24924800395965577
+128,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3805119752883911
+128,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,4,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.21942720413208008
+128,4,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.4678944110870361
+128,4,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.02084096
+128,4,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.021758976
+128,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2288640022277832
+128,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.471347188949585
+128,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019792384
+128,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.020186112
+128,4,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.4308159828186035
+128,4,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.7083840370178223
+128,4,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01920256
+128,4,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019661824
+128,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3129503965377808
+128,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6176608324050903
+128,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4282368183135986
+128,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.7465983867645264
+128,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01920256
+128,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.019661824
+128,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.35040960311889646
+128,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.565772819519043
+128,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,4,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.2919424057006836
+128,4,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5470208168029784
+128,4,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.020316672
+128,4,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.021234688
+128,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3569664001464844
+128,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4286464214324951
+128,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019792384
+128,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.020186112
+128,4,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.37396481037139895
+128,4,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.4729856252670288
+128,4,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018940416
+128,4,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.01939968
+128,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.429260778427124
+128,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5000192165374755
+128,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,4,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.3869695901870728
+128,4,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6991872549057007
+128,4,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.018940416
+128,4,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.01939968
+128,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4700160026550293
+128,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4768735885620117
+128,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.018678272
+128,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.018940928
+128,8,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.32184319496154784
+128,8,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5763072490692138
+128,8,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.020775424
+128,8,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.022283264
+128,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3527679920196533
+128,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.45580163002014157
+128,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.020775424
+128,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.021496832
+128,8,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.3974143981933594
+128,8,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6178815841674805
+128,8,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02005504
+128,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.39352319240570066
+128,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5607424020767212
+128,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+128,8,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.3732480049133301
+128,8,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.5574463844299317
+128,8,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02005504
+128,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.319488000869751
+128,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.553267240524292
+128,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+128,8,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.3835968017578125
+128,8,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.47922563552856445
+128,8,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.022348288
+128,8,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.023856128
+128,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.38993918895721436
+128,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3942591905593872
+128,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.020775424
+128,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.021496832
+128,8,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.486297607421875
+128,8,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.698265552520752
+128,8,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.020087296
+128,8,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.020841472
+128,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.45508480072021484
+128,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.46733436584472654
+128,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+128,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4472832202911377
+128,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.8221855640411377
+128,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.020087296
+128,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.020841472
+128,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3728384017944336
+128,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5416128158569335
+128,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+128,8,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.31650240421295167
+128,8,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5824703931808473
+128,8,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.021561856
+128,8,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.023069696
+128,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.40919041633605957
+128,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3703807830810547
+128,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.020775424
+128,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.021496832
+128,8,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.42485761642456055
+128,8,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.625971221923828
+128,8,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01969408
+128,8,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.020448256
+128,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.24678080081939696
+128,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.38472001552581786
+128,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+128,8,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.22732799053192138
+128,8,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.4944000005722046
+128,8,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.01969408
+128,8,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.020448256
+128,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.24657919406890869
+128,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3944448232650757
+128,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.019300864
+128,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.019760128
+512,2,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.16650240421295165
+512,2,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.4626303911209107
+512,2,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.024904192
+512,2,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.026477568
+512,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2867327928543091
+512,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4942720174789429
+512,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.024904192
+512,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.025691136
+512,2,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.4027552127838135
+512,2,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.7739231586456299
+512,2,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02333184
+512,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.35727360248565676
+512,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6004735708236694
+512,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,2,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.3726336002349854
+512,2,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.76278395652771
+512,2,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02333184
+512,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.45383682250976565
+512,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6441120147705078
+512,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,2,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.35727360248565676
+512,2,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.866211199760437
+512,2,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,2,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.028050432
+512,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.28764159679412843
+512,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5056512117385865
+512,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.024904192
+512,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.025691136
+512,2,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.45250558853149414
+512,2,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.6176768302917481
+512,2,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.023331328
+512,2,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.024118272
+512,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.45393919944763184
+512,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5179392337799072
+512,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.44543681144714353
+512,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.7428127765655518
+512,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.023331328
+512,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.024118272
+512,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.45015997886657716
+512,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.500316858291626
+512,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,2,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.29808640480041504
+512,2,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.5352447986602783
+512,2,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.025690624
+512,2,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.027264
+512,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.21544959545135497
+512,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3630079984664917
+512,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.024904192
+512,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.025691136
+512,2,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.22813758850097657
+512,2,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.4059232234954834
+512,2,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.022938112
+512,2,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.023725056
+512,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3092319965362549
+512,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6095008373260498
+512,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,2,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.36300480365753174
+512,2,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6284319639205933
+512,2,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.022938112
+512,2,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.023725056
+512,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.24576001167297362
+512,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4337503910064698
+512,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.022544896
+512,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.023200768
+512,4,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.1556671977043152
+512,4,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.3450688004493713
+512,4,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.030409216
+512,4,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.034079744
+512,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3555327892303467
+512,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.42455039024353025
+512,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.030409216
+512,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.03250688
+512,4,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.4047999858856201
+512,4,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.7068736553192139
+512,4,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.027263488
+512,4,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5294112205505371
+512,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.38850240707397454
+512,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4016128063201904
+512,4,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6258687496185302
+512,4,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.027263488
+512,4,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.47482881546020506
+512,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.43540477752685547
+512,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.35184640884399415
+512,4,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.6676671981811524
+512,4,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+512,4,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.037225472
+512,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.20285439491271973
+512,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.32204799652099614
+512,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.030409216
+512,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.03250688
+512,4,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.24043519496917726
+512,4,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.5873664140701294
+512,4,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.028836352
+512,4,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.030671872
+512,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4289663791656494
+512,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4907904148101807
+512,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.45066242218017577
+512,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.9430015563964844
+512,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.028836352
+512,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.030671872
+512,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5198847770690918
+512,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4096000671386719
+512,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.27156479358673097
+512,4,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.6733824491500855
+512,4,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.03198208
+512,4,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.035652608
+512,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3510272026062012
+512,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4295680046081543
+512,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.030409216
+512,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.03250688
+512,4,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.4217855930328369
+512,4,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6538208484649659
+512,4,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.02804992
+512,4,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02988544
+512,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.48353281021118166
+512,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4707327842712402
+512,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,4,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.39731199741363527
+512,4,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.7472287893295289
+512,4,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.02804992
+512,4,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.02988544
+512,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3719072103500366
+512,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3944544076919556
+512,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.026477056
+512,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.029099008
+512,8,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.21134400367736816
+512,8,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.6249663829803467
+512,8,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.039059968
+512,8,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0469248
+512,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2061311960220337
+512,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.35696642398834233
+512,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.039059968
+512,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.044041216
+512,8,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.19322880506515502
+512,8,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.4381695866584777
+512,8,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.03840512
+512,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.23193600177764892
+512,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.41521918773651123
+512,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+512,8,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.1922976016998291
+512,8,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.46214718818664546
+512,8,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.03840512
+512,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4498432159423828
+512,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4720640182495118
+512,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+512,8,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.3375168085098267
+512,8,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.8174527883529662
+512,8,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.04508928
+512,8,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.052691968
+512,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.2603967905044556
+512,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4821056127548217
+512,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.039059968
+512,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.044041216
+512,8,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.4704256057739258
+512,8,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.9377792358398438
+512,8,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.037487104
+512,8,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.041550848
+512,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3329024076461792
+512,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.43836481571197516
+512,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+512,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.3374079942703247
+512,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.5224384069442749
+512,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.037487104
+512,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.041550848
+512,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4043776035308838
+512,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5402719974517822
+512,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+512,8,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.27453439235687255
+512,8,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.44093439579010013
+512,8,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.041943552
+512,8,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.049808384
+512,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3555327892303467
+512,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.35288000106811523
+512,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.039059968
+512,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.044041216
+512,8,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.2653183937072754
+512,8,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6269951820373535
+512,8,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.036045312
+512,8,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.040109056
+512,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.23562240600585938
+512,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.41216001510620115
+512,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+512,8,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.2364351987838745
+512,8,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6682687997817993
+512,8,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.036045312
+512,8,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.040109056
+512,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4232192039489746
+512,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.4954112052917481
+512,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.03460352
+512,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.037356544
+1024,2,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.27924480438232424
+1024,2,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.6692959785461425
+1024,2,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.0398464
+1024,2,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.04561408
+1024,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.21637120246887206
+1024,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.40161280632019036
+1024,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.039322112
+1024,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.044041216
+1024,2,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.38594560623168944
+1024,2,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.7418879508972167
+1024,2,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.034865664
+1024,2,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.28682239055633546
+1024,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.3572672128677368
+1024,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+1024,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.20592639446258545
+1024,2,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6368255853652954
+1024,2,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.034341376
+1024,2,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.040895488
+1024,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4214784145355225
+1024,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5038079738616943
+1024,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.034079232
+1024,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.039584768
+1024,2,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.3298432111740112
+1024,2,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.8762239694595337
+1024,2,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.04246784
+1024,2,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.047186944
+1024,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.35450880527496337
+1024,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.43651521205902105
+1024,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.039322112
+1024,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.043254784
+1024,2,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.5017600059509277
+1024,2,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.9622528076171875
+1024,2,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.03591424
+1024,2,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3147615909576416
+1024,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5346463680267335
+1024,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+1024,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4641791820526123
+1024,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.8001344203948973
+1024,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.036438528
+1024,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5421055793762207
+1024,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.40570878982543945
+1024,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+1024,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.28641281127929685
+1024,2,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.617353630065918
+1024,2,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.041419264
+1024,2,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.047186944
+1024,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.20132160186767578
+1024,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5350368022918701
+1024,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.038273536
+1024,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.044041216
+1024,2,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.46284799575805663
+1024,2,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6482944488525391
+1024,2,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.035127808
+1024,2,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.36965439319610593
+1024,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6053056478500366
+1024,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+1024,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.39823360443115235
+1024,2,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.7855999946594239
+1024,2,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.035652096
+1024,2,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.512716817855835
+1024,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5184447765350342
+1024,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.033554944
+1024,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0403712
+1024,4,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.3748863935470581
+1024,4,relu,float32,False,GatedMLP,cuda,Backward Time (ms),0.6408191919326782
+1024,4,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.050856448
+1024,4,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.061080576
+1024,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.372326397895813
+1024,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.65075204372406
+1024,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.051380736
+1024,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.059769856
+1024,4,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.28293120861053467
+1024,4,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6450175523757935
+1024,4,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.04574464
+1024,4,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.058459136
+1024,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.42967681884765624
+1024,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.543942356109619
+1024,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,4,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.28293120861053467
+1024,4,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6687744379043579
+1024,4,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.04574464
+1024,4,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.058459136
+1024,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.461516809463501
+1024,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.49172482490539554
+1024,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,4,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.39536640644073484
+1024,4,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),0.7490560293197631
+1024,4,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.056623616
+1024,4,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.067109888
+1024,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.33371520042419434
+1024,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6011968135833741
+1024,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.051380736
+1024,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.059769856
+1024,4,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.27380800247192383
+1024,4,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.8695743560791016
+1024,4,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.048628224
+1024,4,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.05741056
+1024,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3041280031204224
+1024,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5923840284347535
+1024,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.2733920097351074
+1024,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.8570015907287598
+1024,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.048628224
+1024,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.05741056
+1024,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.32030720710754396
+1024,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5909503459930421
+1024,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,4,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.33720319271087645
+1024,4,silu,float32,False,GatedMLP,cuda,Backward Time (ms),0.6025216341018678
+1024,4,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.054526464
+1024,4,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.064226304
+1024,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.3792896032333374
+1024,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6599680185317994
+1024,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.051380736
+1024,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.059769856
+1024,4,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.2828448057174683
+1024,4,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.6499167680740356
+1024,4,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.047186432
+1024,4,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.05872128
+1024,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.44400639533996583
+1024,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.6030335903167725
+1024,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,4,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.28395519256591795
+1024,4,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.6828096389770508
+1024,4,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.047186432
+1024,4,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.05872128
+1024,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.45608959197998045
+1024,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.5508095741271973
+1024,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.047579648
+1024,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.057672704
+1024,8,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.7250944137573242
+1024,8,relu,float32,False,GatedMLP,cuda,Backward Time (ms),1.358351898193359
+1024,8,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.077332992
+1024,8,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.729702377319336
+1024,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.339904022216797
+1024,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.078905856
+1024,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.10197504
+1024,8,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.5302271842956543
+1024,8,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.9672703742980957
+1024,8,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.100140032
+1024,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5057536125183105
+1024,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9521151542663574
+1024,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.49346561431884767
+1024,8,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.9189215660095216
+1024,8,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.100140032
+1024,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5048319816589355
+1024,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.953753662109375
+1024,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.6982656002044678
+1024,8,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),1.4062559604644773
+1024,8,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.089915904
+1024,8,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.111936512
+1024,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.6617248058319092
+1024,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.239411211013794
+1024,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.077332992
+1024,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.100402176
+1024,8,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.519049596786499
+1024,8,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.9706655979156495
+1024,8,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.079168
+1024,8,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.098305024
+1024,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5045248031616211
+1024,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9551872253417969
+1024,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.5189631938934326
+1024,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.9698303699493408
+1024,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.079168
+1024,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.098305024
+1024,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.536684799194336
+1024,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9969632148742675
+1024,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.7319551944732666
+1024,8,silu,float32,False,GatedMLP,cuda,Backward Time (ms),1.2477439403533936
+1024,8,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.084148736
+1024,8,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.106169344
+1024,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.6600704193115234
+1024,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.2424192428588867
+1024,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.077332992
+1024,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.100402176
+1024,8,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.4984608173370361
+1024,8,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.9198815822601318
+1024,8,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.076284416
+1024,8,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.099091456
+1024,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.4987775802612305
+1024,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9437312126159669
+1024,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+1024,8,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.5008384227752686
+1024,8,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.9304063320159911
+1024,8,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.076284416
+1024,8,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.099091456
+1024,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5402624130249023
+1024,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9932800292968751
+1024,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+1024,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.0993536
+2048,2,relu,float32,False,GatedMLP,cuda,Forward Time (ms),0.7139328002929688
+2048,2,relu,float32,False,GatedMLP,cuda,Backward Time (ms),1.2909568786621095
+2048,2,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.077070848
+2048,2,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101712896
+2048,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.6500351905822754
+2048,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.20883207321167
+2048,2,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.076022272
+2048,2,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.102761472
+2048,2,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.4902912139892578
+2048,2,relu,float16,False,GatedMLP,cuda,Backward Time (ms),0.8958879470825195
+2048,2,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.072483328
+2048,2,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101581824
+2048,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.49735679626464846
+2048,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9257984161376952
+2048,2,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,2,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.4902912139892578
+2048,2,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.894054412841797
+2048,2,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.072483328
+2048,2,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101581824
+2048,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5007359981536865
+2048,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9375744342803956
+2048,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,2,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),0.6645760059356689
+2048,2,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),1.2538976192474365
+2048,2,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.08310016
+2048,2,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.102761472
+2048,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.6484992027282714
+2048,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.209651279449463
+2048,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.076022272
+2048,2,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.102761472
+2048,2,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),0.5055488109588623
+2048,2,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),0.9552896022796632
+2048,2,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.07458048
+2048,2,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101450752
+2048,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5349376201629639
+2048,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9769983768463135
+2048,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.5437439918518067
+2048,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.98056640625
+2048,2,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.07458048
+2048,2,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101450752
+2048,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5339136123657227
+2048,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9752575874328613
+2048,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,2,silu,float32,False,GatedMLP,cuda,Forward Time (ms),0.7181439876556397
+2048,2,silu,float32,False,GatedMLP,cuda,Backward Time (ms),1.3075327396392822
+2048,2,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.080216576
+2048,2,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.103810048
+2048,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.7242752075195312
+2048,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.3068288803100585
+2048,2,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.076022272
+2048,2,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.102761472
+2048,2,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.5312511920928955
+2048,2,silu,float16,False,GatedMLP,cuda,Backward Time (ms),0.9491456508636475
+2048,2,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+2048,2,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101450752
+2048,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5400576114654541
+2048,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9796607494354248
+2048,2,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,2,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.5307392120361328
+2048,2,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),0.9512959480285644
+2048,2,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.073400832
+2048,2,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.101450752
+2048,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.5305312156677247
+2048,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),0.9789471626281738
+2048,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.07064832
+2048,2,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.101843968
+2048,4,relu,float32,False,GatedMLP,cuda,Forward Time (ms),1.4190560340881349
+2048,4,relu,float32,False,GatedMLP,cuda,Backward Time (ms),2.6270750999450683
+2048,4,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.116130304
+2048,4,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.2696576118469238
+2048,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),2.3869441032409666
+2048,4,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.11717888
+2048,4,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,relu,float16,False,GatedMLP,cuda,Forward Time (ms),0.9867360115051269
+2048,4,relu,float16,False,GatedMLP,cuda,Backward Time (ms),1.9846047401428224
+2048,4,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.113771008
+2048,4,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.994099235534668
+2048,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.9336000442504884
+2048,4,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.113771008
+2048,4,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.171181056
+2048,4,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.9923583984375
+2048,4,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),1.9829759597778323
+2048,4,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.115343872
+2048,4,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.9935680389404297
+2048,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.9293279647827148
+2048,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.113508864
+2048,4,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.173016064
+2048,4,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),1.3190143585205079
+2048,4,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),2.5785343170166017
+2048,4,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.12766464
+2048,4,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.2781567573547363
+2048,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),2.380492687225342
+2048,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.116130304
+2048,4,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),1.003007984161377
+2048,4,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),2.051276874542236
+2048,4,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.119538176
+2048,4,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.9911295890808105
+2048,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.9318783760070801
+2048,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.115343872
+2048,4,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),1.0076160430908203
+2048,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),2.0513824462890624
+2048,4,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.119538176
+2048,4,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.9904128074645996
+2048,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.929318332672119
+2048,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.115343872
+2048,4,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,silu,float32,False,GatedMLP,cuda,Forward Time (ms),1.2806367874145508
+2048,4,silu,float32,False,GatedMLP,cuda,Backward Time (ms),2.467100715637207
+2048,4,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.12242176
+2048,4,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.2760064125061035
+2048,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),2.3853056907653807
+2048,4,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.117703168
+2048,4,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.169608192
+2048,4,silu,float16,False,GatedMLP,cuda,Forward Time (ms),0.994099235534668
+2048,4,silu,float16,False,GatedMLP,cuda,Backward Time (ms),1.99946231842041
+2048,4,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.118227456
+2048,4,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.9908224105834961
+2048,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.9264511108398437
+2048,4,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.113771008
+2048,4,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.171181056
+2048,4,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),0.9923583984375
+2048,4,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),1.9978240966796876
+2048,4,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.117965312
+2048,4,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.172229632
+2048,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),0.9916352272033692
+2048,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),1.9250239372253417
+2048,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.112722432
+2048,4,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.171181056
+2048,8,relu,float32,False,GatedMLP,cuda,Forward Time (ms),2.5019392013549804
+2048,8,relu,float32,False,GatedMLP,cuda,Backward Time (ms),4.9307649612426765
+2048,8,relu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.201851392
+2048,8,relu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.314049536
+2048,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),2.471116828918457
+2048,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),4.7256574630737305
+2048,8,relu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.201851392
+2048,8,relu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.313525248
+2048,8,relu,float16,False,GatedMLP,cuda,Forward Time (ms),1.8823135375976563
+2048,8,relu,float16,False,GatedMLP,cuda,Backward Time (ms),3.8861057281494142
+2048,8,relu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.201196032
+2048,8,relu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.9009536743164062
+2048,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),3.8668285369873048
+2048,8,relu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.201589248
+2048,8,relu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),1.8851839065551759
+2048,8,relu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),3.8804479598999024
+2048,8,relu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.201196032
+2048,8,relu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.903104019165039
+2048,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),3.8662143707275387
+2048,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.201589248
+2048,8,relu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu2,float32,False,GatedMLP,cuda,Forward Time (ms),2.5780223846435546
+2048,8,relu2,float32,False,GatedMLP,cuda,Backward Time (ms),5.263468551635743
+2048,8,relu2,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.224395776
+2048,8,relu2,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.313525248
+2048,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),2.598297691345215
+2048,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),5.2491266250610344
+2048,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.224395776
+2048,8,relu2,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.313525248
+2048,8,relu2,float16,False,GatedMLP,cuda,Forward Time (ms),1.9369983673095703
+2048,8,relu2,float16,False,GatedMLP,cuda,Backward Time (ms),4.04060173034668
+2048,8,relu2,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.212992512
+2048,8,relu2,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.9537919998168944
+2048,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),4.02810878753662
+2048,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.212992512
+2048,8,relu2,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Time (ms),1.9368095397949219
+2048,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Time (ms),4.039868927001953
+2048,8,relu2,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.212992512
+2048,8,relu2,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.9535871505737306
+2048,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),4.02851848602295
+2048,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.212992512
+2048,8,relu2,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,silu,float32,False,GatedMLP,cuda,Forward Time (ms),2.4938495635986326
+2048,8,silu,float32,False,GatedMLP,cuda,Backward Time (ms),4.934348678588868
+2048,8,silu,float32,False,GatedMLP,cuda,Forward Peak Memory (GB),0.213123584
+2048,8,silu,float32,False,GatedMLP,cuda,Backward Peak Memory (GB),0.313525248
+2048,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Time (ms),2.510540771484375
+2048,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Time (ms),4.914585876464844
+2048,8,silu,float32,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.213123584
+2048,8,silu,float32,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.313525248
+2048,8,silu,float16,False,GatedMLP,cuda,Forward Time (ms),1.8977792739868165
+2048,8,silu,float16,False,GatedMLP,cuda,Backward Time (ms),3.913010978698731
+2048,8,silu,float16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.207356416
+2048,8,silu,float16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.9126272201538086
+2048,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),3.8967294692993164
+2048,8,silu,float16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.207356416
+2048,8,silu,float16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,silu,bfloat16,False,GatedMLP,cuda,Forward Time (ms),1.8960384368896483
+2048,8,silu,bfloat16,False,GatedMLP,cuda,Backward Time (ms),3.9152641296386723
+2048,8,silu,bfloat16,False,GatedMLP,cuda,Forward Peak Memory (GB),0.207356416
+2048,8,silu,bfloat16,False,GatedMLP,cuda,Backward Peak Memory (GB),0.321127424
+2048,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Time (ms),1.9120128631591797
+2048,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Time (ms),3.89488639831543
+2048,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Forward Peak Memory (GB),0.207356416
+2048,8,silu,bfloat16,False,PreCompiledGatedMLP,cuda,Backward Peak Memory (GB),0.321127424

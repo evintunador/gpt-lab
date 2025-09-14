@@ -284,8 +284,8 @@ def bpe_train(
 
 
 def save_tokenizer(enc, name, vocab_size, sample_size):
-    os.makedirs('experiments/catalog/custom_bpe/trained', exist_ok=True)
-    full_filename = f"experiments/catalog/custom_bpe/trained/{name}_v{vocab_size}_n{sample_size}.pkl"
+    os.makedirs('trained', exist_ok=True)
+    full_filename = f"trained/{name}_v{vocab_size}_n{sample_size}.pkl"
     with open(__file__, 'r') as f:
         script_content = f.read()
     tokenizer_data = {

@@ -10,8 +10,7 @@ from modules.catalog.norms.rms_norm import RMSNorm
 from modules.catalog_utils import next_multiple
 
 
-
-class GPT(nn.Module):
+class ModdedNanoGPT(nn.Module):
     def __init__(self, 
     vocab_size: int, num_layers: int, num_val_emb: int, num_heads: int, model_dim: int, max_seq_len: int, mlp_ratio: int
     ):
