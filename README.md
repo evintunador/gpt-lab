@@ -10,20 +10,22 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - `docs/` - A full mirror of the `src/` repo with documentation about the user-facing API of each corresponding file (planned)
 - `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
 - `src/`
+
     - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
     - `modules/` - Catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
     - `utils/` - Shared utilities across the project
+
         - `llm_code_compiler/` - LLM interface for code generation. Currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later
         - `reproducibility/` - Tools for reproducible research (planned)
         - `distributed.py` - Tools to make other scripts agnostic to single gpu vs torchrun vs slurm (planned)
         - `device.py`
         - `benchmarking.py`
         - `testing.py`
+
     - `data_sources/` - Data loading and preprocessing components
     - `models/` - Catalog of models. 
     - `optimizers/` - Catalog of optimizers. Includes simple testing and benchmarking tools.
     - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
-d
 
 ## Getting Started
 
@@ -38,7 +40,7 @@ d
 
 - [ ] do first DAGSeq2DAGSeq experiment
 
-    - [ ] - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
+    - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
 - [ ] build tools to allow experiment makers to be blissfully unaware of the difference between torchrun vs single gpu, or at least get as close to that as possible
 
