@@ -14,7 +14,6 @@ import torch
 import torch.distributed as dist
 
 from data_sources.catalog.pretraining.fineweb import FineWebDataset
-from models.catalog.tokenizers.visualise import visualise_tokens
 from utils.distributed import DistributedManager
 
 
@@ -96,6 +95,7 @@ def prepare_data_tensors(
     dtype: torch.dtype, 
     separator_flag: int, 
     dist_manager: DistributedManager, 
+    pat_str: str,
     seed: int = random.randint(0, 2**32),
 ):
     dataset = FineWebDataset(
@@ -111,18 +111,20 @@ def prepare_data_tensors(
         ranks[bytes([i])] = i
     tot_ct = 0
     i = 0
+    data_iter = iter(dataset)
     while tot_ct < n:
         try:
-            doc = next(dataset)
-        except Exception:
+            doc = next(data_iter)
+        except StopIteration:
             break
         data_buffer.append(doc)
         tot_ct += len(doc)
         # some cheap vast.ai nodes have less CPU ram than GPU ram so we pipeline
         if len(data_buffer) > 2**16:
+            text_chunk = "\n".join(data_buffer)
             data_buffer_bytes: List[List[bytes]] = [
                 [bytes([b]) for b in wordish.encode("utf-8")]
-                for wordish in regex.findall(pat_str, "".join(data_buffer))
+                for wordish in regex.findall(pat_str, text_chunk)
             ]
             data_buffer_ids: List[List[int]] = [
                 [nat2int(ranks[b]) for b in wordish]
@@ -134,6 +136,22 @@ def prepare_data_tensors(
             data_tensor = torch.concat((data_tensor, ids), dim=0)
             data_buffer = []
         i += 1
+    
+    if data_buffer:
+        text_chunk = "\n".join(data_buffer)
+        data_buffer_bytes: List[List[bytes]] = [
+            [bytes([b]) for b in wordish.encode("utf-8")]
+            for wordish in regex.findall(pat_str, text_chunk)
+        ]
+        data_buffer_ids: List[List[int]] = [
+            [nat2int(ranks[b]) for b in wordish]
+            for wordish in data_buffer_bytes
+        ]
+        ids = torch.tensor(
+            list(chain.from_iterable(word + [separator_flag] for word in data_buffer_ids)), 
+            dtype=dtype, device=dist_manager.device)
+        data_tensor = torch.concat((data_tensor, ids), dim=0)
+    
     return data_tensor, ranks
 
 
@@ -157,7 +175,6 @@ def multi_gpu_best_pair(counts: torch.tensor, unique: torch.tensor, k: int, dist
     pairs_idx = sort_idx[:k] # shape (k)
     most_common_pairs_local = unique[:, pairs_idx] # (2, k)
     counts_local = counts[:k]# (k)
-    
     # communicate between GPUs
     most_common_pairs_global = torch.zeros(
         (2, k * dist_manager.world_size), 
@@ -225,6 +242,9 @@ def bpe_train(
 
         if dist_manager.world_size > 1:
             best_pair = multi_gpu_best_pair(counts, unique, k, dist_manager)
+            if best_pair is None:
+                dist_manager.print_on_main("No more mergeable pairs found. Ending training early.")
+                break
         else:
             pair_idx = torch.argmax(counts) # (1)
             best_pair = unique[:, pair_idx].cpu().numpy() # (2)
@@ -269,8 +289,8 @@ def save_tokenizer(enc, name, vocab_size, sample_size):
     with open(__file__, 'r') as f:
         script_content = f.read()
     tokenizer_data = {
-        "pat_str": enc.pat_str,
-        "mergeable_ranks": enc.mergeable_ranks,
+        "pat_str": enc._pat_str,
+        "mergeable_ranks": enc._mergeable_ranks,
         "script_content": script_content  # Add the script content for backup
     }
     with open(full_filename, 'wb') as f:
@@ -296,10 +316,6 @@ def run(dist_manager: DistributedManager):
     dtype = torch.int16 if args.vocab_size <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
 
-    data, ranks = prepare_data_tensors(
-        n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=args.seed
-    )
-
     pat_str_dict = {
         "gpt2": (r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s"""),
         "gpt4": (r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}++|\p{N}{1,3}+| ?[^\s\p{L}\p{N}]++[\r\n]*+|\s++$|\s*[\r\n]|\s+(?!\S)|\s"""),
@@ -314,6 +330,10 @@ def run(dist_manager: DistributedManager):
         ]),
     }
     pat_str = pat_str_dict[args.pat_str] if args.pat_str in pat_str_dict.keys() else args.pat_str
+
+    data, ranks = prepare_data_tensors(
+        n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=args.seed, pat_str=pat_str
+    )
 
     mergeable_ranks = bpe_train(
         ids=data, 

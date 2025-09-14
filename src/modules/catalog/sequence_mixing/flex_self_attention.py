@@ -117,7 +117,7 @@ __competitors__ = {
 
 fsa_dims_to_test = [256]
 fsa_num_heads_to_test = [4]
-fsa_seq_lens_to_test = [2048, 8192]
+fsa_seq_lens_to_test = [512, 2048]
 fsa_dtypes_to_test = [torch.float32, torch.float16, torch.bfloat16]
 
 

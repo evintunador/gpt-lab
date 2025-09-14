@@ -5,3 +5,5 @@ pytest
 marimo
 plotly
 matplotlib
+litellm
+datasets
