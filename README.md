@@ -11,21 +11,21 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
 - `src/`
 
-    - `train_loops/` - Catalog of training loops. Its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
-    - `modules/` - Catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
-    - `utils/` - Shared utilities across the project
+    - `train_loops/` - catalog of training loops. its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
+    - `modules/` - catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
+    - `utils/` - shared utilities across the project
 
-        - `llm_code_compiler/` - LLM interface for code generation. Currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later
-        - `reproducibility/` - Tools for reproducible research (planned)
-        - `distributed.py` - Tools to make other scripts agnostic to single gpu vs torchrun vs slurm (planned)
+        - `llm_code_compiler/` - llm interface for code generation. currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later
+        - `reproducibility/` - tools for reproducible research (planned)
+        - `distributed.py` - tool to make scripts agnostic to whether they're being run with single gpu vs torchrun vs slurm. recommended pattern for use is `with DistributedManager() as manager: ...`
         - `device.py`
         - `benchmarking.py`
         - `testing.py`
 
-    - `data_sources/` - Data loading and preprocessing components
-    - `models/` - Catalog of models. 
-    - `optimizers/` - Catalog of optimizers. Includes simple testing and benchmarking tools.
-    - `benchmarks/` - Catalog of benchmarks. Defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
+    - `data_sources/` - data loading and preprocessing components
+    - `models/` - catalog of models
+    - `optimizers/` - catalog of optimizers. includes simple testing and benchmarking tools.
+    - `benchmarks/` - catalog of benchmarks. defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
 
 ## Getting Started
 
@@ -42,9 +42,9 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
-- [ ] build tools to allow experiment makers to be blissfully unaware of the difference between torchrun vs single gpu, or at least get as close to that as possible
+- [x] build tools to allow experiment makers to be blissfully unaware of the difference between torchrun vs single gpu, or at least get as close to that as possible
 
-    - [ ] vs slurm as well (less urgent, but please make it general enough to generalize to this feature)
+    - [x] vs slurm as well (less urgent, but please make it general enough to generalize to this feature)
 
 - broadly "the experiment folder utilities" (working name; functions & anstractions TBD)
 

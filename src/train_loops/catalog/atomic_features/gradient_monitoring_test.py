@@ -8,12 +8,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.gradient_monitoring import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_gradient_norm_monitoring(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_gradient_norm_monitoring(run_training_fn, device):
     """Test that gradient norm monitoring works and returns history."""
     torch.manual_seed(42)
     
@@ -51,8 +54,8 @@ def test_gradient_norm_monitoring(run_training_fn):
         assert not torch.isnan(torch.tensor(norm_val)), "Gradient norm values must not be NaN"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_gradient_flow_monitoring(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_gradient_flow_monitoring(run_training_fn, device):
     """Test that gradient flow monitoring works and returns history."""
     torch.manual_seed(42)
     
@@ -95,8 +98,8 @@ def test_gradient_flow_monitoring(run_training_fn):
             assert grad_norm >= 0, f"Gradient norm must be non-negative, got {grad_norm}"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_gradient_monitoring_log_interval(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_gradient_monitoring_log_interval(run_training_fn, device):
     """Test that grad_log_interval parameter controls monitoring frequency."""
     torch.manual_seed(42)
     

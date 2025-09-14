@@ -5,13 +5,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.base_loop import run_training as run_training_base_loop
 from train_loops.catalog.atomic_features.grad_accum import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_accumulation_correctness(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_accumulation_correctness(run_training_fn, device):
     """Test that grad accumulation matches equivalent large batch training."""
     torch.manual_seed(0)
     X = torch.randn(16, 32).to(device)

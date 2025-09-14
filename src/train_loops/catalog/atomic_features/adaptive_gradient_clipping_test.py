@@ -7,12 +7,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.adaptive_gradient_clipping import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_adaptive_gradient_clipping_applied(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_adaptive_gradient_clipping_applied(run_training_fn, device):
     """Test that adaptive gradient clipping affects training when gradients are large."""
     torch.manual_seed(42)
     

@@ -8,9 +8,12 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import pytest
 
-from utils.device import best_device as device
+from utils.device import get_default_device
 from utils.testing import list_all_files_in_folder_and_subdirs, import_module_from_path
 from optimizers.catalog_utils import OptimizerConfig, create_smart_optimizer
+
+
+device = get_default_device()
 
 
 parent_dir = os.path.dirname(os.path.abspath(__file__))

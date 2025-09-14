@@ -10,12 +10,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.early_stopping import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_early_stopping_without_val_loader(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_early_stopping_without_val_loader(run_training_fn, device):
     """Test that training works normally when no validation loader is provided."""
     torch.manual_seed(42)
     
@@ -54,8 +56,8 @@ def test_early_stopping_without_val_loader(run_training_fn):
         "Model parameters should have changed during training"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_early_stopping_with_val_loader(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_early_stopping_with_val_loader(run_training_fn, device):
     """Test that early stopping can handle validation loader and parameters."""
     torch.manual_seed(42)
     
@@ -101,8 +103,8 @@ def test_early_stopping_with_val_loader(run_training_fn):
         "Model parameters should have changed during training"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_early_stopping_parameter_handling(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_early_stopping_parameter_handling(run_training_fn, device):
     """Test that different early stopping parameters are accepted without errors."""
     torch.manual_seed(42)
     

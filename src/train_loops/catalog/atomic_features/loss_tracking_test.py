@@ -8,11 +8,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.loss_tracking import run_training
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_loss_tracking_returns_history(run_training_fn):
+
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_loss_tracking_returns_history(run_training_fn, device):
     """Test that loss tracking is enabled by default and returns train_loss_history."""
     torch.manual_seed(42)
     
@@ -48,8 +51,8 @@ def test_loss_tracking_returns_history(run_training_fn):
         assert not torch.isnan(torch.tensor(loss_val)), "Loss values must not be NaN"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_loss_tracking_disabled(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_loss_tracking_disabled(run_training_fn, device):
     """Test that when track_loss=False, no train_loss_history is returned."""
     torch.manual_seed(42)
     
@@ -78,8 +81,8 @@ def test_loss_tracking_disabled(run_training_fn):
     assert "train_loss_history" not in result, "Result should not contain 'train_loss_history' when track_loss=False"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_loss_tracking_log_interval(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_loss_tracking_log_interval(run_training_fn, device):
     """Test that log_interval parameter controls tracking frequency."""
     torch.manual_seed(42)
     

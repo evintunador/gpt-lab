@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import pytest
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from utils.testing import list_all_files_in_folder_and_subdirs, import_module_from_path
 
 
@@ -72,6 +72,7 @@ def generate_compiled_loop_specific_tests():
     specific_tests = discover_specific_tests()
     compiled_dir = Path("src/train_loops/catalog/llm_compiled")
     params = []
+    AVAILABLE_DEVICES, _ = get_available_devices()
     
     for compiled_loop_file in compiled_dir.glob("*.py"):
         try:
@@ -79,21 +80,22 @@ def generate_compiled_loop_specific_tests():
             module = import_module_from_path(f"compiled_test_{compiled_loop_file.stem}", compiled_loop_file)
             atomic_features = getattr(module, '__atomic_features__', [])
             
-            # For each atomic feature, add its specific tests
+            # For each atomic feature, add its specific tests for each device
             for feature in atomic_features:
                 if feature in specific_tests:
                     for test_func in specific_tests[feature]:
-                        params.append(pytest.param(
-                            test_func, module.run_training, str(compiled_loop_file), feature,
-                            id=f"{compiled_loop_file.stem}_{feature}_{test_func.__name__}"
-                        ))
+                        for device in AVAILABLE_DEVICES:
+                            params.append(pytest.param(
+                                test_func, module.run_training, str(compiled_loop_file), feature, device,
+                                id=f"{compiled_loop_file.stem}_{feature}_{test_func.__name__}_{device}"
+                            ))
         except Exception as e:
             print(f"Warning: Failed to process compiled loop {compiled_loop_file}: {e}")
     
     return params
 
 
-def base_loop_compliance_test(run_training_fn, feature_name: str):
+def base_loop_compliance_test(run_training_fn, feature_name: str, device: str):
     """
     Test that an atomic feature with default arguments behaves identically to base_loop.py.
     This ensures all atomic features maintain backward compatibility and follow the standard.
@@ -176,7 +178,7 @@ def base_loop_compliance_test(run_training_fn, feature_name: str):
         )
 
 
-def universal_learning_test(run_training_fn):
+def universal_learning_test(run_training_fn, device: str):
     """
     Build a tiny task and ensure real learning happened (loss drops).
     This is a standalone function for use by the LLM compiler.
@@ -215,28 +217,47 @@ def universal_learning_test(run_training_fn):
         raise AssertionError(f"Training did not sufficiently improve loss: pre={pre:.4f}, post={post:.4f}")
 
 
-@pytest.mark.parametrize("run_training_fn", all_loop_functions)
-def test_universal_learning_pytest(run_training_fn):
+# Get available devices for parameterization
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+# Create parameterized tests for universal learning across devices
+universal_test_params = []
+for run_training_fn in all_loop_functions:
+    for device in AVAILABLE_DEVICES:
+        universal_test_params.append(
+            pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_{device}")
+        )
+
+# Create parameterized tests for atomic feature compliance across devices
+atomic_compliance_params = []
+for fn, name in discover_atomic_features():
+    for device in AVAILABLE_DEVICES:
+        atomic_compliance_params.append(
+            pytest.param(fn, name, device, id=f"{name}_{device}")
+        )
+
+
+@pytest.mark.parametrize("run_training_fn,device", universal_test_params)
+def test_universal_learning_pytest(run_training_fn, device):
     """
     Pytest wrapper for the universal learning test.
     """
-    universal_learning_test(run_training_fn)
+    universal_learning_test(run_training_fn, device)
 
 
 # Test that all atomic features behave like base_loop.py with default arguments
-@pytest.mark.parametrize("run_training_fn,feature_name", 
-                        [(fn, name) for fn, name in discover_atomic_features()])
-def test_atomic_feature_base_compliance(run_training_fn, feature_name):
+@pytest.mark.parametrize("run_training_fn,feature_name,device", atomic_compliance_params)
+def test_atomic_feature_base_compliance(run_training_fn, feature_name, device):
     """
     Test that atomic features with default arguments behave identically to base_loop.py.
     This enforces the standard that all atomic features must be backwards compatible.
     """
-    base_loop_compliance_test(run_training_fn, feature_name)
+    base_loop_compliance_test(run_training_fn, feature_name, device)
 
 
 # Add new parameterized test for compiled loops
-@pytest.mark.parametrize("test_func,run_training_fn,loop_file,source_feature", 
+@pytest.mark.parametrize("test_func,run_training_fn,loop_file,source_feature,device", 
                         generate_compiled_loop_specific_tests())
-def test_compiled_loop_specific_behaviors(test_func, run_training_fn, loop_file, source_feature):
+def test_compiled_loop_specific_behaviors(test_func, run_training_fn, loop_file, source_feature, device):
     """Run specific tests from atomic features on compiled loops that use them."""
-    test_func(run_training_fn)
+    test_func(run_training_fn, device)

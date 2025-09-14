@@ -13,31 +13,16 @@ from tqdm import tqdm
 import torch
 import torch.distributed as dist
 
-from data_sources.catalog.fineweb import FineWebDataset
+from data_sources.catalog.pretraining.fineweb import FineWebDataset
 from models.catalog.tokenizers.visualise import visualise_tokens
+from utils.distributed import DistributedManager
 
 
+"""
+this script relies on operations that are not available on mps, 
+and there'd be no point running it on CPU
+"""
 assert torch.cuda.is_available()
-# Check if environment variables are set by torchrun, otherwise default to single GPU
-if "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ:
-    rank = int(os.environ["RANK"])
-    world_size = int(os.environ["WORLD_SIZE"])
-    local_rank = int(os.environ["LOCAL_RANK"])
-else:
-    rank = 0
-    world_size = 1
-    local_rank = 0
-    os.environ["RANK"] = str(rank)
-    os.environ["WORLD_SIZE"] = str(world_size) 
-    os.environ["LOCAL_RANK"] = str(local_rank)
-    os.environ["MASTER_ADDR"] = "127.0.0.1"
-    os.environ["MASTER_PORT"] = "29500"
-device = torch.device("cuda", local_rank)
-torch.cuda.set_device(device)
-if world_size > 1:
-    dist.init_process_group(backend="nccl", device_id=device)
-    dist.barrier()
-master_process = (rank == 0)
 
 
 def visualise_tokens(token_values: list[bytes]) -> None:
@@ -106,12 +91,21 @@ def slow_merge(words, most_common_pair, token_bytes):
     return new_words
 
 
-def prepare_data_tensors(n: int, dtype: torch.dtype, separator_flag: int, seed: int = random.randint(0, 2**32)):
-    dataset = FineWebDataset(streaming=True, seed=seed)
-    if world_size > 1:
-        dataset = dist.DistributedSampler(dataset)
+def prepare_data_tensors(
+    n: int, 
+    dtype: torch.dtype, 
+    separator_flag: int, 
+    dist_manager: DistributedManager, 
+    seed: int = random.randint(0, 2**32),
+):
+    dataset = FineWebDataset(
+        streaming=True, 
+        seed=seed,
+        world_size=dist_manager.world_size,
+        rank=dist_manager.rank,
+    )
     data_buffer = []
-    data_tensor = torch.tensor([], dtype=dtype, device=device)
+    data_tensor = torch.tensor([], dtype=dtype, device=dist_manager.device)
     ranks = {}
     for i in range(2**8):
         ranks[bytes([i])] = i
@@ -128,7 +122,7 @@ def prepare_data_tensors(n: int, dtype: torch.dtype, separator_flag: int, seed: 
         if len(data_buffer) > 2**16:
             data_buffer_bytes: List[List[bytes]] = [
                 [bytes([b]) for b in wordish.encode("utf-8")]
-                for wordish in regex.findall(pat_str, data_buffer)
+                for wordish in regex.findall(pat_str, "".join(data_buffer))
             ]
             data_buffer_ids: List[List[int]] = [
                 [nat2int(ranks[b]) for b in wordish]
@@ -136,14 +130,14 @@ def prepare_data_tensors(n: int, dtype: torch.dtype, separator_flag: int, seed: 
             ]
             ids = torch.tensor(
                 list(chain.from_iterable(word + [separator_flag] for word in data_buffer_ids)), 
-                dtype=dtype, device=device)
+                dtype=dtype, device=dist_manager.device)
             data_tensor = torch.concat((data_tensor, ids), dim=0)
             data_buffer = []
         i += 1
     return data_tensor, ranks
 
 
-def pair_up(ids: torch.tensor):
+def pair_up(ids: torch.tensor, separator_flag: int):
     pairs = torch.stack((ids[:-1], ids[1:]), dim=0) # (2, words_in_data * (avg_word_len + 1))
     unique, counts = torch.unique(pairs, return_counts=True, dim=1)
         # shapes (2, very_long) and (very_long)
@@ -157,7 +151,7 @@ def pair_up(ids: torch.tensor):
     return pairs, unique, counts
 
 
-def multi_gpu_best_pair(counts: torch.tensor, unique: torch.tensor, k: int):
+def multi_gpu_best_pair(counts: torch.tensor, unique: torch.tensor, k: int, dist_manager: DistributedManager):
     # select top k pairs to go into consideration
     counts, sort_idx = torch.sort(counts, descending=True) # (very_long) and (very_long)
     pairs_idx = sort_idx[:k] # shape (k)
@@ -165,16 +159,24 @@ def multi_gpu_best_pair(counts: torch.tensor, unique: torch.tensor, k: int):
     counts_local = counts[:k]# (k)
     
     # communicate between GPUs
-    most_common_pairs_global = torch.zeros((2, k * world_size), dtype=torch.float32, device=device)
-    counts_global = torch.zeros(k * world_size, dtype=torch.float32, device=device)
-    most_common_pairs_global[:, rank * k : (rank + 1) * k] = most_common_pairs_local.to(torch.float32)
-    counts_global[rank * k : (rank + 1) * k] = counts_local.to(torch.float32)
+    most_common_pairs_global = torch.zeros(
+        (2, k * dist_manager.world_size), 
+        dtype=torch.float32, 
+        device=dist_manager.device
+    )
+    counts_global = torch.zeros(
+        k * dist_manager.world_size, 
+        dtype=torch.float32, 
+        device=dist_manager.device
+    )
+    most_common_pairs_global[:, dist_manager.rank * k : (dist_manager.rank + 1) * k] = most_common_pairs_local.to(torch.float32)
+    counts_global[dist_manager.rank * k : (dist_manager.rank + 1) * k] = counts_local.to(torch.float32)
     dist.all_reduce(most_common_pairs_global, op=dist.ReduceOp.SUM)
     dist.all_reduce(counts_global, op=dist.ReduceOp.SUM)
 
     # Count occurrences of each unique pair
     unique_pairs, inverse_indices = torch.unique(most_common_pairs_global.t(), dim=0, return_inverse=True)
-    sum_counts = torch.zeros(unique_pairs.size(0), dtype=torch.float, device=device)
+    sum_counts = torch.zeros(unique_pairs.size(0), dtype=torch.float, device=dist_manager.device)
     sum_counts.scatter_add_(0, inverse_indices, counts_global.float())
     pair_occurrences = torch.bincount(inverse_indices)
     max_occurrence = torch.max(pair_occurrences)
@@ -190,7 +192,7 @@ def multi_gpu_best_pair(counts: torch.tensor, unique: torch.tensor, k: int):
     return best_pair
 
 
-def merge(pairs, best_pair, removal_flag: int, new_token_id: int):
+def merge(ids, pairs, best_pair, removal_flag: int, new_token_id: int):
     pair_mask = (pairs[0] == best_pair[0]) & (pairs[1] == best_pair[1]) 
     ids[:-1][pair_mask] = nat2int(new_token_id)
     ids[1:][pair_mask] = removal_flag
@@ -204,9 +206,12 @@ def bpe_train(
         ranks: Dict[bytes, int], 
         vocab_size: int, 
         separator_flag: int,
-        k: int = 256
+        pat_str: str,
+        dtype: torch.dtype,
+        dist_manager: DistributedManager,
+        k: int = 256,
     ) -> Dict[bytes, int]:
-    if master_process:
+    if dist_manager.is_main_process:
         demo_text = (f"This is a test of our custom trained BPE tokenizer on FineWeb data.\n"
                     f"It should handle punctuation, numbers (like 42 and 3.14159), and special characters ($#@!) properly.\n"
                     f"Supercalifragilisticexpialidocious antidisestablishmentarianism!!!")
@@ -214,12 +219,12 @@ def bpe_train(
 
     removal_flag = 32_767 if dtype == torch.int16 else 2_147_483_647
 
-    progress_bar = tqdm(total=vocab_size - 256, unit="merges") if master_process else None
+    progress_bar = tqdm(total=vocab_size - 256, unit="merges") if dist_manager.is_main_process else None
     for j in range(256, vocab_size):
-        pairs, unique, counts = pair_up(ids=ids)
+        pairs, unique, counts = pair_up(ids=ids, separator_flag=separator_flag)
 
-        if world_size > 1:
-            best_pair = multi_gpu_best_pair()
+        if dist_manager.world_size > 1:
+            best_pair = multi_gpu_best_pair(counts, unique, k, dist_manager)
         else:
             pair_idx = torch.argmax(counts) # (1)
             best_pair = unique[:, pair_idx].cpu().numpy() # (2)
@@ -238,26 +243,29 @@ def bpe_train(
         # Add the new token!
         ranks[token_bytes] = new_token_id
 
-        ids = merge(pairs=pairs, best_pair=best_pair, removal_flag=removal_flag, new_token_id=new_token_id)
+        ids = merge(ids=ids, pairs=pairs, best_pair=best_pair, removal_flag=removal_flag, new_token_id=new_token_id)
 
-        demo_words = slow_merge(demo_words, tuple(best_bytes), token_bytes)
-        if j % 1000 == 0 or j in (256, vocab_size - 1):
-            print(f"\nThe most common pair {int2nat(best_pair[0])} + {int2nat(best_pair[1])} "
-                    f"which makes '{token_bytes}' our {len(ranks)}th token")
-            flat_demo_tokens = [token for word in demo_words for token in word]
-            visualise_tokens(flat_demo_tokens)
+        if dist_manager.is_main_process:
+            demo_words = slow_merge(demo_words, tuple(best_bytes), token_bytes)
+            if j % 1000 == 0 or j in (256, vocab_size - 1):
+                dist_manager.print_on_main(
+                    f"\nThe most common pair {int2nat(best_pair[0])} + {int2nat(best_pair[1])} "
+                    f"which makes '{token_bytes}' our {len(ranks)}th token"
+                )
+                flat_demo_tokens = [token for word in demo_words for token in word]
+                visualise_tokens(flat_demo_tokens)
 
-        if master_process:
+        if dist_manager.is_main_process:
             progress_bar.update(1)
     
-    print(f"peak memory reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB")
+    dist_manager.print_on_main(f"peak memory reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB")
 
     return ranks
 
 
 def save_tokenizer(enc, name, vocab_size, sample_size):
-    os.makedirs('tokenizers', exist_ok=True)
-    full_filename = f"tokenizers/trained/{name}_v{vocab_size}_n{sample_size}.pkl"
+    os.makedirs('experiments/catalog/custom_bpe/trained', exist_ok=True)
+    full_filename = f"experiments/catalog/custom_bpe/trained/{name}_v{vocab_size}_n{sample_size}.pkl"
     with open(__file__, 'r') as f:
         script_content = f.read()
     tokenizer_data = {
@@ -270,7 +278,7 @@ def save_tokenizer(enc, name, vocab_size, sample_size):
     print(f"Tokenizer saved to {full_filename}")
 
 
-if __name__ == "__main__":
+def run(dist_manager: DistributedManager):
     parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
     parser.add_argument("-n", "--samples_per_gpu", type=int, default=2**27, 
         help="Maximum number of text characters to use on each GPU during training (default 2^27 should fit on single GPU with 8gb of VRAM)")
@@ -288,7 +296,9 @@ if __name__ == "__main__":
     dtype = torch.int16 if args.vocab_size <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
 
-    data, ranks = prepare_data_tensors(n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag)
+    data, ranks = prepare_data_tensors(
+        n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=args.seed
+    )
 
     pat_str_dict = {
         "gpt2": (r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}++| ?\p{N}++| ?[^\s\p{L}\p{N}]++|\s++$|\s+(?!\S)|\s"""),
@@ -309,11 +319,14 @@ if __name__ == "__main__":
         ids=data, 
         ranks=ranks, 
         vocab_size=args.vocab_size, 
-        separator_flag=separator_flag, 
+        separator_flag=separator_flag,
+        pat_str=pat_str,
+        dtype=dtype,
+        dist_manager=dist_manager,
         k=args.k
     )
 
-    if master_process:
+    if dist_manager.is_main_process:
         enc = tiktoken.Encoding(
             name=args.name,
             pat_str=pat_str,
@@ -324,9 +337,12 @@ if __name__ == "__main__":
         assert enc.decode(enc.encode(test_str)) == test_str
         
         save_tokenizer(
-            mergeable_ranks, 
-            pat_str, 
+            enc, 
             args.name, 
             args.vocab_size, 
             args.samples_per_gpu,
         )
+
+if __name__ == "__main__":
+    with DistributedManager() as dist_manager:
+        run(dist_manager)

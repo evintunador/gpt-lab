@@ -9,12 +9,12 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import pytest
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.smart_api import smart_train
 
 
 # Helper function to create test data
-def _create_test_data():
+def _create_test_data(device: str):
     """Create test data for smart_train tests."""
     torch.manual_seed(42)
     X = torch.randn(16, 4).to(device)
@@ -27,9 +27,12 @@ def _create_test_data():
     return model, optimizer, loss_fn, dataloader
 
 
-def test_smart_train_no_features():
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("device", AVAILABLE_DEVICES)
+def test_smart_train_no_features(device: str):
     """Test smart_train with no additional features."""
-    model, optimizer, loss_fn, dataloader = _create_test_data()
+    model, optimizer, loss_fn, dataloader = _create_test_data(device)
     
     result = smart_train(model, optimizer, loss_fn, dataloader)
     
@@ -38,9 +41,10 @@ def test_smart_train_no_features():
     assert isinstance(result['model'], nn.Module)
 
 
-def test_smart_train_single_feature():
+@pytest.mark.parametrize("device", AVAILABLE_DEVICES)
+def test_smart_train_single_feature(device: str):
     """Test smart_train with single feature (direct execution)."""
-    model, optimizer, loss_fn, dataloader = _create_test_data()
+    model, optimizer, loss_fn, dataloader = _create_test_data(device)
     
     result = smart_train(
         model, optimizer, loss_fn, dataloader,
@@ -52,9 +56,10 @@ def test_smart_train_single_feature():
     assert isinstance(result['model'], nn.Module)
 
 
-def test_smart_train_multi_feature():
+@pytest.mark.parametrize("device", AVAILABLE_DEVICES)
+def test_smart_train_multi_feature(device: str):
     """Test smart_train with multiple features (compilation or demo mode)."""
-    model, optimizer, loss_fn, dataloader = _create_test_data()
+    model, optimizer, loss_fn, dataloader = _create_test_data(device)
     
     result = smart_train(
         model, optimizer, loss_fn, dataloader,
@@ -68,7 +73,8 @@ def test_smart_train_multi_feature():
 
 def test_smart_train_unknown_kwargs():
     """Test that smart_train rejects unknown kwargs."""
-    model, optimizer, loss_fn, dataloader = _create_test_data()
+    # This test is device-agnostic, so we can just use CPU
+    model, optimizer, loss_fn, dataloader = _create_test_data('cpu')
     
     with pytest.raises(ValueError) as exc_info:
         smart_train(
@@ -80,9 +86,10 @@ def test_smart_train_unknown_kwargs():
     assert "Unknown kwargs" in error_msg
 
 
-def test_smart_train_none_filtering():
+@pytest.mark.parametrize("device", AVAILABLE_DEVICES)
+def test_smart_train_none_filtering(device: str):
     """Test that smart_train filters out None values."""
-    model, optimizer, loss_fn, dataloader = _create_test_data()
+    model, optimizer, loss_fn, dataloader = _create_test_data(device)
     
     # Should work the same as no additional features
     result = smart_train(

@@ -2,8 +2,6 @@ from typing import Optional, Dict, Any
 import torch
 import torch.nn as nn
 
-from utils.device import best_device as device
-
 
 def _is_amp_compatible(device_str: str) -> bool:
     """Check if device supports AMP properly."""
@@ -24,12 +22,16 @@ def run_training(
     # mixed precision knobs
     use_amp: Optional[bool] = False,  # False = disabled by default
     loss_scale: Optional[float] = None,
-    device: str = device,
+    device: Optional[str] = None,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
     """Atomic training loop demonstrating automatic mixed precision (AMP)."""
     model.train()
+    
+    # Infer device from model if not provided
+    if device is None:
+        device = str(next(model.parameters()).device)
     
     # Auto-detect AMP compatibility if not explicitly set
     if use_amp is None:

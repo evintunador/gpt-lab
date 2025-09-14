@@ -45,6 +45,8 @@ class FineWebDataset(Dataset):
         split: Split = Split.TRAIN,
         streaming: bool = True,
         seed: Optional[int] = None,
+        world_size: int = 1,
+        rank: int = 0,
     ):
         self.streaming = streaming
         fw = load_dataset(
@@ -55,6 +57,9 @@ class FineWebDataset(Dataset):
             cache_dir='./data/temp/',
         )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
+
+        if world_size > 1:
+            self.data = self.data.shard(num_shards=world_size, index=rank)
 
     def __len__(self):
         if self.streaming:

@@ -8,12 +8,14 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.gradient_skipping import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_gradient_skipping_norm_threshold(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_gradient_skipping_norm_threshold(run_training_fn, device):
     """Test that gradient skipping based on norm threshold works."""
     torch.manual_seed(42)
     

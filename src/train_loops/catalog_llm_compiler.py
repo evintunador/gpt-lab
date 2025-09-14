@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Callable
 
 from train_loops.catalog_test import universal_learning_test, discover_specific_tests
 from utils.llm_code_compiler import LLMClient, create_llm
-from utils.device import best_device as device
+from utils.device import get_default_device
 from utils.testing import import_module_from_path
 
 # Global verbose flag
@@ -294,7 +294,7 @@ __llm_compiled__ = True
     return metadata_header + code
 
 
-def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_features: List[str]):
+def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_features: List[str], device: str):
     """Run all applicable specific tests during compilation - validation only."""
     specific_tests = discover_specific_tests()
     
@@ -303,16 +303,16 @@ def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_feature
         if clean_feature in specific_tests:
             for test_func in specific_tests[clean_feature]:
                 # Just run the test - if it fails, compilation fails
-                test_func(run_training_fn)
+                test_func(run_training_fn, device)
 
 
-def run_base_loop_compliance_test_for_compilation(run_training_fn: Callable, atomic_features: List[str]):
+def run_base_loop_compliance_test_for_compilation(run_training_fn: Callable, atomic_features: List[str], device: str):
     """Run base_loop compliance test during compilation."""
     from train_loops.catalog_test import base_loop_compliance_test
     
     # For compiled loops, we use a representative name from the atomic features
     feature_name = f"compiled_loop_{'-'.join(sorted([f.replace('.py', '') for f in atomic_features]))}"
-    base_loop_compliance_test(run_training_fn, feature_name)
+    base_loop_compliance_test(run_training_fn, feature_name, device)
 
 
 def compile_loop(
@@ -341,6 +341,7 @@ def compile_loop(
     llm = llm or LLMClient()
     name = _make_descriptive_name(atomic_features)
     code_path = Path("src/train_loops/catalog/llm_compiled") / f"{name}.py"
+    device = get_default_device()
 
     vprint_section("LLM TRAINING LOOP COMPILATION")
     vprint(f"Atomic features: {atomic_features}")
@@ -403,7 +404,7 @@ def compile_loop(
 
             # Add metadata and write
             vprint("\n📝 Adding metadata and writing file...")
-            code_with_metadata = _add_metadata_to_code(code, atomic_features, device)
+            code_with_metadata = _add_metadata_to_code(code, atomic_features, str(device))
             _write_file(code_path, code_with_metadata)
             vprint(f"✓ File written to {code_path}")
             
@@ -430,7 +431,7 @@ def compile_loop(
             # Universal test
             vprint("Running universal learning test...")
             try:
-                universal_learning_test(run_training_fn)
+                universal_learning_test(run_training_fn, device=str(device))
                 vprint("✓ Universal test passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
@@ -440,7 +441,7 @@ def compile_loop(
             # Base loop compliance test
             vprint("Running base_loop compliance test...")
             try:
-                run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features)
+                run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features, device=str(device))
                 vprint("✓ Base loop compliance test passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
@@ -450,7 +451,7 @@ def compile_loop(
             # Specific tests
             vprint("Running specific feature tests...")
             try:
-                run_specific_tests_for_compilation(run_training_fn, atomic_features)
+                run_specific_tests_for_compilation(run_training_fn, atomic_features, device=str(device))
                 vprint("✓ All specific tests passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")
@@ -481,7 +482,7 @@ def compile_loop(
                     code = llm.refine(system_prompt, user_prompt, prior_code=code, error_summary=err)
                     vprint("✓ Refinement response received")
                     
-                    code_with_metadata = _add_metadata_to_code(code, atomic_features, device)
+                    code_with_metadata = _add_metadata_to_code(code, atomic_features, str(device))
                     _write_file(code_path, code_with_metadata)
                     vprint(f"✓ Refined code written to {code_path}")
                     
@@ -502,7 +503,7 @@ def compile_loop(
                     vprint("✓ run_training function found")
                     
                     try:
-                        universal_learning_test(run_training_fn)
+                        universal_learning_test(run_training_fn, device=str(device))
                         vprint("✓ Universal test passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
@@ -510,7 +511,7 @@ def compile_loop(
                         raise RuntimeError(err)
                     
                     try:
-                        run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features)
+                        run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features, device=str(device))
                         vprint("✓ Base loop compliance test passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
@@ -518,7 +519,7 @@ def compile_loop(
                         raise RuntimeError(err)
                         
                     try:
-                        run_specific_tests_for_compilation(run_training_fn, atomic_features)
+                        run_specific_tests_for_compilation(run_training_fn, atomic_features, device=str(device))
                         vprint("✓ All specific tests passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")

@@ -23,14 +23,14 @@ def run_training(
     accum_steps: int = 1,
     # loss tracking knobs
     track_loss: bool = False,
-    log_interval: int = 1,  # track every batch by default
+    log_interval: int = 1,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
     """Training loop with gradient accumulation and loss tracking."""
     model.train()
-    
-    if accum_steps is None or accum_steps < 1:
+
+    if accum_steps < 1:
         accum_steps = 1
 
     train_loss_history: List[float] = []
@@ -51,7 +51,7 @@ def run_training(
 
         # Track loss if enabled
         if track_loss and (batch_idx % log_interval == 0):
-            train_loss_history.append(float(loss.detach().cpu().item()) * accum_steps)
+            train_loss_history.append(float(loss.detach().cpu().item()) * (accum_steps if accum_steps > 1 else 1))
 
         if micro_idx % accum_steps == 0:
             optimizer.step()

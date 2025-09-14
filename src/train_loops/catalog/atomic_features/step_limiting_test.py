@@ -8,12 +8,15 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from utils.device import best_device as device
+from utils.device import get_available_devices
 from train_loops.catalog.atomic_features.step_limiting import run_training
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_step_limiting_no_limit(run_training_fn):
+AVAILABLE_DEVICES, _ = get_available_devices()
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_no_limit(run_training_fn, device):
     """Test that training runs normally when max_steps is None."""
     torch.manual_seed(42)
     
@@ -50,8 +53,8 @@ def test_step_limiting_no_limit(run_training_fn):
         "Model parameters should have changed during training"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_step_limiting_with_limit(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_with_limit(run_training_fn, device):
     """Test that training stops after max_steps when specified."""
     torch.manual_seed(42)
     
@@ -88,8 +91,8 @@ def test_step_limiting_with_limit(run_training_fn):
         "Model parameters should have changed during training"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_step_limiting_data_cycling(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_data_cycling(run_training_fn, device):
     """Test that data cycles correctly when max_steps exceeds dataset size."""
     torch.manual_seed(42)
     
@@ -126,8 +129,8 @@ def test_step_limiting_data_cycling(run_training_fn):
         "Model parameters should have changed during training with data cycling"
 
 
-@pytest.mark.parametrize("run_training_fn", [run_training])
-def test_step_limiting_single_step(run_training_fn):
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_single_step(run_training_fn, device):
     """Test that training works correctly with max_steps=1."""
     torch.manual_seed(42)
     
