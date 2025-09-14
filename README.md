@@ -42,22 +42,15 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
-- [x] build tools to allow experiment makers to be blissfully unaware of the difference between torchrun vs single gpu, or at least get as close to that as possible
-
-    - [x] vs slurm as well (less urgent, but please make it general enough to generalize to this feature)
-
-- broadly "the experiment folder utilities" (working name; functions & anstractions TBD)
-
-    - [ ] bulid tools for model checkpointing
-    - [ ] design and build a system for comparing performance between two models (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
-
-- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear histry. i'll figure all that out when i get there.
+- [x] bulid tools for model checkpointing saving & loading
+- [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
+- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear history. i'll figure all that out when i get there.
 
 ### important / not-urgent
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where
 - [ ] find other desirable features to help with our experiments
-- [ ] implement more advanced parallel abilities for [`modules/`](src/modules/) testing and benchmarking
+- [ ] implement more advanced parallel abilities for [`modules/`](src/modules/) testing and benchmarking and general utils to help with the various types of parallelization
 
 ### not important / urgent
 
