@@ -44,7 +44,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
 - [x] bulid tools for model checkpointing saving & loading
-- [ ] design and build a logging system
+- [x] design and build a logging system
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
 - [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear history. i'll figure all that out when i get there.
 
