@@ -89,7 +89,9 @@ def load_checkpoint(
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Checkpoint file not found: {filepath}")
 
-    checkpoint = torch.load(filepath, map_location=map_location)
+    # Set weights_only=False to allow loading of arbitrary python objects
+    # like numpy RNG states, which are not considered "safe" by default.
+    checkpoint = torch.load(filepath, map_location=map_location, weights_only=False)
     
     # Load state into the provided objects
     for key, obj in stateful_objects.items():

@@ -18,6 +18,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
         - `llm_code_compiler/` - llm interface for code generation. currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later
         - `reproducibility/` - tools for reproducible research (planned)
         - `distributed.py` - tool to make scripts agnostic to whether they're being run with single gpu vs torchrun vs slurm. recommended pattern for use is `with DistributedManager() as manager: ...`
+        - `checkpointing.py` - simple tool for saving & loading metadata & objects with state dicts. should be general enough to work with any weird training setup and allow for resuming training right where it left off.
         - `device.py`
         - `benchmarking.py`
         - `testing.py`
@@ -43,6 +44,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
 - [x] bulid tools for model checkpointing saving & loading
+- [ ] design and build a logging system
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
 - [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear history. i'll figure all that out when i get there.
 
