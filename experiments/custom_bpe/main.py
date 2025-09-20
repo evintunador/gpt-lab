@@ -8,14 +8,13 @@ import regex
 import tiktoken
 import numpy as np
 import random
-from datasets import load_dataset
 from tqdm import tqdm
 import torch
 import torch.distributed as dist
 
 from data_sources.catalog.pretraining.fineweb import FineWebDataset
-from utils.distributed import DistributedManager
-from utils.config import get_config
+from distributed import DistributedManager
+from configuration import get_config
 
 
 """

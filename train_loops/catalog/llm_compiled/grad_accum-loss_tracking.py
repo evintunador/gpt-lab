@@ -12,6 +12,7 @@ from typing import Optional, Dict, Any, List
 import torch
 import torch.nn as nn
 
+
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
@@ -29,10 +30,11 @@ def run_training(
     """Training loop with gradient accumulation and loss tracking."""
     model.train()
 
-    if accum_steps is None or accum_steps < 1:
+    if accum_steps < 1:
         accum_steps = 1
 
     train_loss_history: List[float] = []
+    
     micro_idx = 0
     optimizer.zero_grad(set_to_none=True)
 
@@ -49,7 +51,7 @@ def run_training(
 
         # Track loss if enabled
         if track_loss and (batch_idx % log_interval == 0):
-            train_loss_history.append(float(loss.detach().cpu().item()) * accum_steps)
+            train_loss_history.append(float(loss.detach().cpu().item()) * (accum_steps if accum_steps > 1 else 1))
 
         if micro_idx % accum_steps == 0:
             optimizer.step()
@@ -62,5 +64,5 @@ def run_training(
     result = {"model": model}
     if track_loss:
         result["train_loss_history"] = train_loss_history
-
+    
     return result

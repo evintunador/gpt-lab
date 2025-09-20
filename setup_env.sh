@@ -10,20 +10,17 @@ if [ $? -ne 0 ]; then
     return 1
 fi
 
-# Define the src directory inside the git root.
-SRC_DIR="$GIT_ROOT/src"
-
 # Check if PYTHONPATH is already set.
 if [ -n "$PYTHONPATH" ]; then
-    # Check if the src directory is already in PYTHONPATH to avoid duplicates.
-    if [[ ":$PYTHONPATH:" != *":$SRC_DIR:"* ]]; then
-        export PYTHONPATH="$SRC_DIR:$PYTHONPATH"
-        echo "src directory has been added to PYTHONPATH."
+    # Check if the root directory is already in PYTHONPATH to avoid duplicates.
+    if [[ ":$PYTHONPATH:" != *":$GIT_ROOT:"* ]]; then
+        export PYTHONPATH="$GIT_ROOT:$PYTHONPATH"
+        echo "Root directory has been added to PYTHONPATH."
     else
-        echo "src directory is already in PYTHONPATH."
+        echo "Root directory is already in PYTHONPATH."
     fi
 else
-    # If PYTHONPATH is not set, initialize it with the src directory.
-    export PYTHONPATH="$SRC_DIR"
-    echo "PYTHONPATH has been set to the src directory."
+    # If PYTHONPATH is not set, initialize it with the root directory.
+    export PYTHONPATH="$GIT_ROOT"
+    echo "PYTHONPATH has been set to the root directory."
 fi
