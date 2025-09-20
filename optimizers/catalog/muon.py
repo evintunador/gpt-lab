@@ -9,11 +9,11 @@ except ImportError:
     # This allows the module to be imported without error during discovery
     class MuonWithAuxAdam:
         def __init__(self, *args, **kwargs):
-            raise ImportError("Muon package not installed. Install with: pip install muon")
+            raise ImportError("Muon package not installed. Install with: pip install -e '.[optimizers]'")
     
     class SingleDeviceMuonWithAuxAdam:
         def __init__(self, *args, **kwargs):
-            raise ImportError("Muon package not installed. Install with: pip install muon")
+            raise ImportError("Muon package not installed. Install with: pip install -e '.[optimizers]'")
 
 from optimizers.catalog_utils import OptimizerConfig, OptimizerBenchmarkConfig
 

@@ -27,11 +27,17 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ## getting started
 
-1. ensure the correct path is visible in your environment: `bash setup_env.sh`
-2. install dependencies: `pip install -r requirements.txt`
-3. run tests to confirm it all works: `pytest`
-4. add to the various component catalogues.
-5. write and run your experiment over in `experiments/`
+1. Install the project in editable mode. For development, it's recommended to install with all catalog and testing dependencies:
+   ```bash
+   pip install -e '.[dev]'
+   ```
+   If you only need core dependencies, you can run `pip install -e .`. To install dependencies for a specific catalog, use `pip install -e '.[<catalog_name>]'` (e.g., `pip install -e '.[optimizers]'`). To install all catalog dependencies at once, use `pip install -e '.[all_catalogs]'`.
+   
+   **Note:** The quotes around `.[...]` are required for zsh users (default shell on macOS) to prevent glob expansion.
+
+2. run tests to confirm it all works: `pytest`
+3. add to the various component catalogues.
+4. write and run your experiment over in `experiments/`
 
 ## todo
 ### important / urgent
@@ -61,3 +67,4 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `mdoules/`)
 - [ ] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
+- [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)

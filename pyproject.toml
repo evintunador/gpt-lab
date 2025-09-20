@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpt-lab"
+version = "0.1.0"
+description = "A repository for modular, testable, and reproducible ML research."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "tqdm",
+    "torch",
+    "pandas",
+    "marimo",
+    "plotly",
+    "matplotlib",
+    "litellm",
+    "datasets",
+]
+
+[project.optional-dependencies]
+optimizers = [
+    "muon",
+]
+nn_modules = []
+models = []
+data_sources = []
+benchmarks = []
+all_catalogs = [
+    "gpt-lab[optimizers]",
+    "gpt-lab[nn_modules]",
+    "gpt-lab[models]",
+    "gpt-lab[data_sources]",
+    "gpt-lab[benchmarks]",
+]
+dev = [
+    "gpt-lab[all_catalogs]",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+addopts = "--ignore=venv --ignore=.venv"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "ignore:Use 'content=<...>' to upload raw bytes/text content.:DeprecationWarning",
+    "ignore:Pydantic serializer warnings:UserWarning",
+]

@@ -1,9 +1,0 @@
-tqdm
-torch
-pandas
-pytest
-marimo
-plotly
-matplotlib
-litellm
-datasets
