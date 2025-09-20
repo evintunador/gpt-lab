@@ -59,7 +59,7 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
 Example of how the class above might be used in a script:
 
 from some_model_file import MyModel
-from src.data_sources.catalog.benchmarks.multiple_choice import HellaSwagDataset
+from data_sources.catalog.benchmarks.multiple_choice import HellaSwagDataset
 
 1. Instantiate the model and dataset
 model = MyModel()

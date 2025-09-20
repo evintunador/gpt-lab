@@ -71,7 +71,7 @@ USER_PROMPT_TEMPLATE = \
 
 def _build_system_prompt_with_base_loop() -> str:
     """Build the system prompt including base_loop.py content for reference."""
-    base_loop_path = Path("src/train_loops/catalog/atomic_features/base_loop.py")
+    base_loop_path = Path("train_loops/catalog/atomic_features/base_loop.py")
     
     try:
         base_loop_content = base_loop_path.read_text(encoding="utf-8")
@@ -335,12 +335,12 @@ def compile_loop(
         raise ValueError(
             f"Compilation not recommended for single atomic feature '{atomic_features[0]}'. "
             f"Use the atomic feature directly instead for better performance. "
-            f"File: src/train_loops/catalog/atomic_features/{atomic_features[0]}.py"
+            f"File: train_loops/catalog/atomic_features/{atomic_features[0]}.py"
         )
     
     llm = llm or LLMClient()
     name = _make_descriptive_name(atomic_features)
-    code_path = Path("src/train_loops/catalog/llm_compiled") / f"{name}.py"
+    code_path = Path("train_loops/catalog/llm_compiled") / f"{name}.py"
     device = get_default_device()
 
     vprint_section("LLM TRAINING LOOP COMPILATION")

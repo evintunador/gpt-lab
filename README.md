@@ -47,7 +47,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where
 - [ ] find other desirable features to help with our experiments
-- [ ] implement more advanced parallel abilities for [`modules/`](src/modules/) testing and benchmarking and general utils to help with the various types of parallelization
+- [ ] implement more advanced parallel abilities for [`nn_modules/`](nn_modules/) testing and benchmarking and general utils to help with the various types of parallelization
 
 ### not important / urgent
 
@@ -55,7 +55,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ### not important / not urgent
 
 - [ ] add more atomic feature training loops
-- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](src/train_loops/catalog_llm_compiler.py) one into shared utilities.
+- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](train_loops/catalog_llm_compiler.py) one into shared utilities.
 - [ ] add more benchmark datasets
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out and put into `utils/`
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.

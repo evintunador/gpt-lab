@@ -125,7 +125,7 @@ class WikiQADataset(Dataset):
 """
 Example of how this class might be used in a script:
 
-from src.benchmarks.catalog.multiple_choice import MultipleChoiceBenchmark
+from benchmarks.catalog.multiple_choice import MultipleChoiceBenchmark
 # from some_model_file import MyModel
 
 # 1. Instantiate the model

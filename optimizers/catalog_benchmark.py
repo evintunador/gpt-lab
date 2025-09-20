@@ -268,7 +268,7 @@ def benchmark_optimizer(
     }
 
 
-def run_optimizer_benchmarks(configs: List[OptimizerBenchmarkConfig], device: str, output_dir: str = "src/optimizers/bench_results"):
+def run_optimizer_benchmarks(configs: List[OptimizerBenchmarkConfig], device: str, output_dir: str = "optimizers/bench_results"):
     """Run benchmarks for optimizer configurations following the module pattern"""
     
     os.makedirs(output_dir, exist_ok=True)
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     all_benchmark_configs, discovery_errors = discover_dunder_objects(
         dunder='__benchmark_config__', 
         object=OptimizerBenchmarkConfig,
-        search_folders="src/optimizers/catalog/"
+        search_folders="optimizers/catalog/"
     )
 
     if discovery_errors:

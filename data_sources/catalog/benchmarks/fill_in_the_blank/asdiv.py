@@ -116,7 +116,7 @@ class ASDivDataset(Dataset):
 """
 Example of how this class might be used in a script:
 
-from src.benchmarks.catalog.fill_in_the_blank import FillInTheBlankBenchmark
+from benchmarks.catalog.fill_in_the_blank import FillInTheBlankBenchmark
 from some_model_file import MyModel
 
 model = MyModel()
