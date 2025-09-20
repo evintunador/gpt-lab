@@ -15,6 +15,7 @@ import torch.distributed as dist
 
 from data_sources.catalog.pretraining.fineweb import FineWebDataset
 from utils.distributed import DistributedManager
+from utils.config import get_config
 
 
 """
@@ -300,20 +301,27 @@ def save_tokenizer(enc, name, vocab_size, sample_size):
 
 def run(dist_manager: DistributedManager):
     parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
-    parser.add_argument("-n", "--samples_per_gpu", type=int, default=2**27, 
-        help="Maximum number of text characters to use on each GPU during training (default 2^27 should fit on single GPU with 8gb of VRAM)")
-    parser.add_argument("-v", "--vocab_size", type=int, default=2**16-2, 
-        help="Size of the vocabulary to train (default 2**16-2)")
-    parser.add_argument("-f", "--name", type=str, default="gpt4regex", 
-        help="Filename prefix to save the tokenizer (default 'gpt4regex')")
-    parser.add_argument("-k", type=int, default=256,
-        help="number of top-k unique pairs set to be communicated between GPUs. set heuristically to 256")
-    parser.add_argument("-p", "--pat_str", type=str, default="gpt5",
-        help="Pattern string. Defaults to 'gpt5'. Options are {gpt2, gpt4, gpt5}")
-    parser.add_argument("-s", "--seed", type=int, default=random.randint(0, 2**32))
-    args = parser.parse_args()
+    parser.add_argument("-n", "--samples_per_gpu", type=int,
+        help="Maximum number of text characters to use on each GPU during training.")
+    parser.add_argument("-v", "--vocab_size", type=int,
+        help="Size of the vocabulary to train.")
+    parser.add_argument("-f", "--name", type=str,
+        help="Filename prefix to save the tokenizer.")
+    parser.add_argument("-k", type=int,
+        help="Number of top-k unique pairs set to be communicated between GPUs.")
+    parser.add_argument("-p", "--pat_str", type=str,
+        help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
+    parser.add_argument("-s", "--seed", type=int, help="Seed for the data loader.")
+    
+    # The config file is expected to be in the same directory as the script.
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    default_config_path = os.path.join(script_dir, 'config.yaml')
+    parser.add_argument("--config", default=default_config_path,
+        help="Path to the YAML configuration file.")
 
-    dtype = torch.int16 if args.vocab_size <= 2**16-2 else torch.int32
+    config = get_config(parser)
+
+    dtype = torch.int16 if config.vocab_size <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
 
     pat_str_dict = {
@@ -329,38 +337,38 @@ def run(dist_manager: DistributedManager):
             r"""\s+""",
         ]),
     }
-    pat_str = pat_str_dict[args.pat_str] if args.pat_str in pat_str_dict.keys() else args.pat_str
+    pat_str = pat_str_dict[config.pat_str] if config.pat_str in pat_str_dict.keys() else config.pat_str
 
     data, ranks = prepare_data_tensors(
-        n=args.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=args.seed, pat_str=pat_str
+        n=config.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=config.seed, pat_str=pat_str
     )
 
     mergeable_ranks = bpe_train(
         ids=data, 
         ranks=ranks, 
-        vocab_size=args.vocab_size, 
+        vocab_size=config.vocab_size, 
         separator_flag=separator_flag,
         pat_str=pat_str,
         dtype=dtype,
         dist_manager=dist_manager,
-        k=args.k
+        k=config.k
     )
 
     if dist_manager.is_main_process:
         enc = tiktoken.Encoding(
-            name=args.name,
+            name=config.name,
             pat_str=pat_str,
             mergeable_ranks=mergeable_ranks,
-            special_tokens={"<|endoftext|>": args.vocab_size}
+            special_tokens={"<|endoftext|>": config.vocab_size}
         )
         test_str = f"hello world"
         assert enc.decode(enc.encode(test_str)) == test_str
         
         save_tokenizer(
             enc, 
-            args.name, 
-            args.vocab_size, 
-            args.samples_per_gpu,
+            config.name, 
+            config.vocab_size, 
+            config.samples_per_gpu,
         )
 
 if __name__ == "__main__":
