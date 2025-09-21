@@ -7,6 +7,7 @@ import torch.optim as optim
 
 from checkpointer import save_checkpoint, load_checkpoint
 from device import get_default_device
+from reproducibility import get_git_commit_hash
 
 
 class SimpleModel(nn.Module):
@@ -31,7 +32,20 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
     # 2. Create original objects and move to device
     model_orig = SimpleModel().to(device)
     optimizer_orig = optim.Adam(model_orig.parameters(), lr=0.001)
-    metadata_orig = {'epoch': 10, 'step': 1234, 'best_val_loss': 0.05}
+    
+    # Create metadata with git info (mimicking what ReproducibilityManager would provide)
+    git_info = {
+        "commit_hash": get_git_commit_hash(),
+        "branch": "test-branch",
+        "remote_url": "https://github.com/test/repo.git",
+        "was_dirty": False
+    }
+    metadata_orig = {
+        'epoch': 10, 
+        'step': 1234, 
+        'best_val_loss': 0.05,
+        'git_info': git_info
+    }
 
     # Perform a training step to give the optimizer state
     optimizer_orig.zero_grad()
@@ -71,8 +85,11 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
 
     # 6. Assert that the state has been restored correctly
     assert loaded_data['metadata'] == metadata_orig, "Metadata was not loaded correctly"
-    assert 'git_commit_hash' in loaded_data, "Git commit hash not found in loaded data"
     assert 'rng_states' in loaded_data, "RNG states not found in loaded data"
+    
+    # Verify git info is properly stored in metadata
+    assert 'git_info' in loaded_data['metadata'], "Git info not found in metadata"
+    assert loaded_data['metadata']['git_info']['commit_hash'] == git_info['commit_hash'], "Git commit hash not preserved"
 
     # Check model state
     for p_orig, p_loaded in zip(model_orig.parameters(), model_loaded.parameters()):

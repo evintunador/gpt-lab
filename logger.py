@@ -23,18 +23,6 @@ def get_package_versions() -> Dict[str, Any]:
         return {"error": f"Could not run 'pip freeze': {e}"}
 
 
-def get_git_commit_hash() -> Optional[str]:
-    """Retrieves the current git commit hash."""
-    try:
-        return (
-            subprocess.check_output(["git", "rev-parse", "HEAD"])
-            .decode("ascii")
-            .strip()
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-
-
 class ExperimentLogger:
     """
     A flexible logger for deep learning experiments.
@@ -98,8 +86,14 @@ class ExperimentLogger:
         """Logs hyperparameters."""
         self.log({"type": "hyperparameters", "data": params}, print_to_console=True)
 
-    def log_system_info(self):
-        """Logs system information, package versions, and git hash."""
+    def log_system_info(self, git_info: Optional[Dict[str, Any]] = None):
+        """
+        Logs system information, package versions, and git information.
+        
+        Args:
+            git_info: Git information dictionary from ReproducibilityManager.
+                     If None, git information will be omitted from the log.
+        """
         info = {
             "type": "system_info",
             "data": {
@@ -115,10 +109,14 @@ class ExperimentLogger:
                 ]
                 if torch.cuda.is_available()
                 else [],
-                "git_commit_hash": get_git_commit_hash(),
                 "package_versions": get_package_versions(),
             },
         }
+        
+        # Add git information if provided
+        if git_info:
+            info["data"]["git_info"] = git_info
+        
         self.log(info, print_to_console=True)
 
     def close(self):

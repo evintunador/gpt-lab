@@ -7,19 +7,6 @@ import numpy as np
 import torch
 
 
-def get_git_commit_hash() -> Optional[str]:
-    """
-    Retrieves the current git commit hash.
-
-    Returns:
-        The git commit hash as a string, or None if not in a git repository.
-    """
-    try:
-        return subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode('ascii').strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return None
-
-
 def save_checkpoint(
     save_dir: str,
     filename: str,
@@ -34,6 +21,7 @@ def save_checkpoint(
         save_dir: The directory to save the checkpoint in.
         filename: The name of the checkpoint file.
         metadata: Any non-stateful metadata to save (e.g., epoch, step, metrics).
+                 Should include 'git_info' from ReproducibilityManager for full reproducibility.
         save_rng_state: If True, saves the state of torch, numpy, and random RNGs.
         **stateful_objects: Keyword arguments for stateful objects to save
             (e.g., model=my_model, optimizer=my_optimizer).
@@ -46,7 +34,6 @@ def save_checkpoint(
 
     state = {
         'metadata': metadata or {},
-        'git_commit_hash': get_git_commit_hash(),
     }
 
     if save_rng_state:
@@ -81,6 +68,10 @@ def load_checkpoint(
         map_location: The device to map the loaded tensors to ('cpu', 'cuda', etc.).
         **stateful_objects: Keyword arguments for objects to load state into
             (e.g., model=my_model, optimizer=my_optimizer).
+
+    Modifies in-place:
+        All stateful objects passed as keyword arguments will have their state
+        loaded via their load_state_dict() method if available.
 
     Returns:
         A dictionary containing all non-state-dict data from the checkpoint,

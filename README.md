@@ -42,9 +42,10 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## todo
 ### important / urgent
 
-- [x] design & build a config management tool
+- [x] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear history. i'll figure all that out when i get there
+- [ ] design and build a wrapper around other general experiment utilities to make the repo easier to use. maybe also a template experiment?
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment (presumably benchmark outputs need to be saved in experiment directory) both directly and as a function of the performance per runtime/memory difference
-- [ ] design and build reproducibility tools that force a git commit maybe at an independent branch or something for every experiment. independent branch might get messy idk; i guess it might make more sense to propose a more linear history. i'll figure all that out when i get there.
+- [ ] implement nanogpt and moddednanogpt as experiments for demonstration purposes. i'm sure eventually i'll fill in other common models into the catalog as well
 - [ ] do first DAGSeq2DAGSeq experiment
 
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
