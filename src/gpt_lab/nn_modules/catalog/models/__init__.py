@@ -1,14 +1,11 @@
-from gpt_lab.catalog_utils import SkipModuleException
+import torch
 from .nano_gpt import NanoGPT
 
 __all__ = [
     "NanoGPT",
 ]
 
-try:
+# Import CUDA-specific modules if CUDA is available
+if torch.cuda.is_available():
     from .modded_nanogpt import ModdedNanoGPT
-    __all__.append(
-        "ModdedNanoGPT"
-        )
-except SkipModuleException:
-    pass
+    __all__.append("ModdedNanoGPT")

@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset
 
 from gpt_lab.data_sources.catalog_utils import Split, download_file
-from gpt_lab.benchmarks.catalog.multiple_choice import LogitMultipleChoiceItem
+from gpt_lab.benchmarks.catalog.multiple_choice import MultipleChoiceItem
 
 
 """
@@ -53,7 +53,7 @@ The validation set of HellaSwag has a total of 10,042 examples.
 
 class HellaSwagDataset(Dataset):
     """
-    HellaSwag dataset that yields standardized LogitMultipleChoiceItem objects.
+    HellaSwag dataset that yields standardized MultipleChoiceItem objects.
     
     Supports both streaming and downloading modes with flexible caching.
     """
@@ -149,13 +149,13 @@ class HellaSwagDataset(Dataset):
             return float('inf') if self.limit is None else self.limit
         return len(self.data)
     
-    def __getitem__(self, idx: int) -> LogitMultipleChoiceItem:
+    def __getitem__(self, idx: int) -> MultipleChoiceItem:
         """Get a single example from the dataset."""
         if self.streaming:
             # For streaming, we need to handle indexing differently
             for i, example in enumerate(self.data):
                 if i == idx:
-                    return LogitMultipleChoiceItem(
+                    return MultipleChoiceItem(
                         context=example["ctx"],
                         choices=example["endings"],
                         label=example["label"],
@@ -163,7 +163,7 @@ class HellaSwagDataset(Dataset):
             raise IndexError(f"Index {idx} out of range")
         
         example = self.data[idx]
-        return LogitMultipleChoiceItem(
+        return MultipleChoiceItem(
             context=example["ctx"],
             choices=example["endings"], 
             label=example["label"],

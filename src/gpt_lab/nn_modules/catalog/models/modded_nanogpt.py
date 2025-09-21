@@ -4,14 +4,15 @@ from torch import Tensor
 import torch.nn.functional as F
 from torch.nn.attention.flex_attention import create_block_mask
 
-from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
-from gpt_lab.nn_modules.catalog.layers import ModdedNanoGPTBlock
-from gpt_lab.nn_modules.catalog.channel_mixing import FP8Linear
 from gpt_lab.nn_modules.catalog.norms import RMSNorm
 from gpt_lab.nn_modules.catalog_utils import next_multiple
+from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
 
-
+# Check for CUDA availability before importing CUDA-specific modules
 ignore_if_no_cuda()
+
+from gpt_lab.nn_modules.catalog.layers import ModdedNanoGPTBlock
+from gpt_lab.nn_modules.catalog.channel_mixing import FP8Linear
 
 
 class ModdedNanoGPT(nn.Module):

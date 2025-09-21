@@ -2,13 +2,14 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 
+from gpt_lab.nn_modules.catalog.norms import RMSNorm
 from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
+
+# Check for CUDA availability before importing CUDA-specific modules
+ignore_if_no_cuda()
+
 from gpt_lab.nn_modules.catalog.sequence_mixing.modded_nanogpt_flex_self_attention import ModdedNanoGPTFlexSelfAttention, BlockMask
 from gpt_lab.nn_modules.catalog.channel_mixing import MLP
-from gpt_lab.nn_modules.catalog.norms import RMSNorm
-
-
-ignore_if_no_cuda()
 
 
 class ModdedNanoGPTBlock(nn.Module):

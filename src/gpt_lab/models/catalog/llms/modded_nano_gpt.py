@@ -4,12 +4,13 @@ import torch.nn.functional as F
 import tiktoken
 
 from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
+
+# Check for CUDA availability before importing CUDA-specific modules
+ignore_if_no_cuda()
+
 from gpt_lab.nn_modules.catalog.models.modded_nanogpt import ModdedNanoGPT
 from gpt_lab.benchmarks import register_handler
 from gpt_lab.benchmarks.catalog import MultipleChoiceItem, MultipleChoiceBenchmark, FillInTheBlankItem
-
-
-ignore_if_no_cuda()
 
 
 class ModdedNanoGPTModel:

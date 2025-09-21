@@ -6,16 +6,22 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ## Directory Structure
 
+### Top-level directories
+- `src/gpt_lab/` - main package source code (see below for details)
+- `experiments/` - catalog of experiment workflows. there are a bunch of common and useful examples already in there; go build your own
+- `docs/` - documentation about the user-facing API of each corresponding file (planned)
+- `bench_results/` - benchmark results and performance data
+- `tools/` - utility scripts for viewing benchmark results and other tools
+- `test_artifacts/` - test output artifacts
 
+### Main package (`src/gpt_lab/`)
 - `benchmarks/` - catalog of benchmarks. defines different benchmark types which allows for easily swappable benchmark datasets and plugging in of models
-- `catalog_utils.py`
-- `checkpointing.py` - tool for saving & loading metadata & objects with state dicts. should be general enough to work with any weird training setup and allow for resuming training right where it left off.
+- `catalog_utils.py` - shared utilities for catalog management
+- `checkpointer.py` - tool for saving & loading metadata & objects with state dicts. should be general enough to work with any weird training setup and allow for resuming training right where it left off.
 - `configuration.py` - tool for combining `.yaml` configs with terminal arguments
 - `data_sources/` - data loading and preprocessing components
 - `device.py` - simple tools for device management
 - `distributed.py` - tool to make scripts agnostic to whether they're being run with single gpu vs torchrun vs slurm. recommended pattern for use is `with DistributedManager() as manager: ...`
-- `docs/` - documentation about the user-facing API of each corresponding file (planned)
-- `experiments/` - catalog of experiment workflows. there are a bunch of common and useful examples already in there; go build your own
 - `llm_code_compiler/` - llm interface for automated and testable code generation. currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later. if not, then it'll be folded into `train_loops/`
 - `logger.py` - tool for structured logging
 - `models/` - catalog of models. the distinction between a model and a module lies in the latter being interfaceable with `.forward()` and the former being a wrapper with a variety of capabilities (eg. `.inference()`, `.batched_inference()`, `.benchmark()`, `.get_attention_logits()`, etc.)
@@ -23,6 +29,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - `optimizers/` - catalog of optimizers. includes testing and benchmarking tools.
 - `reproducibility.py` - tools for reproducible research
 - `train_loops/` - catalog of training loops. its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
+- `tests/` - unit tests for core functionality
 
 
 ## getting started
@@ -52,11 +59,11 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ### important / not-urgent
 
-- [ ] Refactor the project structure to use a `src`-layout. This will simplify package discovery, eliminate the need to manually update `pyproject.toml` when new top-level modules/packages are added, and align with modern Python packaging standards.
+- [x] Refactor the project structure to use a `src`-layout. This will simplify package discovery, eliminate the need to manually update `pyproject.toml` when new top-level modules/packages are added, and align with modern Python packaging standards.
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where
 - [ ] find other desirable features to help with our experiments
-- [ ] implement more advanced parallel abilities for [`nn_modules/`](nn_modules/) testing and benchmarking and general utils to help with the various types of parallelization
+- [ ] implement more advanced parallel abilities for [`src/gpt_lab/nn_modules/`](src/gpt_lab/nn_modules/) testing and benchmarking and general utils to help with the various types of parallelization
 
 ### not important / urgent
 
@@ -65,11 +72,11 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 - [ ] add more atomic feature training loops
 - [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM
-- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](train_loops/catalog_llm_compiler.py) one into shared utilities.
+- [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`src/gpt_lab/train_loops/`](src/gpt_lab/train_loops/llm_train_loop_compiler.py) one into shared utilities.
 - [ ] add more benchmark datasets
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
-- [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `nn_modules/`)
+- [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
 - [ ] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
-- [ ] switch tests from current next-to-file setup to one where each catalog directory gets its own test directory (eg. `nn_modules/tests/` and `train_loops/tests/`). will require editing pyproject.toml to tell pytest that there are multiple tests/ folders. better than one single tests/ folder since it's more in line with our modular catalog design.
+- [x] switch tests from current next-to-file setup to one where each catalog directory gets its own test directory (eg. `src/gpt_lab/nn_modules/tests/` and `src/gpt_lab/train_loops/tests/`). will require editing pyproject.toml to tell pytest that there are multiple tests/ folders. better than one single tests/ folder since it's more in line with our modular catalog design
