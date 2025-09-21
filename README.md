@@ -15,13 +15,13 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - `device.py` - simple tools for device management
 - `distributed.py` - tool to make scripts agnostic to whether they're being run with single gpu vs torchrun vs slurm. recommended pattern for use is `with DistributedManager() as manager: ...`
 - `docs/` - documentation about the user-facing API of each corresponding file (planned)
-- `experiments/` - Catalog of experiment workflows. Utilizes `utils/reproducibility/` to ensure reproducibility. (planned)
+- `experiments/` - catalog of experiment workflows. there are a bunch of common and useful examples already in there; go build your own
 - `llm_code_compiler/` - llm interface for automated and testable code generation. currently used to "compile" individual "atomic feature" training loops into multi-feature versions, but hoping more parts of the repo will find it useful later. if not, then it'll be folded into `train_loops/`
 - `logger.py` - tool for structured logging
 - `models/` - catalog of models. the distinction between a model and a module lies in the latter being interfaceable with `.forward()` and the former being a wrapper with a variety of capabilities (eg. `.inference()`, `.batched_inference()`, `.benchmark()`, `.get_attention_logits()`, etc.)
 - `nn_modules/` - catalog of `nn.Module`'s with bulk testing and runtime/memory benchmarking frameworks.
 - `optimizers/` - catalog of optimizers. includes testing and benchmarking tools.
-- `reproducibility.py` - tools for reproducible research (planned)
+- `reproducibility.py` - tools for reproducible research
 - `train_loops/` - catalog of training loops. its primary notable feature consists of LLM-driven "compilation" by presenting different "atomic feature" training loop examples and having the LLM write a loop with all of the individual features combined. Researchers are also welcome to write their own loops manually. Also includes 1) bulk testing of all training loops, 2) optional feature-specific tests and 3) an API that infers the user's intended training loop behavior and compiles it (or fetches from cache if already available)
 
 
