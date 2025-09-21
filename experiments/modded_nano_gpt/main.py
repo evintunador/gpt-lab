@@ -2,13 +2,12 @@ import argparse
 import os
 import time
 import pickle
-import tiktoken
 from contextlib import nullcontext
+
 import random
 import numpy as np
-
 import torch
-import torch.optim
+import tiktoken
 
 from configuration import get_config, ConfigObject
 from distributed import DistributedManager
@@ -17,14 +16,12 @@ from logger import ExperimentLogger
 from checkpointer import save_checkpoint, load_checkpoint
 from data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
 from data_sources.catalog_utils import Split
-from nn_modules.catalog.models.modded_nanogpt import ModdedNanoGPT
-from models.catalog.llms.modded_nano_gpt import ModdedNanoGPTModel
-from optimizers.catalog.muon import Muon
-from data_sources.catalog.benchmarks.multiple_choice.wiki_qa import WikiQADataset
-from data_sources.catalog.benchmarks.multiple_choice.hellaswag import HellaSwagDataset
-from data_sources.catalog.benchmarks.fill_in_the_blank.asdiv import ASDivDataset
-from benchmarks.catalog.multiple_choice import MultipleChoiceBenchmark
-from benchmarks.catalog.fill_in_the_blank import FillInTheBlankBenchmark
+from nn_modules.catalog.models import ModdedNanoGPT
+from models.catalog.llms import ModdedNanoGPTModel
+from optimizers.catalog import Muon
+from data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
+from data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
+from benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
 
 
 def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManager):

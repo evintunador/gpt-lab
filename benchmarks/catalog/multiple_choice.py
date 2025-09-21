@@ -54,6 +54,36 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
         accuracy = self.results["correct"] / total
         return {"accuracy": accuracy, "total_examples": total}
 
+    @staticmethod
+    def render_example(example: MultipleChoiceItem, tokenizer_encode_fn):
+        """
+        Given the example as a MultipleChoiceItem, render it as three torch tensors:
+        - tokens (the tokens of context + completion, of size 4xN, as there are always 4 candidates)
+        - mask (is 1 in the region of the candidate completion, where we evaluate likelihoods)
+        - label (the index of the correct completion, which we hope has the highest likelihood)
+        """
+        ctx = example.context
+        label = example.label
+        endings = example.choices
+
+        # gather up all the tokens
+        ctx_tokens = tokenizer_encode_fn(ctx)
+        tok_rows = []
+        mask_rows = []
+        for end in endings:
+            end_tokens = tokenizer_encode_fn(" " + end)  # NOTE: prepending " " assuming GPT-2 based tokenizer
+            tok_rows.append(ctx_tokens + end_tokens)
+            mask_rows.append([0]*len(ctx_tokens) + [1]*len(end_tokens))
+
+        # have to be careful during the collation because the number of tokens in each row can differ
+        max_len = max(len(row) for row in tok_rows)
+        tokens = torch.zeros((4, max_len), dtype=torch.int32)
+        mask = torch.zeros((4, max_len), dtype=torch.int32)
+        for i, (tok_row, mask_row) in enumerate(zip(tok_rows, mask_rows)):
+            tokens[i, :len(tok_row)] = torch.tensor(tok_row)
+            mask[i, :len(mask_row)] = torch.tensor(mask_row)
+
+        return tokens, mask, label
 
 """
 Example of how the class above might be used in a script:
@@ -74,34 +104,3 @@ results = benchmark.run(dataset, batch_size=8, limit=1000)
 print(results)
 Expected output: {'accuracy': 0.45, 'total_examples': 1000} (example value)
 """
-
-
-def render_example(example: MultipleChoiceItem, tokenizer_encode_fn):
-    """
-    Given the example as a MultipleChoiceItem, render it as three torch tensors:
-    - tokens (the tokens of context + completion, of size 4xN, as there are always 4 candidates)
-    - mask (is 1 in the region of the candidate completion, where we evaluate likelihoods)
-    - label (the index of the correct completion, which we hope has the highest likelihood)
-    """
-    ctx = example.context
-    label = example.label
-    endings = example.choices
-
-    # gather up all the tokens
-    ctx_tokens = tokenizer_encode_fn(ctx)
-    tok_rows = []
-    mask_rows = []
-    for end in endings:
-        end_tokens = tokenizer_encode_fn(" " + end)  # NOTE: prepending " " assuming GPT-2 based tokenizer
-        tok_rows.append(ctx_tokens + end_tokens)
-        mask_rows.append([0]*len(ctx_tokens) + [1]*len(end_tokens))
-
-    # have to be careful during the collation because the number of tokens in each row can differ
-    max_len = max(len(row) for row in tok_rows)
-    tokens = torch.zeros((4, max_len), dtype=torch.int32)
-    mask = torch.zeros((4, max_len), dtype=torch.int32)
-    for i, (tok_row, mask_row) in enumerate(zip(tok_rows, mask_rows)):
-        tokens[i, :len(tok_row)] = torch.tensor(tok_row)
-        mask[i, :len(mask_row)] = torch.tensor(mask_row)
-
-    return tokens, mask, label

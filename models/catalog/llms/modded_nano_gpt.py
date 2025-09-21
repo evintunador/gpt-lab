@@ -4,9 +4,8 @@ import torch.nn.functional as F
 import tiktoken
 
 from nn_modules.catalog.models.modded_nanogpt import ModdedNanoGPT
-from benchmarks.registry import register_handler
-from benchmarks.catalog.multiple_choice import MultipleChoiceItem, render_example
-from benchmarks.catalog.fill_in_the_blank import FillInTheBlankItem
+from benchmarks import register_handler
+from benchmarks.catalog import MultipleChoiceItem, MultipleChoiceBenchmark, FillInTheBlankItem
 
 
 class ModdedNanoGPTModel:
@@ -133,7 +132,7 @@ class ModdedNanoGPTModel:
 
         for item in batch:
             # Render the example into tokens, mask, and label
-            tokens, mask, label = render_example(item, self.tokenizer.encode)
+            tokens, mask, label = MultipleChoiceBenchmark.render_example(item, self.tokenizer.encode)
             tokens = tokens.to(self.nn_module.embed.weight.device)
             mask = mask.to(self.nn_module.embed.weight.device)
             
