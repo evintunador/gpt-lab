@@ -133,13 +133,15 @@ if __name__ == "__main__":
         formatter_class=argparse.RawTextHelpFormatter,
         epilog="""
 NOTE: Any parameter in the YAML configuration can also be overridden from the command line
-using dot notation. For example:
+using dot notation. For example, to run with the default config but override the number of layers:
 
-  python experiments/nano_gpt/main.py --config experiments/nano_gpt/config.yaml \\
-    --model.n_layer 16 --optimizer.learning_rate 5e-4
+  python experiments/nano_gpt/main.py --model.n_layer 16
+
+To specify a different config file:
+
+  python experiments/nano_gpt/main.py --config path/to/your_config.yaml
 """
     )
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file.")
     parser.add_argument("--resume-from-checkpoint", dest="training.resume_from_checkpoint", type=str, help="Path to a checkpoint to resume from.")
     parser.add_argument("--save-best-model", dest="training.save_best_model", action=argparse.BooleanOptionalAction, help="Enable saving best model based on validation loss.")
     parser.add_argument("--max-steps", dest="training.max_steps", type=int, help="Total training steps.")

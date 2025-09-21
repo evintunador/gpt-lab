@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import os
+import sys
 from collections.abc import Mapping
 
 
@@ -69,10 +70,23 @@ def get_config(parser: argparse.ArgumentParser) -> ConfigObject:
         A ConfigObject containing the final, merged configuration.
     """
     if not any(action.dest == 'config' for action in parser._actions):
+        default_config_path = None
+        try:
+            # sys.argv[0] is the path to the script being executed.
+            main_script_path = os.path.abspath(sys.argv[0])
+            caller_dir = os.path.dirname(main_script_path)
+            potential_config_path = os.path.join(caller_dir, 'config.yaml')
+            if os.path.exists(potential_config_path):
+                default_config_path = potential_config_path
+        except Exception:
+            pass  # Fails gracefully if path cannot be determined.
+
         parser.add_argument(
             "--config",
             type=str,
-            help="Path to the YAML configuration file."
+            default=default_config_path,
+            required=default_config_path is None,
+            help="Path to the YAML configuration file. Defaults to 'config.yaml' in the script's directory if available."
         )
 
     args, unknown = parser.parse_known_args()

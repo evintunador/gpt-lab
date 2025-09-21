@@ -159,3 +159,4 @@ experiments/*/outputs/
 experiments/*/checkpoints/
 experiments/*/logs/
 experiments/*/runs/
+experiment_artifacts/
