@@ -6,19 +6,19 @@ import torch
 import tiktoken
 from torch.nn import CrossEntropyLoss
 
-from configuration import get_config, ConfigObject
-from distributed import DistributedManager
-from reproducibility import ReproducibilityManager
-from logger import ExperimentLogger
-from checkpointer import load_checkpoint
-from data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
-from data_sources.catalog_utils import Split
-from nn_modules.catalog.models import NanoGPT
-from models.catalog.llms import NanoGPTModel
-from train_loops.smart_api import smart_train
-from data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
-from data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
-from benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
+from gpt_lab.configuration import get_config, ConfigObject
+from gpt_lab.distributed import DistributedManager
+from gpt_lab.reproducibility import ReproducibilityManager
+from gpt_lab.logger import ExperimentLogger
+from gpt_lab.checkpointer import load_checkpoint
+from gpt_lab.data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
+from gpt_lab.data_sources.catalog_utils import Split
+from gpt_lab.nn_modules.catalog.models import NanoGPT
+from gpt_lab.models.catalog.llms import NanoGPTModel
+from gpt_lab.train_loops.smart_api import smart_train
+from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
+from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
+from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
 
 
 def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManager):

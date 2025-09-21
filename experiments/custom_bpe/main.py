@@ -12,11 +12,11 @@ from tqdm import tqdm
 import torch
 import torch.distributed as dist
 
-from data_sources.catalog.pretraining.fineweb import FineWebDataset
-from distributed import DistributedManager
-from configuration import get_config
-from reproducibility import ReproducibilityManager
-from logger import ExperimentLogger
+from gpt_lab.data_sources.catalog.pretraining import FineWebDataset
+from gpt_lab.distributed import DistributedManager
+from gpt_lab.configuration import get_config
+from gpt_lab.reproducibility import ReproducibilityManager
+from gpt_lab.logger import ExperimentLogger
 
 
 """

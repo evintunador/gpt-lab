@@ -16,23 +16,31 @@ dependencies = [
     "plotly",
     "matplotlib",
     "litellm",
-    "datasets",
 ]
 
 [project.optional-dependencies]
+benchmarks = []
+data_sources = [
+    "huggingface",
+    "datasets",
+]
+llm_code_compiler = []
+models = []
+nn_modules = [
+    "triton; sys_platform != 'darwin'",  # Skip triton on macOS
+]
 optimizers = [
     "muon",
 ]
-nn_modules = []
-models = []
-data_sources = []
-benchmarks = []
+train_loops = []
 all_catalogs = [
-    "gpt-lab[optimizers]",
-    "gpt-lab[nn_modules]",
-    "gpt-lab[models]",
-    "gpt-lab[data_sources]",
     "gpt-lab[benchmarks]",
+    "gpt-lab[data_sources]",
+    "gpt-lab[llm_code_compiler]",
+    "gpt-lab[models]",
+    "gpt-lab[nn_modules]",
+    "gpt-lab[optimizers]",
+    "gpt-lab[train_loops]",
 ]
 dev = [
     "gpt-lab[all_catalogs]",
@@ -40,7 +48,9 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--ignore=venv --ignore=.venv"
+testpaths = [
+    "src/gpt_lab",
+]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
@@ -50,18 +60,7 @@ filterwarnings = [
 ]
 
 [tool.setuptools]
-# By explicitly listing single-file modules, we tell setuptools to include them.
-py-modules = [
-    "catalog_utils",
-    "checkpointer",
-    "configuration",
-    "device",
-    "distributed",
-    "logger",
-    "reproducibility",
-]
 
 [tool.setuptools.packages.find]
-# By enabling package discovery, we confirm to setuptools that we want to
-# include all packages found in the project root.
-# This resolves the "multiple top-level packages" ambiguity.
+# Tell setuptools to look for packages inside the 'src' directory.
+where = ["src"]
