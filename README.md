@@ -62,9 +62,10 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ### not important / not urgent
 
 - [ ] add more atomic feature training loops
+- [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM
 - [ ] find other use cases for our llm compiler system & abstract out some of what's in the [`train_loops/`](train_loops/catalog_llm_compiler.py) one into shared utilities.
 - [ ] add more benchmark datasets
-- [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out and put into `utils/`
+- [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `nn_modules/`)
 - [ ] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
