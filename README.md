@@ -51,6 +51,8 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
 ### important / not-urgent
+
+- [ ] Refactor the project structure to use a `src`-layout. This will simplify package discovery, eliminate the need to manually update `pyproject.toml` when new top-level modules/packages are added, and align with modern Python packaging standards.
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where
 - [ ] find other desirable features to help with our experiments

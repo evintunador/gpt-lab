@@ -48,3 +48,20 @@ filterwarnings = [
     "ignore:Use 'content=<...>' to upload raw bytes/text content.:DeprecationWarning",
     "ignore:Pydantic serializer warnings:UserWarning",
 ]
+
+[tool.setuptools]
+# By explicitly listing single-file modules, we tell setuptools to include them.
+py-modules = [
+    "catalog_utils",
+    "checkpointer",
+    "configuration",
+    "device",
+    "distributed",
+    "logger",
+    "reproducibility",
+]
+
+[tool.setuptools.packages.find]
+# By enabling package discovery, we confirm to setuptools that we want to
+# include all packages found in the project root.
+# This resolves the "multiple top-level packages" ambiguity.
