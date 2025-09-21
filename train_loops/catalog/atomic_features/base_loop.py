@@ -13,8 +13,6 @@ def run_training(
 ) -> Dict[str, Any]:
     """A base 'zero feature' training loop to build your new atomic feature loop off of."""
     model.train()
-
-    micro_idx = 0
     optimizer.zero_grad(set_to_none=True)
 
     for batch in train_loader:
@@ -23,8 +21,6 @@ def run_training(
         loss = loss_fn(logits, yb)
 
         loss.backward()
-        micro_idx += 1
-
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
 

@@ -1,0 +1,67 @@
+experiment_name: "nanogpt-gpt2-small"
+seed: 1337
+
+model:
+  block_size: 1024
+  vocab_size: 50257 # GPT-2 vocab size
+  n_layer: 12
+  n_head: 12
+  n_embd: 768
+  dropout: 0.0
+  bias: True
+
+data:
+  dataset: 'FineWeb'
+  data_dir: './data/fineweb_cache'
+  train_seq_len: 1024
+  val_seq_len: 1024
+
+optimizer:
+  # Note: learning_rate is now under training kwargs for the scheduler feature
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+
+training:
+  # These will be passed as kwargs to the smart_train API,
+  # which will select atomic features based on them.
+  device: "cuda"
+  
+  # For step_limiting feature
+  max_steps: 600000
+  
+  # For grad_accum feature
+  accum_steps: 40
+  
+  # For lr_scheduling feature with a custom lambda
+  lr_scheduler_type: 'lambda_lr'
+  learning_rate: 6e-4 # This will be the max_lr
+  warmup_iters: 2000
+  lr_decay_iters: 600000
+  min_lr: 6e-5
+
+  # For grad_norm_clip feature
+  norm_clip_value: 1.0
+
+  # For validation feature
+  val_every_steps: 2000
+  val_steps: 200
+
+  # For checkpointing features
+  resume_from_checkpoint: null
+  save_every_steps: 2000
+  save_best_model: True
+
+  # For logging and loss_tracking features
+  track_loss: True
+
+# Benchmarking and generation after training
+benchmarks:
+  run_benchmarks: True
+  hellaswag_limit: 500
+  wikiqa_limit: 500
+  asdiv_limit: 500
+generation:
+  max_new_tokens: 32
+  temperature: 0.8
+  top_k: 200
