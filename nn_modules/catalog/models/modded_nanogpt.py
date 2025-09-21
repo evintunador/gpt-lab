@@ -22,30 +22,28 @@ class ModdedNanoGPT(nn.Module):
         # value embedding code simplification inspired by @ragulpr https://github.com/KellerJordan/modded-nanogpt/pull/78
         self.value_embeds = nn.ModuleList([nn.Embedding(vocab_size, model_dim) for _ in range(num_val_emb)])
         self.blocks = nn.ModuleList([ModdedNanoGPTBlock(model_dim, num_heads, mlp_ratio, max_seq_len, i) for i in range(num_layers)])
-        # there are only 50257 unique GPT-2 tokens; we extend to nearest multiple of 128 for efficiency.
-        # suggested by @Grad62304977. this originates from Karpathy's experiments.
+        # Pad vocab to the nearest multiple of 128 for efficiency.
+        # From Karpathy's experiments, suggested by @Grad62304977.
         self.lm_head = FP8Linear(model_dim, next_multiple(vocab_size, n=128),
                                     use_fp8=False, x_s=(model_dim**0.5)/448, w_s=24/448, grad_s=1/448)
         self.lm_head.weight.detach().zero_() # @Grad62304977
-        # Add learnable skip connection weights for decoder layers
         self.skip_weights = nn.Parameter(torch.ones(num_layers//2))
         self.norm = RMSNorm()
 
     def forward(self, input_seq: Tensor, target_seq: Tensor = None):
-        assert input_seq.ndim == 1 # shape (B*N)
+        assert input_seq.ndim == 1 # (B*N)
 
         # value emeddings provide extra info about a token at the first & final few layers
         ve = [value_embed(input_seq) for value_embed in self.value_embeds] # each (B*N, D)
         ve = [ve[i] for i in range(len(ve))] + [None] * (len(self.blocks) - len(ve)*2) + [ve[i] for i in range(len(ve))]
         assert len(ve) == len(self.blocks)
 
-        # creating flex-attentio mask
         docs = (input_seq == 50256).cumsum(0)
         def doc_causal(b, h, q_idx, kv_idx):
             causal_mask = q_idx >= kv_idx
             document_mask = docs[q_idx] == docs[kv_idx]
             return causal_mask & document_mask
-        # Because the sparsity pattern is independent of batch and heads, we'll set them to None (which broadcasts them) 
+        # Because the sparsity pattern is independent of batch and heads, we can set them to None.
         block_mask = create_block_mask(doc_causal, B=None, H=None, Q_LEN=len(input_seq), KV_LEN=len(input_seq))
 
         x = x0 = self.norm(self.embed(input_seq)[None]) # use of norm here by @Grad62304977
@@ -72,48 +70,4 @@ class ModdedNanoGPT(nn.Module):
                                   reduction='sum' if self.training else 'mean')
 
     def get_num_params(self):
-        """
-        Return the number of parameters in the model.
-        """
-        n_params = sum(p.numel() for p in self.parameters())
-        return n_params
-
-    @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
-        """
-        Take a conditioning sequence of indices idx (LongTensor of shape (t)) and complete
-        the sequence max_new_tokens times, feeding the predictions back into the model each time.
-        Most likely you'll want to make sure to be in model.eval() mode of operation for this.
-        """
-        assert idx.ndim == 1
-        def cdiv(m, n):
-            return (m + (n - 1)) // n
-        seq_len = idx.size(0)
-        if seq_len % 128 != 0:
-            pad_ct = cdiv(seq_len, 128) * 128 - seq_len
-            idx = torch.cat((idx, torch.zeros(pad_ct, dtype=idx.dtype, device=idx.device)), dim=0)
-        
-        self.eval()  # Ensure model is in evaluation mode
-        for _ in range(max_new_tokens):
-            # Forward pass to get logits
-            logits = self(idx[-self.max_seq_len:] if idx.size(0) > self.max_seq_len else idx)
-            # Focus on the last token's prediction
-            logits = logits[0, min(seq_len, self.max_seq_len) - 1, :] / temperature
-            # optionally crop the logits to only the top k options
-            if top_k is not None:
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[-1]] = -float('Inf')
-            # apply softmax to convert logits to (normalized) probabilities
-            probs = F.softmax(logits, dim=-1)
-            # sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1)
-            # append sampled index to the running sequence and continue
-            idx[min(seq_len, self.max_seq_len)] = idx_next
-
-            # iterate sequence count and account for any time we surpass flex-attention's block size
-            seq_len += 1
-            if (seq_len - 1) % 128 == 0:
-                pad_ct = cdiv(seq_len, 128) * 128 - seq_len
-                idx = torch.cat((idx, [0] * pad_ct), dim=0)
-
-        return idx[:seq_len]
+        return sum(p.numel() for p in self.parameters())

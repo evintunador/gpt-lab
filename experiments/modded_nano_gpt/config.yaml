@@ -1,0 +1,54 @@
+# Configuration for ModdedNanoGPT Experiment
+
+# -- Experiment Settings --
+experiment_name: "modded-nano-gpt"
+model_name: "ModdedNanoGPT"
+save_model: true
+
+# -- Reproducibility --
+seed: 42
+
+# -- Data Settings --
+# Assumes data has been pre-tokenized using a script similar to the original repo's
+# download_fineweb.py, which creates these .bin files.
+train_files_pattern: "data/fineweb*_train_*.bin"
+val_files_pattern: "data/fineweb*_val_*.bin"
+# NOTE: The PrecachedFineWebDataset expects a tokenizer for on-the-fly tokenization
+# if the .bin cache does not exist.
+tokenizer_path: "experiments/custom_bpe/trained/gpt4regex_v2048_n134217728.pkl"
+
+# -- Model Architecture --
+# Parameters set for GPUs w/ ~8GB VRAM
+model:
+  vocab_size: 50257
+  num_layers: 12
+  num_heads: 6
+  model_dim: 384
+  mlp_ratio: 4
+  num_val_emb: 2 # Number of value embeddings used at initial and final layers
+  # `max_seq_len` will be set dynamically in the script from training/validation settings
+
+# -- Training Loop Settings --
+training:
+  resume_from_checkpoint: null # Set to a path like "experiments/modded-nano-gpt/.../step_1000.pt" to resume
+  train_steps: 20000
+  grad_acc_steps: 1
+  use_fp8: false # Experimental; requires Hopper GPU or newer
+  # Learning Rate Schedule
+  cooldown_frac: 0.4 # Fraction of training to spend cooling down LR
+  # Optimizers
+  adam_head_lr: 0.22
+  adam_embed_lr: 0.6
+  adam_scalar_lr: 0.04
+  muon_lr: 0.05
+  muon_momentum: 0.95
+
+# -- Dataloader/Sequence Length Settings --
+sequence:
+  train_seq_len: 8192 # FlexAttention sequence length
+  val_seq_len: 16384 # Can be longer for validation as no gradients are stored
+
+# -- Validation & Logging Settings --
+validation:
+  val_every_steps: 100
+  val_steps: 4 # Number of batches to evaluate for each validation run

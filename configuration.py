@@ -114,7 +114,11 @@ def get_config(parser: argparse.ArgumentParser) -> ConfigObject:
 
     for key, value in vars(args).items():
         if value is not None and key != 'config':
-            cli_args[key] = value
+            keys = key.split('.')
+            d = cli_args
+            for k in keys[:-1]:
+                d = d.setdefault(k, {})
+            d[keys[-1]] = value
 
     final_config_dict = _merge_dicts(config_dict, cli_args)
     

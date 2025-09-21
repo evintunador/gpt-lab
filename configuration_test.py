@@ -118,3 +118,45 @@ def test_user_defined_args(create_test_config):
 
     assert config.batch_size == 128      # From CLI
     assert config.learning_rate == 0.1    # From CLI
+
+
+def test_user_defined_nested_dest(create_test_config):
+    """
+    Tests that user-defined arguments with nested `dest` attributes
+    correctly create nested structures and override YAML values.
+    """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--dim",
+        dest="model.dim",
+        type=int,
+        help="Override model dimension."
+    )
+    parser.add_argument(
+        "--dropout",
+        dest="model.dropout",
+        type=float,
+        default=0.1,
+        help="Set model dropout."
+    )
+
+    # Case 1: Override existing key (dim) and add new key (dropout) from its default
+    argv = ['script', '--config', str(create_test_config), '--dim', '1024']
+    with mock.patch('sys.argv', argv):
+        config = get_config(parser)
+
+    assert config.model.dim == 1024      # Overridden by CLI
+    assert config.model.dropout == 0.1   # Added from parser default
+    assert config.model.layers == 6      # Preserved from YAML
+
+    # Case 2: Override both from the command line
+    argv = [
+        'script', '--config', str(create_test_config),
+        '--dim', '2048',
+        '--dropout', '0.5'
+    ]
+    with mock.patch('sys.argv', argv):
+        config = get_config(parser)
+
+    assert config.model.dim == 2048      # Overridden by CLI
+    assert config.model.dropout == 0.5   # Overridden by CLI
