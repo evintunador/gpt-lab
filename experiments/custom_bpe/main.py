@@ -15,6 +15,8 @@ import torch.distributed as dist
 from data_sources.catalog.pretraining.fineweb import FineWebDataset
 from distributed import DistributedManager
 from configuration import get_config
+from reproducibility import ReproducibilityManager
+from logger import ExperimentLogger
 
 
 """
@@ -56,7 +58,7 @@ def nat2int(num: int):
         return num // 2
     else: # odd numbers map to negative
         return -(num + 1) // 2
-    
+
 
 def int2nat(num: int):
     """
@@ -136,7 +138,7 @@ def prepare_data_tensors(
             data_tensor = torch.concat((data_tensor, ids), dim=0)
             data_buffer = []
         i += 1
-    
+
     if data_buffer:
         text_chunk = "\n".join(data_buffer)
         data_buffer_bytes: List[List[bytes]] = [
@@ -151,7 +153,7 @@ def prepare_data_tensors(
             list(chain.from_iterable(word + [separator_flag] for word in data_buffer_ids)), 
             dtype=dtype, device=dist_manager.device)
         data_tensor = torch.concat((data_tensor, ids), dim=0)
-    
+
     return data_tensor, ranks
 
 
@@ -160,7 +162,7 @@ def pair_up(ids: torch.tensor, separator_flag: int):
     unique, counts = torch.unique(pairs, return_counts=True, dim=1)
         # shapes (2, very_long) and (very_long)
         # where very_long < words_in_data * (avg_word_len + 1)
-    
+
     # use separator token between words to ensure we follow regex
     valid_mask = torch.all(unique != separator_flag, dim=0) # (very_long)
     unique = unique[:, valid_mask] # (2, very_long)
@@ -248,7 +250,7 @@ def bpe_train(
         else:
             pair_idx = torch.argmax(counts) # (1)
             best_pair = unique[:, pair_idx].cpu().numpy() # (2)
-            
+
         # Map token IDs back to the corresponding byte sequences
         best_bytes = [None, None]
         best_pair_0 = int2nat(best_pair[0])
@@ -277,28 +279,27 @@ def bpe_train(
 
         if dist_manager.is_main_process:
             progress_bar.update(1)
-    
+
     dist_manager.print_on_main(f"peak memory reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB")
 
     return ranks
 
 
-def save_tokenizer(enc, name, vocab_size, sample_size):
-    os.makedirs('trained', exist_ok=True)
-    full_filename = f"trained/{name}_v{vocab_size}_n{sample_size}.pkl"
-    with open(__file__, 'r') as f:
-        script_content = f.read()
+def save_tokenizer(output_dir: str, enc, name, vocab_size, sample_size):
+    """Saves the tokenizer to the specified output directory."""
+    full_filename = os.path.join(output_dir, f"{name}_v{vocab_size}_n{sample_size}.pkl")
+    
     tokenizer_data = {
         "pat_str": enc._pat_str,
         "mergeable_ranks": enc._mergeable_ranks,
-        "script_content": script_content  # Add the script content for backup
     }
     with open(full_filename, 'wb') as f:
         pickle.dump(tokenizer_data, f)
     print(f"Tokenizer saved to {full_filename}")
 
 
-def run(dist_manager: DistributedManager):
+def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager):
+    # --- Configuration ---
     parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
     parser.add_argument("-n", "--samples_per_gpu", type=int,
         help="Maximum number of text characters to use on each GPU during training.")
@@ -311,7 +312,7 @@ def run(dist_manager: DistributedManager):
     parser.add_argument("-p", "--pat_str", type=str,
         help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
     parser.add_argument("-s", "--seed", type=int, help="Seed for the data loader.")
-    
+
     # The config file is expected to be in the same directory as the script.
     script_dir = os.path.dirname(os.path.realpath(__file__))
     default_config_path = os.path.join(script_dir, 'config.yaml')
@@ -319,6 +320,18 @@ def run(dist_manager: DistributedManager):
         help="Path to the YAML configuration file.")
 
     config = get_config(parser)
+
+    # --- Logger Setup ---
+    logger = None
+    if repro_manager.output_dir:
+        logger = ExperimentLogger(
+            log_dir=repro_manager.output_dir,
+            rank=dist_manager.rank,
+            is_main_process=dist_manager.is_main_process
+        )
+        logger.log_system_info(git_info=repro_manager.get_git_info())
+        logger.log_hyperparams(vars(config))
+
 
     dtype = torch.int16 if config.vocab_size <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
@@ -362,14 +375,28 @@ def run(dist_manager: DistributedManager):
         )
         test_str = f"hello world"
         assert enc.decode(enc.encode(test_str)) == test_str
-        
+
+        if logger:
+            peak_mem = torch.cuda.max_memory_reserved() // 1024 // 1024
+            logger.info(f"Final peak memory reserved: {peak_mem} MiB")
+
         save_tokenizer(
-            enc, 
-            config.name, 
-            config.vocab_size, 
-            config.samples_per_gpu,
+            output_dir=repro_manager.output_dir,
+            enc=enc,
+            name=config.name,
+            vocab_size=config.vocab_size,
+            sample_size=config.samples_per_gpu,
         )
+
+    if logger:
+        logger.close()
+
 
 if __name__ == "__main__":
     with DistributedManager() as dist_manager:
-        run(dist_manager)
+        with ReproducibilityManager(
+            experiment_name="custom_bpe",
+            base_dir="experiments/custom_bpe",
+            is_main_process=dist_manager.is_main_process,
+        ) as repro_manager:
+            run(dist_manager, repro_manager)

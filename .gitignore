@@ -158,3 +158,4 @@ __marimo__/cache/
 experiments/*/outputs/
 experiments/*/checkpoints/
 experiments/*/logs/
+experiments/*/runs/
