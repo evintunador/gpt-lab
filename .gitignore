@@ -144,6 +144,7 @@ $RECYCLE.BIN/
 
 # Test artifacts
 /test_artifacts/
+src/gpt_lab/nn_modules/test_error_maps/
 
 # Environment variables
 .env
