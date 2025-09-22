@@ -313,12 +313,8 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
         help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
     parser.add_argument("-s", "--seed", type=int, help="Seed for the data loader.")
 
-    # The config file is expected to be in the same directory as the script.
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    default_config_path = os.path.join(script_dir, 'config.yaml')
-    parser.add_argument("--config", default=default_config_path,
-        help="Path to the YAML configuration file.")
-
+    # The get_config function will now automatically look for 'config.yaml'
+    # in the script's directory by default.
     config = get_config(parser)
 
     # --- Logger Setup ---
@@ -330,10 +326,10 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
             is_main_process=dist_manager.is_main_process
         )
         logger.log_system_info(git_info=repro_manager.get_git_info())
-        logger.log_hyperparams(vars(config))
+        logger.log_hyperparams(config)
 
 
-    dtype = torch.int16 if config.vocab_size <= 2**16-2 else torch.int32
+    dtype = torch.int16 if config['vocab_size'] <= 2**16-2 else torch.int32
     separator_flag = -32_768 if dtype == torch.int16 else -2_147_483_648
 
     pat_str_dict = {
@@ -349,29 +345,29 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
             r"""\s+""",
         ]),
     }
-    pat_str = pat_str_dict[config.pat_str] if config.pat_str in pat_str_dict.keys() else config.pat_str
+    pat_str = pat_str_dict[config['pat_str']] if config['pat_str'] in pat_str_dict.keys() else config['pat_str']
 
     data, ranks = prepare_data_tensors(
-        n=config.samples_per_gpu, dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=config.seed, pat_str=pat_str
+        n=config['samples_per_gpu'], dtype=dtype, separator_flag=separator_flag, dist_manager=dist_manager, seed=config['seed'], pat_str=pat_str
     )
 
     mergeable_ranks = bpe_train(
         ids=data, 
         ranks=ranks, 
-        vocab_size=config.vocab_size, 
+        vocab_size=config['vocab_size'], 
         separator_flag=separator_flag,
         pat_str=pat_str,
         dtype=dtype,
         dist_manager=dist_manager,
-        k=config.k
+        k=config['k']
     )
 
     if dist_manager.is_main_process:
         enc = tiktoken.Encoding(
-            name=config.name,
+            name=config['name'],
             pat_str=pat_str,
             mergeable_ranks=mergeable_ranks,
-            special_tokens={"<|endoftext|>": config.vocab_size}
+            special_tokens={"<|endoftext|>": config['vocab_size']}
         )
         test_str = f"hello world"
         assert enc.decode(enc.encode(test_str)) == test_str
@@ -383,9 +379,9 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
         save_tokenizer(
             output_dir=repro_manager.output_dir,
             enc=enc,
-            name=config.name,
-            vocab_size=config.vocab_size,
-            sample_size=config.samples_per_gpu,
+            name=config['name'],
+            vocab_size=config['vocab_size'],
+            sample_size=config['samples_per_gpu'],
         )
 
     if logger:
@@ -394,9 +390,9 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
 
 if __name__ == "__main__":
     with DistributedManager() as dist_manager:
+        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
         with ReproducibilityManager(
-            experiment_name="custom_bpe",
-            base_dir="experiments/custom_bpe",
+            output_dir=runs_dir,
             is_main_process=dist_manager.is_main_process,
         ) as repro_manager:
             run(dist_manager, repro_manager)

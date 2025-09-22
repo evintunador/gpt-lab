@@ -44,7 +44,7 @@ class WikiQADataset(Dataset):
         """
         self.split = split
         if cache_dir is None:
-            cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "gpt-lab", "wiki_qa")
+            cache_dir = os.path.join("data", ".cache", "wiki_qa")
         os.makedirs(cache_dir, exist_ok=True)
         self.cache_dir = cache_dir
 

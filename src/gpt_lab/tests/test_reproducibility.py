@@ -65,7 +65,8 @@ def test_manager_clean_repo(git_repo: Path):
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
-        with ReproducibilityManager(experiment_name="test-exp", base_dir=str(git_repo / "experiments")) as manager:
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -94,7 +95,8 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
         elif dirty_type == "untracked":
             (git_repo / "new_file.txt").write_text("untracked file")
 
-        with ReproducibilityManager(experiment_name="test-exp", base_dir=str(git_repo / "experiments")) as manager:
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -118,13 +120,13 @@ def test_manager_distributed_awareness(git_repo: Path):
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
-            experiment_name="test-exp", 
-            base_dir=str(git_repo / "experiments"),
+            output_dir=str(runs_dir),
             is_main_process=False
         ) as manager:
             assert manager.output_dir is None
-            assert not (git_repo / "experiments").exists()
+            assert not runs_dir.exists()
     finally:
         os.chdir(original_cwd)
 
@@ -136,9 +138,9 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         os.chdir(git_repo)
         mock_storage = MockStorageBackend(source_artifacts_dir=tmp_path / "remote_storage")
         
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
-            experiment_name="test-exp", 
-            base_dir=str(git_repo / "experiments"),
+            output_dir=str(runs_dir),
             storage_backend=mock_storage
         ) as manager:
             # Simulate creating an output file in the experiment dir
@@ -169,12 +171,13 @@ def test_restore_state_roundtrip(git_repo: Path, tmp_path: Path):
         storage = LocalFileSystemBackend(root_dir=str(storage_root))
         
         experiment_id = None
+        runs_dir = git_repo / "experiments" / "roundtrip-exp" / "runs"
         with ReproducibilityManager(
-            experiment_name="roundtrip-exp", 
-            base_dir=str(git_repo / "experiments"),
+            output_dir=str(runs_dir),
             storage_backend=storage
         ) as manager:
-            experiment_id = f"{manager.experiment_name}/{Path(manager.output_dir).name}"
+            # The experiment ID needs to be relative to CWD for the default backend
+            experiment_id = os.path.relpath(manager.output_dir, git_repo)
 
         # --- 2. Reset the repo to a clean state ---
         subprocess.run(["git", "reset", "--hard", "HEAD"], check=True, capture_output=True)

@@ -51,7 +51,7 @@ class FineWebDataset(Dataset):
             name="sample-" + size.value, 
             split=split.value, 
             streaming=streaming,
-            cache_dir='./data/temp/',
+            cache_dir='./data/.cache/huggingface_fw',
         )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
 

@@ -65,6 +65,18 @@ class PrecachedDatasetMixin:
         self._num_items: int = 0
         self._split: Optional[str] = None
 
+    @staticmethod
+    def pick_token_dtype(vocab_size: int) -> np.dtype:
+        """Selects the smallest uint dtype that can hold the vocabulary."""
+        if vocab_size < 2**8:
+            return np.uint8
+        elif vocab_size < 2**16:
+            return np.uint16
+        elif vocab_size < 2**32:
+            return np.uint32
+        else:
+            return np.uint64
+
     def _cache_glob(self, split: str) -> List[Path]:
         return sorted(self._cache_dir.glob(f"{self._cache_filename_prefix}_{split}_*.bin"))
 
@@ -105,7 +117,7 @@ class PrecachedDatasetMixin:
                         pbar.update(len(tokens))
                     else:
                         split = "val" if shard_index == 0 else "train"
-                        filename = self._cache_dir / f"{self._cache_prefix}_{split}_{shard_index:06d}.bin"
+                        filename = self._cache_dir / f"{self._cache_filename_prefix}_{split}_{shard_index:06d}.bin"
                         remainder = self._shard_size - token_count
                         if pbar is None:
                             pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
@@ -136,7 +148,7 @@ class PrecachedDatasetMixin:
                     pbar.update(len(tokens))
                 else:
                     split = "val" if shard_index == 0 else "train"
-                    filename = self._cache_dir / f"{self._cache_prefix}_{split}_{shard_index:06d}.bin"
+                    filename = self._cache_dir / f"{self._cache_filename_prefix}_{split}_{shard_index:06d}.bin"
                     remainder = self._shard_size - token_count
                     if pbar is None:
                         pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
@@ -155,7 +167,7 @@ class PrecachedDatasetMixin:
 
         if token_count != 0 and (self._max_num_shards is None or shard_index < self._max_num_shards + 1):
             split = "val" if shard_index == 0 else "train"
-            filename = self._cache_dir / f"{self._cache_prefix}_{split}_{shard_index:06d}.bin"
+            filename = self._cache_dir / f"{self._cache_filename_prefix}_{split}_{shard_index:06d}.bin"
             PrecachedDatasetMixin.write_datafile(str(filename), all_tokens_np[:token_count])
 
     def _split_to_str(self, split: Union[str, "Enum"]) -> str:

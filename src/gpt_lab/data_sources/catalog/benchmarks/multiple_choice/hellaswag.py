@@ -80,7 +80,7 @@ class HellaSwagDataset(Dataset):
         
         # Set up cache path
         if cache_dir is None:
-            cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "hellaswag")
+            cache_dir = os.path.join("data", ".cache", "hellaswag")
         self.cache_path = os.path.join(cache_dir, f"hellaswag_{split.value}.jsonl")
         
         # Check if we have cached data for non-streaming mode
@@ -115,7 +115,7 @@ class HellaSwagDataset(Dataset):
         """Fallback method to manually download HellaSwag data."""
         # Use the existing download logic from above
         if self.cache_dir is None:
-            self.cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "hellaswag")
+            self.cache_dir = os.path.join("data", ".cache", "hellaswag")
         
         os.makedirs(self.cache_dir, exist_ok=True)
         

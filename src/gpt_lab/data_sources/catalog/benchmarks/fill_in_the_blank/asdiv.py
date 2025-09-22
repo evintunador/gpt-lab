@@ -48,7 +48,7 @@ class ASDivDataset(Dataset):
         self.target = target
 
         if cache_dir is None:
-            cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "asdiv")
+            cache_dir = os.path.join("data", ".cache", "asdiv")
         os.makedirs(cache_dir, exist_ok=True)
         
         self.cache_path = os.path.join(cache_dir, "ASDiv.xml")

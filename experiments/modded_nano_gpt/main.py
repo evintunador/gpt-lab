@@ -3,13 +3,14 @@ import os
 import time
 import pickle
 from contextlib import nullcontext
+from typing import Dict, Any
 
 import random
 import numpy as np
 import torch
 import tiktoken
 
-from gpt_lab.configuration import get_config, ConfigObject
+from gpt_lab.configuration import get_config
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import ExperimentLogger
@@ -24,22 +25,22 @@ from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDatas
 from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
 
 
-def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManager):
+def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityManager):
     """Main experiment script for ModdedNanoGPT."""
-    dist.set_seed(cfg.seed)
+    dist.set_seed(cfg['seed'])
     device_type = "cuda" if "cuda" in dist.device.type else "cpu"
     torch_dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
     ctx = torch.amp.autocast(device_type=device_type, dtype=torch_dtype) if torch_dtype != torch.float32 else nullcontext()
 
     logger = ExperimentLogger(rep.output_dir, dist.rank, dist.is_main_process)
     logger.log_system_info(rep.get_git_info())
-    logger.log_hyperparams(cfg.__dict__)
+    logger.log_hyperparams(cfg)
 
-    with open(cfg.tokenizer_path, 'rb') as f:
+    with open(cfg['tokenizer_path'], 'rb') as f:
         tokenizer_config = pickle.load(f)
     
     # Cap tokenizer vocab to match model config
-    num_merges_needed = cfg.model.vocab_size - 257 # 256 base tokens + 1 special
+    num_merges_needed = cfg['model']['vocab_size'] - 257 # 256 base tokens + 1 special
     if len(tokenizer_config['mergeable_ranks']) < num_merges_needed:
         raise ValueError(
             f"Tokenizer vocab is smaller than model vocab size. "
@@ -52,7 +53,7 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
     eot_token_id = 256 + len(capped_merges)
 
     enc = tiktoken.Encoding(
-        name=os.path.basename(cfg.tokenizer_path),
+        name=os.path.basename(cfg['tokenizer_path']),
         pat_str=tokenizer_config['pat_str'],
         mergeable_ranks=capped_merges,
         special_tokens={"<|endoftext|>": eot_token_id}
@@ -63,12 +64,12 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
     common_dataset_args = {
         "save_dir": "./data/fineweb_cache",
         "tokenizer_encode_fn": enc.encode,
-        "vocab_size": cfg.model.vocab_size,
+        "vocab_size": cfg['model']['vocab_size'],
         "doc_separator": enc.eot_token,
         "size": FineWebSize.v10B, # Using 10B subset for faster setup
     }
-    train_dataset = PrecachedFineWebDataset(split=Split.TRAIN, seq_len=cfg.sequence.train_seq_len, **common_dataset_args)
-    val_dataset = PrecachedFineWebDataset(split=Split.VAL, seq_len=cfg.sequence.val_seq_len, **common_dataset_args)
+    train_dataset = PrecachedFineWebDataset(split=Split.TRAIN, seq_len=cfg['sequence']['train_seq_len'], **common_dataset_args)
+    val_dataset = PrecachedFineWebDataset(split=Split.VAL, seq_len=cfg['sequence']['val_seq_len'], **common_dataset_args)
     
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, num_workers=0) # BS=1 to handle packed sequences
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, num_workers=0)
@@ -76,7 +77,7 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
     train_iter = iter(train_loader)
     val_iter = iter(val_loader)
 
-    model_args = {**cfg.model, 'max_seq_len': max(cfg.sequence.train_seq_len, cfg.sequence.val_seq_len)}
+    model_args = {**cfg['model'], 'max_seq_len': max(cfg['sequence']['train_seq_len'], cfg['sequence']['val_seq_len'])}
     model = ModdedNanoGPT(**model_args).to(dist.device)
     dist.print_on_main(f"Model parameters: {model.get_num_params():,}")
 
@@ -84,25 +85,25 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
     all_params = list(model.parameters())
     optimizer = Muon(
         all_params,
-        muon_lr=cfg.training.muon_lr,
-        adamw_lr=cfg.training.adam_embed_lr, # Use embed_lr as the default AdamW lr
-        momentum=cfg.training.muon_momentum,
+        muon_lr=cfg['training']['muon_lr'],
+        adamw_lr=cfg['training']['adam_embed_lr'], # Use embed_lr as the default AdamW lr
+        momentum=cfg['training']['muon_momentum'],
     )
 
     # Manually set different LR for head and scalars if needed, as AdamW handles these.
     for group in optimizer.param_groups:
         if not group['use_muon']: # This is the AdamW group
             if any(p in group['params'] for p in model.lm_head.parameters()):
-                group['lr'] = cfg.training.adam_head_lr
+                group['lr'] = cfg['training']['adam_head_lr']
 
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
 
     start_step = 0
-    if cfg.training.resume_from_checkpoint:
-        dist.print_on_main(f"Resuming from checkpoint: {cfg.training.resume_from_checkpoint}")
+    if cfg['training']['resume_from_checkpoint']:
+        dist.print_on_main(f"Resuming from checkpoint: {cfg['training']['resume_from_checkpoint']}")
         resume_data = load_checkpoint(
-            cfg.training.resume_from_checkpoint,
+            cfg['training']['resume_from_checkpoint'],
             map_location=dist.device,
             model=model,
             optimizer=optimizer
@@ -118,7 +119,7 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
             random.setstate(rng_states['random'])
             dist.print_on_main("Restored RNG states from checkpoint.")
 
-    if cfg.training.use_fp8:
+    if cfg['training']['use_fp8']:
         # Note: Requires Hopper GPU. Will not error on others but may not use FP8.
         from nn_modules.catalog.channel_mixing.fp8_linear import is_hopper_available
         if is_hopper_available():
@@ -135,18 +136,18 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[dist.local_rank])
 
     def get_lr_multiplier(step: int):
-        progress = step / cfg.training.train_steps
-        if progress < 1.0 - cfg.training.cooldown_frac:
+        progress = step / cfg['training']['train_steps']
+        if progress < 1.0 - cfg['training']['cooldown_frac']:
             return 1.0
         else:
-            cooldown_progress = (progress - (1.0 - cfg.training.cooldown_frac)) / cfg.training.cooldown_frac
+            cooldown_progress = (progress - (1.0 - cfg['training']['cooldown_frac'])) / cfg['training']['cooldown_frac']
             return (1.0 - cooldown_progress) * (1.0 - 0.1) + 0.1 # Decay to 10%
 
     dist.print_on_main("Starting training...")
     training_time_ms = 0
     t0 = time.perf_counter()
 
-    for step in range(start_step, cfg.training.train_steps):
+    for step in range(start_step, cfg['training']['train_steps']):
         lr_mult = get_lr_multiplier(step)
         for group in optimizer.param_groups:
             group['lr'] = group['initial_lr'] * lr_mult
@@ -157,20 +158,20 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
             if group['use_muon']:
                 group['momentum'] = (1 - frac) * 0.85 + frac * 0.95
 
-        for micro_step in range(cfg.training.grad_acc_steps):
+        for micro_step in range(cfg['training']['grad_acc_steps']):
             batch = next(train_iter).squeeze(0) # Remove batch dim
             inputs = batch[:-1].to(dist.device, non_blocking=True)
             targets = batch[1:].to(dist.device, non_blocking=True)
 
             with ctx:
                 loss = model(inputs, targets)
-                loss = loss / cfg.training.grad_acc_steps
+                loss = loss / cfg['training']['grad_acc_steps']
             loss.backward()
 
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
         
-        if step % cfg.validation.val_every_steps == 0 or step == cfg.training.train_steps - 1:
+        if step % cfg['validation']['val_every_steps'] == 0 or step == cfg['training']['train_steps'] - 1:
             torch.cuda.synchronize()
             step_time_ms = (time.perf_counter() - t0) * 1000
             training_time_ms += step_time_ms
@@ -178,14 +179,14 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
             model.eval()
             val_loss = 0.0
             with torch.no_grad():
-                for _ in range(cfg.validation.val_steps):
+                for _ in range(cfg['validation']['val_steps']):
                     val_batch = next(val_iter).squeeze(0)
                     v_inputs = val_batch[:-1].to(dist.device)
                     v_targets = val_batch[1:].to(dist.device)
                     with ctx:
                         v_loss = model(v_inputs, v_targets)
                     val_loss += v_loss.item()
-            val_loss /= cfg.validation.val_steps
+            val_loss /= cfg['validation']['val_steps']
             model.train()
             
             if dist.is_distributed:
@@ -203,12 +204,12 @@ def main(cfg: ConfigObject, dist: DistributedManager, rep: ReproducibilityManage
             }
             logger.log(log_data, print_to_console=True)
 
-            if cfg.save_model and rep.output_dir:
+            if cfg['save_model'] and rep.output_dir:
                 raw_model = model.module if dist.is_distributed else model
                 checkpoint_path = save_checkpoint(
                     save_dir=os.path.join(rep.output_dir, "checkpoints"),
                     filename=f"step_{step}.pt",
-                    metadata={"step": step, "val_loss": val_loss, "config": cfg.__dict__},
+                    metadata={"step": step, "val_loss": val_loss, "config": cfg},
                     model=raw_model,
                     optimizer=optimizer,
                 )
@@ -294,5 +295,10 @@ using dot notation, which is useful for parameters not exposed below. For exampl
     
     with DistributedManager() as dist:
         config = get_config(parser)
-        with ReproducibilityManager(config.experiment_name, is_main_process=dist.is_main_process) as rep:
+        
+        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+        with ReproducibilityManager(
+            output_dir=runs_dir,
+            is_main_process=dist.is_main_process
+        ) as rep:
             main(config, dist, rep)

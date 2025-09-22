@@ -2,35 +2,7 @@ import argparse
 import yaml
 import os
 import sys
-from collections.abc import Mapping
-
-
-class ConfigObject(object):
-    """
-    Wraps a dictionary to provide attribute-style access, recursively
-    turning nested dictionaries into ConfigObjects.
-    """
-    def __init__(self, data):
-        for key, value in data.items():
-            if isinstance(value, Mapping):
-                self.__dict__[key] = ConfigObject(value)
-            else:
-                self.__dict__[key] = value
-
-    def __getattr__(self, name):
-        try:
-            return self.__dict__[name]
-        except KeyError:
-            raise AttributeError(f"'ConfigObject' has no attribute '{name}'")
-
-    def __setattr__(self, name, value):
-        self.__dict__[name] = value
-
-    def __getitem__(self, key):
-        return self.__dict__[key]
-
-    def __repr__(self):
-        return f"ConfigObject({self.__dict__})"
+from typing import Dict, Any
 
 
 def _str_to_bool(value):
@@ -54,7 +26,7 @@ def _merge_dicts(base_dict, override_dict):
     return base_dict
 
 
-def get_config(parser: argparse.ArgumentParser) -> ConfigObject:
+def get_config(parser: argparse.ArgumentParser) -> Dict[str, Any]:
     """
     Builds a configuration object by merging a YAML file with CLI arguments.
 
@@ -67,7 +39,7 @@ def get_config(parser: argparse.ArgumentParser) -> ConfigObject:
         parser: An argparse.ArgumentParser instance.
 
     Returns:
-        A ConfigObject containing the final, merged configuration.
+        A dictionary containing the final, merged configuration.
     """
     if not any(action.dest == 'config' for action in parser._actions):
         default_config_path = None
@@ -136,4 +108,4 @@ def get_config(parser: argparse.ArgumentParser) -> ConfigObject:
 
     final_config_dict = _merge_dicts(config_dict, cli_args)
     
-    return ConfigObject(final_config_dict)
+    return final_config_dict

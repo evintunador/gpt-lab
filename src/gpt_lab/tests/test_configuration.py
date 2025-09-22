@@ -30,10 +30,10 @@ def test_basic_yaml_loading(create_test_config):
     with mock.patch('sys.argv', ['test_script', '--config', str(create_test_config)]):
         config = get_config(parser)
 
-    assert config.learning_rate == 0.001
-    assert config.model.name == "transformer"
-    assert config.model.dim == 512
-    assert not config.use_fp16
+    assert config['learning_rate'] == 0.001
+    assert config['model']['name'] == "transformer"
+    assert config['model']['dim'] == 512
+    assert not config['use_fp16']
 
 
 def test_cli_override(create_test_config):
@@ -44,8 +44,8 @@ def test_cli_override(create_test_config):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert config.learning_rate == 0.05
-    assert config.optimizer == "adam"  # Ensure other values are untouched
+    assert config['learning_rate'] == 0.05
+    assert config['optimizer'] == "adam"  # Ensure other values are untouched
 
 
 def test_nested_cli_override(create_test_config):
@@ -56,8 +56,8 @@ def test_nested_cli_override(create_test_config):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert config.model.dim == 1024
-    assert config.model.name == "transformer"  # Ensure other nested values are untouched
+    assert config['model']['dim'] == 1024
+    assert config['model']['name'] == "transformer"  # Ensure other nested values are untouched
 
 
 @pytest.mark.parametrize(
@@ -88,7 +88,7 @@ def test_cli_type_conversion(tmp_path: Path, key, cli_value, expected_value):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert getattr(config, key) == expected_value
+    assert config[key] == expected_value
 
 
 def test_user_defined_args(create_test_config):
@@ -104,8 +104,8 @@ def test_user_defined_args(create_test_config):
     with mock.patch('sys.argv', ['script', '--config', str(create_test_config)]):
         config = get_config(parser)
     
-    assert config.batch_size == 32       # From parser default
-    assert config.learning_rate == 0.001  # From YAML
+    assert config['batch_size'] == 32       # From parser default
+    assert config['learning_rate'] == 0.001  # From YAML
 
     # Case 2: Override all with CLI arguments
     argv = [
@@ -116,8 +116,8 @@ def test_user_defined_args(create_test_config):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert config.batch_size == 128      # From CLI
-    assert config.learning_rate == 0.1    # From CLI
+    assert config['batch_size'] == 128      # From CLI
+    assert config['learning_rate'] == 0.1    # From CLI
 
 
 def test_user_defined_nested_dest(create_test_config):
@@ -145,9 +145,9 @@ def test_user_defined_nested_dest(create_test_config):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert config.model.dim == 1024      # Overridden by CLI
-    assert config.model.dropout == 0.1   # Added from parser default
-    assert config.model.layers == 6      # Preserved from YAML
+    assert config['model']['dim'] == 1024      # Overridden by CLI
+    assert config['model']['dropout'] == 0.1   # Added from parser default
+    assert config['model']['layers'] == 6      # Preserved from YAML
 
     # Case 2: Override both from the command line
     argv = [
@@ -158,5 +158,5 @@ def test_user_defined_nested_dest(create_test_config):
     with mock.patch('sys.argv', argv):
         config = get_config(parser)
 
-    assert config.model.dim == 2048      # Overridden by CLI
-    assert config.model.dropout == 0.5   # Overridden by CLI
+    assert config['model']['dim'] == 2048      # Overridden by CLI
+    assert config['model']['dropout'] == 0.5   # Overridden by CLI

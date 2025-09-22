@@ -27,13 +27,18 @@ class BaseStorageBackend(ABC):
 class LocalFileSystemBackend(BaseStorageBackend):
     """A default backend that saves artifacts to another local directory."""
 
-    def __init__(self, root_dir: str = "experiment_artifacts"):
+    def __init__(self, root_dir: str = "experiments"):
         self.root_dir = os.path.abspath(root_dir)
         os.makedirs(self.root_dir, exist_ok=True)
         print(f"[Storage] LocalFileSystemBackend initialized at: {self.root_dir}")
 
     def upload(self, local_source_dir: str, experiment_id: str):
         destination = os.path.join(self.root_dir, experiment_id)
+        
+        if os.path.abspath(local_source_dir) == os.path.abspath(destination):
+            print(f"[Storage] Artifacts are already in their final destination: {destination}")
+            return
+            
         if os.path.exists(destination):
             shutil.rmtree(destination)
         shutil.copytree(local_source_dir, destination)
@@ -143,16 +148,17 @@ class ReproducibilityManager:
 
     def __init__(
         self,
-        experiment_name: str,
-        base_dir: str = "experiments",
+        output_dir: str,
         storage_backend: Optional[BaseStorageBackend] = None,
         is_main_process: bool = True,
     ):
-        self.experiment_name = experiment_name
-        self.base_dir = base_dir
-        self.storage_backend = storage_backend or LocalFileSystemBackend()
+        self.output_root_dir = os.path.abspath(output_dir)
         self.is_main_process = is_main_process
-        
+        self.storage_backend = storage_backend
+
+        if self.storage_backend is None and self.is_main_process:
+            self.storage_backend = LocalFileSystemBackend(root_dir=output_dir)
+
         # These will be set in __enter__
         self.output_dir: Optional[str] = None
         self.git_info: Dict[str, Any] = {}
@@ -194,8 +200,7 @@ class ReproducibilityManager:
             commit_short = commit_hash[:7] if commit_hash else "unknown"
             dir_name = f"{timestamp}_{commit_short}"
             
-            experiment_base_dir = os.path.join(self.base_dir, self.experiment_name)
-            self.output_dir = os.path.join(experiment_base_dir, dir_name)
+            self.output_dir = os.path.join(self.output_root_dir, dir_name)
             os.makedirs(self.output_dir, exist_ok=True)
             
             print(f"[Reproducibility] Experiment output directory: {self.output_dir}")
@@ -223,8 +228,17 @@ class ReproducibilityManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Cleans up and optionally uploads artifacts."""
         if self.is_main_process and self.storage_backend and self.output_dir:
+            if exc_type is not None:
+                print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
             print("\n--- Uploading Experiment Artifacts ---")
-            experiment_id = f"{self.experiment_name}/{os.path.basename(self.output_dir)}"
+            
+            # The experiment ID is the path relative to the CWD for clean storage paths.
+            try:
+                experiment_id = os.path.relpath(self.output_dir, os.getcwd())
+            except ValueError:
+                # Fallback for cases like different drives on Windows
+                experiment_id = self.output_dir
+
             try:
                 self.storage_backend.upload(
                     local_source_dir=self.output_dir,
