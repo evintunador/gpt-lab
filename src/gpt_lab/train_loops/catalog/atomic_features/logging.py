@@ -27,7 +27,7 @@ def run_training(
     """
     model.train()
 
-    for batch_idx, batch in enumerate(train_loader):
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)

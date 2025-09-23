@@ -30,6 +30,19 @@ def run_training(
     model.train()
     optimizer.zero_grad(set_to_none=True)
     
+    # Save checkpoint before training begins
+    if save_every_epochs is not None and output_dir is not None:
+        raw_model = model.module if hasattr(model, 'module') else model
+        checkpointer.save_checkpoint(
+            save_dir=os.path.join(output_dir, "checkpoints"),
+            filename=f"epoch_-1.pt",
+            # include ALL metadata that would be required to resume training from this epoch
+            metadata={"epoch": -1, "config": kwargs.get("config", {})}, 
+            # include ALL objects with a state_dict as kwargs
+            model=raw_model,
+            optimizer=optimizer,
+        )
+    
     for epoch in range(num_epochs):
         for batch in train_loader:
             xb, yb = batch
@@ -42,7 +55,7 @@ def run_training(
 
         if (save_every_epochs is not None 
             and output_dir is not None
-            and (epoch == 0 
+            and (epoch == 0
                 or epoch % save_every_epochs == 0 
                 or epoch == num_epochs - 1)):
             raw_model = model.module if hasattr(model, 'module') else model

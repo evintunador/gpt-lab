@@ -89,14 +89,15 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         final_lr = cfg['training']['min_lr'] + coeff * (cfg['training']['learning_rate'] - cfg['training']['min_lr'])
         return final_lr / cfg['training']['learning_rate']
 
-    training_kwargs = {}
-    training_kwargs['val_loader'] = val_loader
-    training_kwargs['logger'] = logger
-    training_kwargs['output_dir'] = rep.output_dir
-    #training_kwargs['start_step'] = start_step
-    training_kwargs['scheduler_kwargs'] = {'lr_lambda': get_lr_lambda}
-    training_kwargs['total_steps'] = cfg['training']['total_steps']
-
+    training_kwargs = {
+        'val_loader': val_loader,
+        'logger': logger,
+        'output_dir': rep.output_dir,
+        'lr_scheduler_type': 'lambda_lr',
+        'scheduler_kwargs': {'lr_lambda': get_lr_lambda},
+        'total_steps': cfg['training']['total_steps'],
+        #'start_step': start_step
+    }
 
     dist.print_on_main("Starting training with smart_train API...")
     result = smart_train(

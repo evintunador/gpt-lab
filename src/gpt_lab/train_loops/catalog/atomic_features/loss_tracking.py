@@ -20,8 +20,9 @@ def run_training(
     model.train()
     
     train_loss_history: List[float] = []
-    
-    for batch_idx, batch in enumerate(train_loader):
+    step_count = 0
+
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -31,8 +32,10 @@ def run_training(
         optimizer.step()
         
         # Track loss if enabled
-        if track_loss and (batch_idx % log_interval == 0):
+        if track_loss and (step_count % log_interval == 0):
             train_loss_history.append(float(loss.detach().cpu().item()))
+
+        step_count += 1
 
     result = {"model": model}
     if track_loss:

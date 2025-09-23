@@ -20,8 +20,9 @@ def run_training(
     model.train()
     
     lr_history: List[float] = []
-    
-    for batch_idx, batch in enumerate(train_loader):
+    step_count = 0
+
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -31,10 +32,12 @@ def run_training(
         optimizer.step()
         
         # Log learning rate if enabled
-        if log_lr_changes and (batch_idx % lr_log_interval == 0):
+        if log_lr_changes and (step_count % lr_log_interval == 0):
             # Get current learning rate from first parameter group
             current_lr = optimizer.param_groups[0]['lr']
             lr_history.append(current_lr)
+
+        step_count += 1
 
     result = {"model": model}
     if log_lr_changes and lr_history:

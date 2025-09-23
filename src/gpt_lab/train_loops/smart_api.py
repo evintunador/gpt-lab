@@ -238,8 +238,8 @@ def discover_atomic_feature_mappings() -> Tuple[Dict[str, Set[str]], Dict[str, S
     feature_to_kwargs: Dict[str, Set[str]] = {}
     kwarg_to_features: Dict[str, Set[str]] = defaultdict(set)
     
-    # Discover all atomic feature files
-    for feature_file in atomic_features_dir.glob("*.py"):
+    # Discover all atomic feature files, sorted for determinism
+    for feature_file in sorted(atomic_features_dir.glob("*.py")):
         # Skip test files, __init__.py, and base_loop.py
         if (feature_file.name.endswith("_test.py") or 
             feature_file.name == "__init__.py" or
@@ -332,11 +332,11 @@ def _find_overlapping_feature_groups(candidate_features: Set[str], feature_to_kw
     feature_kwargs_map = {f: feature_to_kwargs[f] for f in candidate_features}
     
     groups = []
-    remaining_features = set(candidate_features)
+    remaining_features = sorted(list(candidate_features)) # Sort for determinism
     
     while remaining_features:
-        # Start a new group with an arbitrary remaining feature
-        current_feature = remaining_features.pop()
+        # Start a new group with the next feature in sorted order
+        current_feature = remaining_features.pop(0)
         current_group = {current_feature}
         current_kwargs = feature_kwargs_map[current_feature]
         
@@ -354,7 +354,8 @@ def _find_overlapping_feature_groups(candidate_features: Set[str], feature_to_kw
                     to_remove.add(feature)
                     changed = True
             
-            remaining_features -= to_remove
+            for feature in to_remove:
+                remaining_features.remove(feature)
         
         groups.append(current_group)
     
@@ -373,7 +374,7 @@ def _select_most_specific_from_group(group: Set[str], feature_to_kwargs: Dict[st
     """
     # Find features where user provided at least one kwarg
     satisfiable_features = []
-    for feature in group:
+    for feature in sorted(list(group)): # Sort for determinism
         feature_kwargs = feature_to_kwargs[feature]
         matched_kwargs = feature_kwargs & user_kwarg_set
         

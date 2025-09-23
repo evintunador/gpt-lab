@@ -22,8 +22,9 @@ def run_training(
     
     grad_norm_history: List[float] = []
     grad_flow_history: List[Dict[str, float]] = []
-    
-    for batch_idx, batch in enumerate(train_loader):
+    step_count = 0
+
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -32,7 +33,7 @@ def run_training(
         loss.backward()
         
         # Monitor gradients if enabled
-        if (track_grad_norms or track_grad_flow) and (batch_idx % grad_log_interval == 0):
+        if (track_grad_norms or track_grad_flow) and (step_count % grad_log_interval == 0):
             with torch.no_grad():
                 if track_grad_norms:
                     total_norm = 0.0
@@ -57,6 +58,7 @@ def run_training(
                         grad_flow_history.append(grad_flow)
 
         optimizer.step()
+        step_count += 1
 
     result = {"model": model}
     if track_grad_norms and grad_norm_history:

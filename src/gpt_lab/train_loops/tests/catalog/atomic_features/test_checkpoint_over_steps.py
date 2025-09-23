@@ -40,10 +40,19 @@ def test_checkpointing_over_steps(mock_save_checkpoint, device, tmp_path):
         output_dir=output_dir,
     )
 
-    # Check that save_checkpoint was called at steps 3, 6, 9
-    assert mock_save_checkpoint.call_count == num_steps // save_interval # 10 // 3 = 3
+    # It saves at step -1, every `save_interval`, and at the end if the last step is not a multiple of `save_interval`.
+    # For 10 steps and interval 3, it saves at steps: -1, 3, 6, 9, 10
+    expected_saves = 1 + (num_steps // save_interval) + (1 if num_steps % save_interval != 0 else 0)
+    assert mock_save_checkpoint.call_count == expected_saves
     
     expected_calls = [
+        call(
+            save_dir=str(output_dir / "checkpoints"),
+            filename="step_-1.pt",
+            metadata={"step": -1, "config": {}},
+            model=model,
+            optimizer=optimizer,
+        ),
         call(
             save_dir=str(output_dir / "checkpoints"),
             filename="step_3.pt",
@@ -62,6 +71,13 @@ def test_checkpointing_over_steps(mock_save_checkpoint, device, tmp_path):
             save_dir=str(output_dir / "checkpoints"),
             filename="step_9.pt",
             metadata={"step": 9, "config": {}},
+            model=model,
+            optimizer=optimizer,
+        ),
+        call(
+            save_dir=str(output_dir / "checkpoints"),
+            filename="step_10.pt",
+            metadata={"step": 10, "config": {}},
             model=model,
             optimizer=optimizer,
         ),

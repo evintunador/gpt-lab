@@ -52,8 +52,9 @@ def run_training(
     
     best_val_loss = float('inf')
     patience_counter = 0
-    
-    for batch_idx, batch in enumerate(train_loader):
+    step_count = 0
+
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -63,7 +64,7 @@ def run_training(
         optimizer.step()
         
         # Check for early stopping
-        if batch_idx % val_interval == 0:
+        if step_count % val_interval == 0:
             val_loss = _eval_loss(model, loss_fn, val_loader)
             
             if val_loss < best_val_loss - min_delta:
@@ -73,7 +74,7 @@ def run_training(
                 patience_counter += 1
                 
             if patience_counter >= patience:
-                print(f"Early stopping at batch {batch_idx}")
+                print(f"Early stopping at batch {step_count}")
                 break
 
     return {"model": model}

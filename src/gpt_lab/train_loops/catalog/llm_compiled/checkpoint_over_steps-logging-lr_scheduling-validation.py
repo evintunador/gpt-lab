@@ -36,26 +36,31 @@ def run_training(
     loss_fn,
     train_loader,
     *,
-    # checkpoint_over_steps
     save_every_steps: Optional[int] = None,
     output_dir: Optional[str] = None,
-    # logging
     logger: Optional[ExperimentLogger] = None,
-    # lr_scheduling
     lr_scheduler_type: Optional[str] = None,
     scheduler_kwargs: Optional[Dict[str, Any]] = None,
     warmup_steps: int = 0,
     max_lr: Optional[float] = None,
     min_lr: float = 0.0,
     total_steps: Optional[int] = None,
-    # validation
     val_loader = None,
     val_interval: int = 10,
-    # misc
     **kwargs,
 ) -> Dict[str, Any]:
     model.train()
     optimizer.zero_grad(set_to_none=True)
+
+    if save_every_steps is not None and output_dir is not None:
+        raw_model = model.module if hasattr(model, 'module') else model
+        checkpointer.save_checkpoint(
+            save_dir=os.path.join(output_dir, "checkpoints"),
+            filename="step_-1.pt",
+            metadata={"step": -1, "config": kwargs.get("config", {})},
+            model=raw_model,
+            optimizer=optimizer,
+        )
 
     if total_steps is None:
         try:
@@ -93,17 +98,17 @@ def run_training(
     val_loss_history: List[float] = []
     step_count = 0
 
-    for batch_idx, batch in enumerate(train_loader):
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
 
+        if logger:
+            logger.log({"train_loss": loss.item()})
+
         loss.backward()
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)
-
-        if logger:
-            logger.log({"train_loss": loss.item()})
 
         if scheduler is not None:
             scheduler.step()
@@ -123,11 +128,29 @@ def run_training(
                     optimizer=optimizer,
                 )
 
-        if val_loader is not None and (batch_idx % val_interval == 0 or batch_idx == len(train_loader) - 1):
+        if val_loader is not None and step_count > 0 and step_count % val_interval == 0:
             val_loss = _eval_loss(model, loss_fn, val_loader)
             val_loss_history.append(val_loss)
             if logger:
                 logger.log({"val_loss": val_loss})
+
+    if (save_every_steps is not None
+        and output_dir is not None 
+        and step_count % save_every_steps != 0):
+        raw_model = model.module if hasattr(model, 'module') else model
+        checkpointer.save_checkpoint(
+            save_dir=os.path.join(output_dir, "checkpoints"),
+            filename=f"step_{step_count}.pt",
+            metadata={"step": step_count, "config": kwargs.get("config", {})},
+            model=raw_model,
+            optimizer=optimizer,
+        )
+
+    if val_loader is not None and (step_count == 0 or step_count % val_interval != 0):
+        final_val_loss = _eval_loss(model, loss_fn, val_loader)
+        val_loss_history.append(final_val_loss)
+        if logger:
+            logger.log({"val_loss": final_val_loss})
 
     result = {"model": model}
     if val_loader is not None:

@@ -62,6 +62,8 @@ class FineWebDataset(Dataset):
             self.data = self.data.shard(num_shards=world_size, index=rank)
 
     def __len__(self):
+        if self.streaming:
+            raise TypeError("This dataset is in streaming mode and has no defined length.")
         return len(self.data)
     
     def __getitem__(self, i: int):

@@ -37,11 +37,11 @@ def test_checkpointing_over_epochs(mock_save_checkpoint, device, tmp_path):
         output_dir=output_dir,
     )
 
-    # The logic saves on epoch 0, every `save_interval`, and the last epoch.
-    # For 10 epochs and interval 3, it should save on epochs: 0, 3, 6, 9
-    assert mock_save_checkpoint.call_count == 4
+    # The logic saves before training, on epoch 0, every `save_interval`, and the last epoch.
+    # For 10 epochs and interval 3, it should save on epochs: -1, 0, 3, 6, 9
+    assert mock_save_checkpoint.call_count == 5
     
-    expected_epochs = [0, 3, 6, 9]
+    expected_epochs = [-1, 0, 3, 6, 9]
     called_epochs = {c.kwargs['metadata']['epoch'] for c in mock_save_checkpoint.call_args_list}
     assert called_epochs == set(expected_epochs)
 

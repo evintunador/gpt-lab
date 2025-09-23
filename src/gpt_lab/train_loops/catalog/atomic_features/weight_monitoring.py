@@ -22,6 +22,7 @@ def run_training(
     
     weight_norm_history: List[float] = []
     weight_change_history: List[float] = []
+    step_count = 0
     
     # Store initial weights if tracking changes
     initial_weights = {}
@@ -30,7 +31,7 @@ def run_training(
             for name, param in model.named_parameters():
                 initial_weights[name] = param.data.clone()
     
-    for batch_idx, batch in enumerate(train_loader):
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -40,7 +41,7 @@ def run_training(
         optimizer.step()
         
         # Monitor weights if enabled
-        if (track_weight_norms or track_weight_changes) and (batch_idx % weight_log_interval == 0):
+        if (track_weight_norms or track_weight_changes) and (step_count % weight_log_interval == 0):
             with torch.no_grad():
                 if track_weight_norms:
                     total_norm = 0.0
@@ -67,6 +68,8 @@ def run_training(
                     if param_count > 0:
                         total_change = total_change ** 0.5
                         weight_change_history.append(total_change)
+        
+        step_count += 1
 
     result = {"model": model}
     if track_weight_norms and weight_norm_history:

@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
 
-from gpt_lab.train_loops.tests.test_train_loops_catalog import universal_learning_test, discover_specific_tests, base_loop_compliance_test
+from gpt_lab.train_loops.tests.test_train_loops_catalog import (
+    universal_learning_test, discover_specific_tests, base_loop_compliance_test, dataset_type_compatibility_test
+)
 from gpt_lab.llm_code_compiler import LLMClient, create_llm
 from gpt_lab.device import get_default_device
 from gpt_lab.catalog_utils import import_module_from_path
@@ -438,6 +440,16 @@ def compile_loop(
                 vprint(f"✗ Universal test failed: {err}")
                 raise RuntimeError(err)
 
+            # Dataset compatibility test
+            vprint("Running dataset type compatibility test...")
+            try:
+                dataset_type_compatibility_test(run_training_fn, device=str(device))
+                vprint("✓ Dataset type compatibility test passed")
+            except Exception:
+                err = _summarize_exception_filtered([str(code_path)], phase="[dataset_type_compatibility_test]")
+                vprint(f"✗ Dataset type compatibility test failed: {err}")
+                raise RuntimeError(err)
+
             # Base loop compliance test
             vprint("Running base_loop compliance test...")
             try:
@@ -508,6 +520,14 @@ def compile_loop(
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
                         vprint(f"✗ Universal test failed: {err}")
+                        raise RuntimeError(err)
+                    
+                    try:
+                        dataset_type_compatibility_test(run_training_fn, device=str(device))
+                        vprint("✓ Dataset type compatibility test passed")
+                    except Exception:
+                        err = _summarize_exception_filtered([str(code_path)], phase="[dataset_type_compatibility_test]")
+                        vprint(f"✗ Dataset type compatibility test failed: {err}")
                         raise RuntimeError(err)
                     
                     try:

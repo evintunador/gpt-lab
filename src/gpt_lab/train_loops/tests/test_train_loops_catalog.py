@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, IterableDataset
 import pytest
 
 from gpt_lab.device import get_available_devices
@@ -16,6 +16,22 @@ from gpt_lab.catalog_utils import list_all_files_in_folder_and_subdirs, import_m
 TESTS_ROOT = Path(__file__).parent
 TRAIN_LOOPS_ROOT = TESTS_ROOT.parent
 CATALOG_DIR = TRAIN_LOOPS_ROOT / "catalog"
+
+
+class SimpleIterableDataset(IterableDataset):
+    """A simple iterable dataset for testing purposes."""
+    def __init__(self, X, y, batch_size):
+        super().__init__()
+        assert X.shape[0] == y.shape[0]
+        self.X = X
+        self.y = y
+        self.batch_size = batch_size
+        self.num_samples = X.shape[0]
+
+    def __iter__(self):
+        for i in range(0, self.num_samples, self.batch_size):
+            end = min(i + self.batch_size, self.num_samples)
+            yield self.X[i:end], self.y[i:end]
 
 
 all_loop_files = list_all_files_in_folder_and_subdirs(str(CATALOG_DIR))
@@ -221,8 +237,65 @@ def universal_learning_test(run_training_fn, device: str):
         raise AssertionError(f"Training did not sufficiently improve loss: pre={pre:.4f}, post={post:.4f}")
 
 
+def dataset_type_compatibility_test(run_training_fn, device: str):
+    """
+    Tests that a training loop works with both map-style (indexed) and iterable-style datasets
+    by running a consistent learning task on both.
+    """
+    def run_test_on_loader(loader, X_full, y_full, model, loss_fn, optim, ds_type: str):
+        """Helper to run the learning test on a given dataloader."""
+        model.to(device)
+        with torch.no_grad():
+            pre_loss = loss_fn(model(X_full), y_full).item()
+        
+        try:
+            run_training_fn(
+                model=model,
+                optimizer=optim,
+                loss_fn=loss_fn,
+                train_loader=loader,
+            )
+        except Exception as e:
+            raise AssertionError(f"Training loop failed with a {ds_type} dataset: {e}") from e
+
+        with torch.no_grad():
+            post_loss = loss_fn(model(X_full), y_full).item()
+
+        if not (post_loss < pre_loss * 0.9):  # at least 10% relative improvement
+            raise AssertionError(
+                f"Loss did not sufficiently decrease for {ds_type} dataset. "
+                f"pre={pre_loss:.4f}, post={post_loss:.4f}"
+            )
+
+    batch_size = 64
+    torch.manual_seed(0)
+    X = torch.randn(2048, 32).to(device)
+    y = (X.sum(dim=1) > 0).long().to(device)
+
+    # --- 1. Test with Map-style Dataset (TensorDataset) ---
+    torch.manual_seed(1)
+    model_map = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    loss_fn_map = nn.CrossEntropyLoss()
+    optim_map = torch.optim.AdamW(model_map.parameters(), lr=3e-3)
+    
+    map_dataset = TensorDataset(X, y)
+    map_loader = DataLoader(map_dataset, batch_size=batch_size, shuffle=True)
+    run_test_on_loader(map_loader, X, y, model_map, loss_fn_map, optim_map, "map-style")
+
+    # --- 2. Test with Iterable-style Dataset ---
+    torch.manual_seed(1) # Reset seed for identical model initialization
+    model_iter = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    loss_fn_iter = nn.CrossEntropyLoss()
+    optim_iter = torch.optim.AdamW(model_iter.parameters(), lr=3e-3)
+    
+    iterable_dataset = SimpleIterableDataset(X, y, batch_size=batch_size)
+    iterable_loader = DataLoader(iterable_dataset, batch_size=None) # batch_size=None as dataset yields batches
+    run_test_on_loader(iterable_loader, X, y, model_iter, loss_fn_iter, optim_iter, "iterable-style")
+
+
 # Get available devices for parameterization
 AVAILABLE_DEVICES, _ = get_available_devices()
+
 
 # Create parameterized tests for universal learning across devices
 universal_test_params = []
@@ -232,12 +305,22 @@ for run_training_fn in all_loop_functions:
             pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_{device}")
         )
 
+
 # Create parameterized tests for atomic feature compliance across devices
 atomic_compliance_params = []
 for fn, name in discover_atomic_features():
     for device in AVAILABLE_DEVICES:
         atomic_compliance_params.append(
             pytest.param(fn, name, device, id=f"{name}_{device}")
+        )
+
+
+# Create parameterized tests for dataset compatibility across devices
+dataset_type_compatibility_params = []
+for run_training_fn in all_loop_functions:
+    for device in AVAILABLE_DEVICES:
+        dataset_type_compatibility_params.append(
+            pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_dataset_compat_{device}")
         )
 
 
@@ -257,6 +340,12 @@ def test_atomic_feature_base_compliance(run_training_fn, feature_name, device):
     This enforces the standard that all atomic features must be backwards compatible.
     """
     base_loop_compliance_test(run_training_fn, feature_name, device)
+
+
+@pytest.mark.parametrize("run_training_fn,device", dataset_type_compatibility_params)
+def test_dataset_type_compatibility_pytest(run_training_fn, device):
+    """Pytest wrapper for the dataset compatibility test."""
+    dataset_type_compatibility_test(run_training_fn, device)
 
 
 # Add new parameterized test for compiled loops

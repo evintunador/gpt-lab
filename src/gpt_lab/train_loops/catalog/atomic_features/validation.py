@@ -38,7 +38,8 @@ def run_training(
     
     val_loss_history: List[float] = []
     
-    for batch_idx, batch in enumerate(train_loader):
+    step_count = 0
+    for batch in train_loader:
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
@@ -47,10 +48,15 @@ def run_training(
         loss.backward()
         optimizer.step()
         
-        # Validation evaluation
-        if val_loader is not None and (batch_idx % val_interval == 0 or batch_idx == len(train_loader) - 1):
+        if val_loader is not None and step_count > 0 and step_count % val_interval == 0:
             val_loss = _eval_loss(model, loss_fn, val_loader)
             val_loss_history.append(val_loss)
+        step_count += 1
+    
+    # Final validation at end of training
+    if val_loader is not None and (step_count == 0 or step_count % val_interval != 0):
+        final_val_loss = _eval_loss(model, loss_fn, val_loader)
+        val_loss_history.append(final_val_loss)
 
     result = {"model": model}
     if val_loader is not None:
