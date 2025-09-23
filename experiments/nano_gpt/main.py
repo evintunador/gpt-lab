@@ -12,7 +12,7 @@ from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import ExperimentLogger
 from gpt_lab.checkpointer import load_checkpoint
-from gpt_lab.data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
+from gpt_lab.data_sources.catalog.pretraining.fineweb import FineWebDataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
 from gpt_lab.nn_modules.catalog.models import NanoGPT
 from gpt_lab.models.catalog.llms import NanoGPTModel
@@ -33,19 +33,21 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     enc = tiktoken.get_encoding("gpt2")
 
     common_dataset_args = {
-        "save_dir": cfg['data']['data_dir'], "tokenizer_encode_fn": enc.encode,
-        "vocab_size": cfg['model']['vocab_size'], "doc_separator": enc.eot_token,
-        "size": FineWebSize.v10B,
-        "shard_size": cfg['data']['shard_size'],
-        "max_num_shards": cfg['data']['max_num_shards'],
+        "edu": True,
+        "streaming": True,
+        "world_size": dist.world_size,
+        "tokenizer_enc_func": enc.encode,
+        "max_seq_len": cfg['model']['max_seq_len']
     }
-    train_dataset = PrecachedFineWebDataset(split=Split.TRAIN, seq_len=cfg['data']['train_seq_len'], **common_dataset_args)
-    val_dataset = PrecachedFineWebDataset(split=Split.VAL, seq_len=cfg['data']['val_seq_len'], **common_dataset_args)
+    train_dataset = FineWebDataset(size=FineWebSize.v10B, seed=cfg['seed'], **common_dataset_args)
+    val_dataset = FineWebDataset(size=FineWebSize.v350B, seed=cfg['seed']+1, **common_dataset_args) 
+        # TODO: real train vs val split; rn i'm in a rush so using the bigger dataset is a proxy w/ only (1/35)*100% overlap
     
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, num_workers=0)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, num_workers=0)
+    bsz = cfg['data']['batch_size']
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=min(bsz, 4))
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=min(bsz, 4))
 
-    model = NanoGPT(cfg['model']).to(dist.device)
+    model = NanoGPT(**cfg['model']).to(dist.device)
     dist.print_on_main(f"Model parameters: {model.get_num_params():,}")
 
     param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
@@ -57,6 +59,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     ]
     optimizer = torch.optim.AdamW(optim_groups, lr=cfg['training']['learning_rate'], betas=(cfg['optimizer']['beta1'], cfg['optimizer']['beta2']))
 
+    """
     start_step = 0
     if cfg['training']['resume_from_checkpoint']:
         dist.print_on_main(f"Resuming from checkpoint: {cfg['training']['resume_from_checkpoint']}")
@@ -68,7 +71,8 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         )
         start_step = resume_data.get('metadata', {}).get('step', -1) + 1
         dist.print_on_main(f"Resuming training from step {start_step}")
-
+    
+    """
     loss_fn = CrossEntropyLoss()
 
     # Define the lambda function for the learning rate schedule
@@ -85,15 +89,13 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         final_lr = cfg['training']['min_lr'] + coeff * (cfg['training']['learning_rate'] - cfg['training']['min_lr'])
         return final_lr / cfg['training']['learning_rate']
 
-    training_kwargs = dict(cfg['training'])
+    training_kwargs = {}
     training_kwargs['val_loader'] = val_loader
     training_kwargs['logger'] = logger
     training_kwargs['output_dir'] = rep.output_dir
-    training_kwargs['start_step'] = start_step
-    training_kwargs['config'] = cfg
+    #training_kwargs['start_step'] = start_step
     training_kwargs['scheduler_kwargs'] = {'lr_lambda': get_lr_lambda}
-    # Pass total steps to the scheduler feature
-    training_kwargs['total_steps'] = cfg['training']['max_steps']
+    training_kwargs['total_steps'] = cfg['training']['total_steps']
 
 
     dist.print_on_main("Starting training with smart_train API...")

@@ -44,6 +44,7 @@ class MLP(nn.Module):
             "relu": nn.ReLU(),
             "silu": nn.SiLU(),
             "relu2": ReLU2(),
+            "gelu": nn.GELU(),
         }
         self.act_fn = act_registry[self.act_str]
 

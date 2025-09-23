@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
 
-from gpt_lab.train_loops.tests.test_train_loops_catalog import universal_learning_test, discover_specific_tests
+from gpt_lab.train_loops.tests.test_train_loops_catalog import universal_learning_test, discover_specific_tests, base_loop_compliance_test
 from gpt_lab.llm_code_compiler import LLMClient, create_llm
 from gpt_lab.device import get_default_device
 from gpt_lab.catalog_utils import import_module_from_path
@@ -71,7 +71,7 @@ USER_PROMPT_TEMPLATE = \
 
 def _build_system_prompt_with_base_loop() -> str:
     """Build the system prompt including base_loop.py content for reference."""
-    base_loop_path = Path("train_loops/catalog/atomic_features/base_loop.py")
+    base_loop_path = Path(__file__).parent / "catalog" / "atomic_features" / "base_loop.py"
     
     try:
         base_loop_content = base_loop_path.read_text(encoding="utf-8")
@@ -308,7 +308,6 @@ def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_feature
 
 def run_base_loop_compliance_test_for_compilation(run_training_fn: Callable, atomic_features: List[str], device: str):
     """Run base_loop compliance test during compilation."""
-    from train_loops.catalog_test import base_loop_compliance_test
     
     # For compiled loops, we use a representative name from the atomic features
     feature_name = f"compiled_loop_{'-'.join(sorted([f.replace('.py', '') for f in atomic_features]))}"
@@ -332,15 +331,16 @@ def compile_loop(
         raise ValueError("No atomic features provided for compilation")
     
     if len(atomic_features) == 1:
+        atomic_path = Path(__file__).parent / "catalog" / "atomic_features" / f"{atomic_features[0]}.py"
         raise ValueError(
             f"Compilation not recommended for single atomic feature '{atomic_features[0]}'. "
             f"Use the atomic feature directly instead for better performance. "
-            f"File: train_loops/catalog/atomic_features/{atomic_features[0]}.py"
+            f"File: {atomic_path}.py"
         )
     
     llm = llm or LLMClient()
     name = _make_descriptive_name(atomic_features)
-    code_path = Path("train_loops/catalog/llm_compiled") / f"{name}.py"
+    code_path = Path(__file__).parent / "catalog" / "llm_compiled" / f"{name}.py"
     device = get_default_device()
 
     vprint_section("LLM TRAINING LOOP COMPILATION")

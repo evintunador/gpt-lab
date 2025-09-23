@@ -4,7 +4,7 @@ from torch.nn import functional as F
 
 
 class CausalSelfAttention(nn.Module):
-    def __init__(self, n_embd: int, n_head: int, block_size: int, dropout: float, bias: bool):
+    def __init__(self, n_embd: int, n_head: int, dropout: float, bias: bool):
         super().__init__()
         assert n_embd % n_head == 0
         # key, query, value projections for all heads, but in a batch

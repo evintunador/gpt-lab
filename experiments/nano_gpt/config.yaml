@@ -2,7 +2,7 @@ experiment_name: "nanogpt-gpt2-small"
 seed: 1337
 
 model:
-  block_size: 1024
+  max_seq_len: 1024
   vocab_size: 50257 # GPT-2 vocab size
   n_layer: 12
   n_head: 12
@@ -11,12 +11,7 @@ model:
   bias: True
 
 data:
-  dataset: 'FineWeb'
-  data_dir: './data/fineweb_cache'
-  train_seq_len: 1024
-  val_seq_len: 1024
-  shard_size: 134217728 # 2**27
-  max_num_shards: 1
+  batch_size: 8
 
 optimizer:
   # Note: learning_rate is now under training kwargs for the scheduler feature
@@ -30,17 +25,17 @@ training:
   device: "cuda"
   
   # For step_limiting feature
-  max_steps: 600000
+  total_steps: 600000
   
   # For grad_accum feature
   accum_steps: 40
   
   # For lr_scheduling feature with a custom lambda
   lr_scheduler_type: 'lambda_lr'
-  learning_rate: 6e-4 # This will be the max_lr
+  learning_rate: .0006 # This will be the max_lr
   warmup_iters: 2000
   lr_decay_iters: 600000
-  min_lr: 6e-5
+  min_lr: .00006
 
   # For grad_norm_clip feature
   norm_clip_value: 1.0

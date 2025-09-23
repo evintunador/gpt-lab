@@ -17,8 +17,8 @@ class NanoGPTModel:
         self.nn_module = nn_module
         self.tokenizer = tokenizer
 
-    def to(self, device):
-        self.nn_module.to(device)
+    def to(self, device_or_dtype):
+        self.nn_module.to(device_or_dtype)
         return self
 
     def eval(self):

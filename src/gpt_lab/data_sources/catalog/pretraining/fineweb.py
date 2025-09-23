@@ -39,38 +39,60 @@ class FineWebDataset(Dataset):
         self, 
         size: FineWebSize = FineWebSize.v350B,
         edu: bool = False,
-        split: Split = Split.TRAIN,
         streaming: bool = True,
         seed: Optional[int] = None,
         world_size: int = 1,
         rank: int = 0,
+        tokenizer_enc_func: Callable = None,
+        max_seq_len: int = None,
     ):
         self.streaming = streaming
         fw = load_dataset(
             "HuggingFaceFW/fineweb" + ("-edu" if edu else ""), 
             name="sample-" + size.value, 
-            split=split.value, 
+            split='train', 
             streaming=streaming,
             cache_dir='./data/.cache/huggingface_fw',
         )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
+        self.tokenizer_enc_func = tokenizer_enc_func
+        self.max_seq_len = max_seq_len
 
         if world_size > 1:
             self.data = self.data.shard(num_shards=world_size, index=rank)
 
     def __len__(self):
-        if self.streaming:
-            raise TypeError("FineWebDataset with streaming=True has no finite length.")
         return len(self.data)
     
     def __getitem__(self, i: int):
         if self.streaming:
             raise TypeError("Indexing not supported when streaming=True. Iterate instead.")
-        return self.data[i]["text"]
+
+        data = self.data[i]["text"]
+        
+        if not self.tokenizer_enc_func:
+            return data
+            
+        tokens = self.tokenizer_enc_func(data)
+        
+        if self.max_seq_len:
+            tokens = tokens[:self.max_seq_len]
+            
+        return tokens
 
     def __iter__(self) -> Iterable[dict]:
         for rec in self.data:
-            yield rec["text"]
+            data = rec["text"]
+            
+            if not self.tokenizer_enc_func:
+                yield data
+            else:
+                tokens = self.tokenizer_enc_func(data)
+                
+                if self.max_seq_len:
+                    tokens = tokens[:self.max_seq_len]
+                    
+                yield tokens
 
 
 class PrecachedFineWebDataset(Dataset, PrecachedDatasetMixin):

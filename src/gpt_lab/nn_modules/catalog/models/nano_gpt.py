@@ -8,18 +8,20 @@ from gpt_lab.nn_modules.catalog.layers import NanoGPTBlock
 
 
 class NanoGPT(nn.Module):
-    def __init__(self, 
-                 block_size: int = 1024,
-                 vocab_size: int = 50304,  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
-                 n_layer: int = 12,
-                 n_head: int = 12,
-                 n_embd: int = 768,
-                 dropout: float = 0.0,
-                 bias: bool = True):  # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    def __init__(
+        self, 
+        n_embd: int = 768,
+        n_layer: int = 12,
+        n_head: int = 12,
+        max_seq_len: int = 1024,
+        vocab_size: int = 50304,  # GPT-2 vocab_size of 50257, padded up to nearest multiple of 64 for efficiency
+        dropout: float = 0.0,
+        bias: bool = True, # True: bias in Linears and LayerNorms, like GPT-2. False: a bit better and faster
+    ):  
         super().__init__()
         assert vocab_size is not None
-        assert block_size is not None
-        self.block_size = block_size
+        assert max_seq_len is not None
+        self.max_seq_len = max_seq_len
         self.vocab_size = vocab_size
         self.n_layer = n_layer
         self.n_head = n_head
@@ -29,13 +31,12 @@ class NanoGPT(nn.Module):
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(vocab_size, n_embd),
-            wpe = nn.Embedding(block_size, n_embd),
+            wpe = nn.Embedding(max_seq_len, n_embd),
             drop = nn.Dropout(dropout),
             h = nn.ModuleList([
                 NanoGPTBlock(
                     n_embd=n_embd, 
                     n_head=n_head, 
-                    block_size=block_size, 
                     dropout=dropout, 
                     bias=bias
                 ) for _ in range(n_layer)
@@ -54,15 +55,8 @@ class NanoGPT(nn.Module):
                 torch.nn.init.normal_(p, mean=0.0, std=0.02/math.sqrt(2 * n_layer))
 
     def get_num_params(self, non_embedding=True):
-        """
-        Return the number of parameters in the model.
-        For non-embedding count (default), the position embeddings get subtracted.
-        The token embeddings would too, except due to the parameter sharing these
-        params are actually used as weights in the final layer, so we include them.
-        """
         n_params = sum(p.numel() for p in self.parameters())
-        if non_embedding:
-            n_params -= self.transformer.wpe.weight.numel()
+        n_params -= self.transformer.wte.weight.numel() # shared weights
         return n_params
 
     def _init_weights(self, module):
@@ -76,7 +70,7 @@ class NanoGPT(nn.Module):
     def forward(self, idx, targets=None):
         device = idx.device
         b, t = idx.size()
-        assert t <= self.block_size, f"Cannot forward sequence of length {t}, block size is only {self.block_size}"
+        assert t <= self.max_seq_len, f"Cannot forward sequence of length {t}, max_seq_len is only {self.max_seq_len}"
         pos = torch.arange(0, t, dtype=torch.long, device=device) # shape (t)
 
         # forward the GPT model itself
@@ -132,8 +126,8 @@ class NanoGPT(nn.Module):
         Most likely you'll want to make sure to be in model.eval() mode of operation for this.
         """
         for _ in range(max_new_tokens):
-            # if the sequence context is growing too long we must crop it at block_size
-            idx_cond = idx if idx.size(1) <= self.block_size else idx[:, -self.block_size:]
+            # if the sequence context is growing too long we must crop it at max_seq_len
+            idx_cond = idx if idx.size(1) <= self.max_seq_len else idx[:, -self.max_seq_len:]
             # forward the model to get the logits for the index in the sequence
             logits, _ = self(idx_cond)
             # pluck the logits at the final step and scale by desired temperature
