@@ -21,13 +21,16 @@ Usage:
 
 import ast
 import inspect
+import logging
 from pathlib import Path
-from typing import Dict, Set, List, Tuple, Any, Optional
+from typing import Dict, Set, List, Tuple, Any
 from collections import defaultdict
 
 from gpt_lab.catalog_utils import import_module_from_path
 from gpt_lab.llm_code_compiler import create_llm
-from .llm_train_loop_compiler import compile_loop
+from gpt_lab.train_loops.llm_train_loop_compiler import compile_loop
+
+logger = logging.getLogger(__name__)
 
 
 def _get_atomic_features_dir() -> Path:
@@ -68,7 +71,7 @@ def _parse_file_for_kwargs(file_path: Path) -> Set[str]:
         return set()
     
     except Exception as e:
-        print(f"Warning: Failed to parse {file_path}: {e}")
+        logger.warning(f"Failed to parse {file_path}: {e}")
         return set()
 
 
@@ -97,7 +100,7 @@ def _load_feature_metadata(feature_name: str) -> Dict[str, Any]:
         return metadata if isinstance(metadata, dict) else {}
         
     except Exception as e:
-        print(f"Warning: Failed to load metadata for {feature_name}: {e}")
+        logger.warning(f"Failed to load metadata for {feature_name}: {e}")
         return {}
 
 
@@ -143,87 +146,6 @@ def _check_feature_conflicts(selected_features: List[str]) -> None:
         )
 
 
-def visual_test_conflict_detection():
-    """Test the conflict detection system."""
-    print("\n" + "=" * 80)
-    print("TESTING CONFLICT DETECTION")
-    print("=" * 80)
-    
-    # Test case that should trigger conflict
-    conflict_kwargs = {"norm_clip_value": 1.0, "elem_grad_clip": 0.5}
-    
-    print(f"\nTesting conflict case: {conflict_kwargs}")
-    print("-" * 60)
-    try:
-        selected = select_features_from_kwargs(conflict_kwargs)
-        print(f"Selected features: {selected}")
-        
-        # Check conflicts manually
-        _check_feature_conflicts(selected)
-        print("❌ ERROR: Conflict should have been detected!")
-        
-    except ValueError as e:
-        print(f"✅ Conflict correctly detected: {e}")
-    except Exception as e:
-        print(f"⚠️  Unexpected error: {e}")
-    
-    print("\n" + "=" * 80)
-    print("Conflict detection test complete!")
-
-
-def visual_test_feature_selection():
-    """Test the feature selection logic with various scenarios."""
-    test_cases = [
-        # Basic single feature cases
-        {"accum_steps": 4},
-        
-        # Overlapping kwargs - validation only (most specific subset)
-        {"val_loader": "some_loader"},
-        {"val_loader": "some_loader", "val_interval": 5},
-        
-        # Overlapping kwargs - early stopping only (has unique kwargs)
-        {"patience": 3},
-        {"patience": 5, "min_delta": 0.01},
-        
-        # Overlapping kwargs - early stopping (user provides early_stopping specific kwargs)
-        {"val_loader": "some_loader", "patience": 3},
-        {"val_loader": "some_loader", "val_interval": 5, "patience": 3, "min_delta": 0.01},
-        
-        # Multiple non-overlapping features
-        {"accum_steps": 4, "norm_clip_value": 1.0, "track_loss": True},
-        
-        # Complex mixed case
-        {"accum_steps": 4, "val_loader": "loader", "patience": 5, "use_amp": True, "num_epochs": 3},
-        
-        # Test conflict detection
-        {"norm_clip_value": 1.0, "elem_grad_clip": 0.5},
-    ]
-    
-    print("=" * 80)
-    print("TESTING FEATURE SELECTION ALGORITHM")
-    print("=" * 80)
-    
-    for i, kwargs in enumerate(test_cases, 1):
-        print(f"\nTest Case {i}: {kwargs}")
-        print("-" * 60)
-        try:
-            selected = select_features_from_kwargs(kwargs)
-            print(f"Selected features: {selected}")
-            
-            # Quick validation of the logic
-            feature_to_kwargs, _ = discover_atomic_feature_mappings()
-            for feature in selected:
-                feature_kwargs = feature_to_kwargs[feature]
-                matched = feature_kwargs & set(kwargs.keys())
-                print(f"  {feature}: matched {sorted(matched)}")
-                
-        except Exception as e:
-            print(f"ERROR: {e}")
-    
-    print("\n" + "=" * 80)
-    print("Test complete!")
-
-
 def discover_atomic_feature_mappings() -> Tuple[Dict[str, Set[str]], Dict[str, Set[str]]]:
     """
     Discover all atomic features and create bidirectional mappings.
@@ -262,65 +184,8 @@ def discover_atomic_feature_mappings() -> Tuple[Dict[str, Set[str]], Dict[str, S
     # Convert defaultdict to regular dict for cleaner output
     kwarg_to_features = dict(kwarg_to_features)
     
+    logger.debug(f"Discovered {len(feature_to_kwargs)} atomic features with kwargs.")
     return feature_to_kwargs, kwarg_to_features
-
-
-def visual_test_discovered_mappings():
-    """
-    Print all discovered features and kwargs for visual validation.
-    """
-    feature_to_kwargs, kwarg_to_features = discover_atomic_feature_mappings()
-    
-    print("=" * 60)
-    print("DISCOVERED ATOMIC FEATURES AND KWARGS")
-    print("=" * 60)
-    
-    print(f"\nFound {len(feature_to_kwargs)} atomic features:\n")
-    
-    for feature_name in sorted(feature_to_kwargs.keys()):
-        kwargs = feature_to_kwargs[feature_name]
-        print(f"📦 {feature_name}:")
-        if kwargs:
-            for kwarg in sorted(kwargs):
-                print(f"    - {kwarg}")
-        else:
-            print("    (no kwargs)")
-        print()
-    
-    print("=" * 60)
-    print("KWARG TO FEATURES MAPPING")
-    print("=" * 60)
-    
-    print(f"\nFound {len(kwarg_to_features)} unique kwargs:\n")
-    
-    for kwarg in sorted(kwarg_to_features.keys()):
-        features = kwarg_to_features[kwarg]
-        print(f"🔑 {kwarg}:")
-        for feature in sorted(features):
-            print(f"    - {feature}")
-        print()
-    
-    # Find overlapping kwargs (used by multiple features)
-    overlapping_kwargs = {k: v for k, v in kwarg_to_features.items() if len(v) > 1}
-    
-    if overlapping_kwargs:
-        print("=" * 60)
-        print("OVERLAPPING KWARGS (Multiple Features)")
-        print("=" * 60)
-        print()
-        
-        for kwarg in sorted(overlapping_kwargs.keys()):
-            features = overlapping_kwargs[kwarg]
-            print(f"⚠️  {kwarg} used by {len(features)} features: {', '.join(sorted(features))}")
-        print()
-    
-    print("=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    print(f"Total atomic features: {len(feature_to_kwargs)}")
-    print(f"Total unique kwargs: {len(kwarg_to_features)}")
-    print(f"Overlapping kwargs: {len(overlapping_kwargs)}")
-    print("=" * 60)
 
 
 def _find_overlapping_feature_groups(candidate_features: Set[str], feature_to_kwargs: Dict[str, Set[str]]) -> List[Set[str]]:
@@ -485,7 +350,7 @@ def smart_train(
     loss_fn,
     train_loader,
     *,
-    llm_compiler_model="anthropic/claude-3-5-sonnet-20240620",
+    llm_compiler_model="anthropic/claude-sonnet-4-20250514",
     api_key=None,
     **kwargs
 ) -> Dict[str, Any]:
@@ -530,7 +395,8 @@ def smart_train(
     
     if not filtered_kwargs:
         # No additional features requested - use base training loop
-        from train_loops.catalog.atomic_features.base_loop import run_training
+        logger.info("No atomic features requested. Using base training loop.")
+        from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training
         return run_training(model, optimizer, loss_fn, train_loader)
     
     # Select appropriate atomic features based on kwargs
@@ -538,18 +404,19 @@ def smart_train(
     
     if not selected_features:
         # No features selected (shouldn't happen if kwargs are valid, but safety check)
-        from train_loops.catalog.atomic_features.base_loop import run_training
+        logger.info("No atomic features selected based on kwargs. Using base training loop.")
+        from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training
         return run_training(model, optimizer, loss_fn, train_loader)
     
     # Check for feature conflicts
     _check_feature_conflicts(selected_features)
     
-    print(f"[smart_train] Selected features: {selected_features}")
+    logger.info(f"Selected atomic features based on kwargs: {selected_features}")
     
     # Optimization: For single atomic features, use them directly
     if len(selected_features) == 1:
         feature_name = selected_features[0]
-        print(f"[smart_train] Single feature optimization: using {feature_name}.py directly")
+        logger.info(f"Single feature optimization: using '{feature_name}.py' directly.")
         
         try:
             # Load the atomic feature directly
@@ -563,14 +430,15 @@ def smart_train(
             atomic_run_training = atomic_module.run_training
             
         except Exception as e:
-            raise RuntimeError(f"Failed to load atomic feature {feature_name} directly: {e}")
+            raise RuntimeError(f"Failed to load atomic feature '{feature_name}' directly: {e}")
             
-        print(f"[smart_train] Using atomic feature directly: {feature_path}")
+        logger.debug(f"Executing atomic feature directly from: {feature_path}")
         
         # Execute the atomic feature directly with user's kwargs
         return atomic_run_training(model, optimizer, loss_fn, train_loader, **filtered_kwargs)
     
     # instantiate llm code compiler
+    logger.info("Multiple features selected. Proceeding with LLM compilation.")
     llm = create_llm(model=llm_compiler_model, api_key=api_key)
 
     # create the training loop code
@@ -581,13 +449,20 @@ def smart_train(
     compiled_module = import_module_from_path("smart_compiled_loop", compiled_module_path)
     compiled_run_training = compiled_module.run_training
     
-    print(f"[smart_train] Using compiled loop: {compiled_module_path}")
+    logger.info(f"Using compiled training loop: {compiled_module_path}")
     
     # Execute the compiled training loop with user's kwargs
     return compiled_run_training(model, optimizer, loss_fn, train_loader, **filtered_kwargs)
 
 
 if __name__ == "__main__":
-    print_discovered_mappings()
-    test_feature_selection()
-    test_conflict_detection()
+    # This block is for demonstration and debugging.
+    # Proper testing is handled in tests/test_smart_api.py.
+    logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+    logger.info("Running smart_api.py visual tests...")
+    
+    feature_to_kwargs, kwarg_to_features = discover_atomic_feature_mappings()
+    logger.info(f"Discovered {len(feature_to_kwargs)} features.")
+    
+    overlapping = {k: v for k, v in kwarg_to_features.items() if len(v) > 1}
+    logger.info(f"Found {len(overlapping)} overlapping kwargs: {list(overlapping.keys())}")

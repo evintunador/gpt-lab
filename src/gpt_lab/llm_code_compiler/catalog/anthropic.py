@@ -10,7 +10,7 @@ class AnthropicLLM(LLMClient):
     """
     Anthropic LLM client using litellm for completion.
     """
-    def __init__(self, api_key: Optional[str] = None, model: str = "claude-3-5-sonnet-20240620"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "claude-sonnet-4-20250514"):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         if not self.api_key:
             raise ValueError("Antrhopic API key must be provided either as parameter or ANTHROPIC_API_KEY environment variable.")

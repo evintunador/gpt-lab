@@ -1,11 +1,79 @@
 import json
+import logging
 import os
 import sys
 import subprocess
-import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any, Optional, List
 
 import torch
+
+
+class JsonFormatter(logging.Formatter):
+    """
+    A custom log formatter that outputs log records as JSON strings.
+    This formatter merges the standard log record attributes with any
+    extra data provided in the logging call.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        # Create a dictionary with standard log record attributes
+        log_object = {
+            "timestamp": self.formatTime(record, self.datefmt),
+            "name": record.name,
+            "level": record.levelname,
+            "message": record.getMessage(),
+        }
+
+        # Add any extra data passed to the logger
+        if hasattr(record, "__dict__"):
+            extra_data = {
+                key: value
+                for key, value in record.__dict__.items()
+                if key
+                not in [
+                    "args",
+                    "asctime",
+                    "created",
+                    "exc_info",
+                    "exc_text",
+                    "filename",
+                    "funcName",
+                    "levelname",
+                    "levelno",
+                    "lineno",
+                    "module",
+                    "msecs",
+                    "message",
+                    "msg",
+                    "name",
+                    "pathname",
+                    "process",
+                    "processName",
+                    "relativeCreated",
+                    "stack_info",
+                    "thread",
+                    "threadName",
+                ]
+            }
+            if extra_data:
+                log_object.update(extra_data)
+
+        return json.dumps(log_object)
+
+
+class Whitelist(logging.Filter):
+    """
+    A logging filter that allows only records whose names start with
+    one of the specified prefixes. This is used to silence logs from
+    third-party libraries and focus on application-specific logging.
+    """
+
+    def __init__(self, prefixes: List[str]):
+        super().__init__()
+        self.prefixes = tuple(prefixes)
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.name.startswith(self.prefixes)
 
 
 def get_package_versions() -> Dict[str, Any]:
@@ -23,106 +91,78 @@ def get_package_versions() -> Dict[str, Any]:
         return {"error": f"Could not run 'pip freeze': {e}"}
 
 
-class ExperimentLogger:
+def get_system_info(git_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    A flexible logger for deep learning experiments.
+    Collects system information, package versions, and optional git information.
 
-    Handles logging to local files and optional console printing.
-    It is designed to be distributed-aware, with each process
-    writing to its own log file.
+    Args:
+        git_info: Optional git information dictionary from ReproducibilityManager.
+
+    Returns:
+        A dictionary containing system details.
     """
+    info = {
+        "python_version": sys.version,
+        "torch_version": torch.__version__,
+        "cuda_available": torch.cuda.is_available(),
+        "device_count": (
+            torch.cuda.device_count() if torch.cuda.is_available() else 0
+        ),
+        "devices": [
+            torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+        ]
+        if torch.cuda.is_available()
+        else [],
+        "package_versions": get_package_versions(),
+    }
+    if git_info:
+        info["git_info"] = git_info
+    return info
 
-    def __init__(
-        self,
-        log_dir: str,
-        rank: int = 0,
-        is_main_process: bool = True,
-    ):
-        """
-        Initializes the logger.
 
-        Args:
-            log_dir: The directory to save log files in.
-            rank: The global rank of the current process in a distributed setup.
-            is_main_process: True if this process is the main one (rank 0).
-        """
-        self.log_dir = log_dir
-        self.rank = rank
-        self.is_main_process = is_main_process
+def setup_experiment_logging(
+    log_dir: str, rank: int, is_main_process: bool, level=logging.INFO
+):
+    """
+    Configures the root logger for a reproducible experiment.
 
-        os.makedirs(self.log_dir, exist_ok=True)
-        log_file_path = os.path.join(self.log_dir, f"log_rank_{self.rank}.jsonl")
-        self.log_file = open(log_file_path, "a")
+    This function sets up a unified logging system that:
+    1.  Writes all log records from all ranks to a rank-specific JSONL file.
+    2.  If on the main process, also prints human-readable logs to the console.
+    3.  Filters out logs from third-party libraries to keep logs clean.
 
-    def log(
-        self,
-        data: Dict[str, Any],
-        print_to_console: bool = False,
-    ):
-        """
-        Logs a dictionary of data.
+    Args:
+        log_dir: The directory to save log files in.
+        rank: The global rank of the current process.
+        is_main_process: True if this process is the main one (rank 0).
+        level: The minimum logging level to capture (e.g., logging.INFO).
+    """
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
 
-        Args:
-            data: A dictionary of key-value pairs to log.
-            print_to_console: If True, prints to console (main process only).
-        """
-        log_entry = {
-            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-            **data,
-        }
-        self.log_file.write(json.dumps(log_entry) + "\n")
-        self.log_file.flush()
+    # Clear any existing handlers to prevent duplicate logging
+    root_logger.handlers.clear()
 
-        if self.is_main_process and print_to_console:
-            print(f"[LOG] {json.dumps(data)}")
+    # Create a filter to only include logs from our project code and the main script
+    project_filter = Whitelist(["gpt_lab", "experiments", "__main__"])
 
-    def info(self, message: str, print_to_console: bool = True):
-        """Logs a simple informational message."""
-        self.log(
-            {"type": "info", "message": message}, print_to_console=print_to_console
+    # Create the log directory if it doesn't exist
+    os.makedirs(log_dir, exist_ok=True)
+
+    # File handler for structured JSON logging (for all ranks)
+    log_file_path = os.path.join(log_dir, f"log_rank_{rank}.jsonl")
+    file_handler = logging.FileHandler(log_file_path, mode="a")
+    file_handler.setFormatter(JsonFormatter())
+    file_handler.addFilter(project_filter)
+    root_logger.addHandler(file_handler)
+
+    # Console handler for human-readable output (main process only)
+    if is_main_process:
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_formatter = logging.Formatter(
+            "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
-
-    def log_hyperparams(self, params: Dict[str, Any]):
-        """Logs hyperparameters."""
-        self.log({"type": "hyperparameters", "data": params}, print_to_console=True)
-
-    def log_system_info(self, git_info: Optional[Dict[str, Any]] = None):
-        """
-        Logs system information, package versions, and git information.
-        
-        Args:
-            git_info: Git information dictionary from ReproducibilityManager.
-                     If None, git information will be omitted from the log.
-        """
-        info = {
-            "type": "system_info",
-            "data": {
-                "python_version": sys.version,
-                "torch_version": torch.__version__,
-                "cuda_available": torch.cuda.is_available(),
-                "device_count": torch.cuda.device_count()
-                if torch.cuda.is_available()
-                else 0,
-                "devices": [
-                    torch.cuda.get_device_name(i)
-                    for i in range(torch.cuda.device_count())
-                ]
-                if torch.cuda.is_available()
-                else [],
-                "package_versions": get_package_versions(),
-            },
-        }
-        
-        # Add git information if provided
-        if git_info:
-            info["data"]["git_info"] = git_info
-        
-        self.log(info, print_to_console=True)
-
-    def close(self):
-        """Closes the log file."""
-        if self.log_file and not self.log_file.closed:
-            self.log_file.close()
-
-    def __del__(self):
-        self.close()
+        console_handler.setFormatter(console_formatter)
+        console_handler.addFilter(project_filter)
+        root_logger.addHandler(console_handler)

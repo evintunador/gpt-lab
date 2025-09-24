@@ -39,15 +39,6 @@ def test_cpu_fallback(mock_mps, mock_cuda):
         assert manager.device.type == "cpu"
 
 
-def test_print_on_main(capsys):
-    """Test print_on_main functionality."""
-    with DistributedManager() as manager:
-        test_message = "Test message"
-        manager.print_on_main(test_message)
-        captured = capsys.readouterr()
-        assert test_message in captured.out
-
-
 def test_all_gather_object_single_process():
     """Test all_gather_object in single process mode."""
     with DistributedManager() as manager:

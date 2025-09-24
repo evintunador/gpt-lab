@@ -4,6 +4,7 @@
 import sys
 import traceback
 import inspect
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
@@ -15,27 +16,8 @@ from gpt_lab.llm_code_compiler import LLMClient, create_llm
 from gpt_lab.device import get_default_device
 from gpt_lab.catalog_utils import import_module_from_path
 
-# Global verbose flag
-VERBOSE = False
-
-def vprint(*args, **kwargs):
-    """Verbose print - only prints if VERBOSE is True"""
-    if VERBOSE:
-        print(*args, **kwargs)
-
-def vprint_section(title: str):
-    """Print a section header for verbose output"""
-    if VERBOSE:
-        print(f"\n{'='*60}")
-        print(f" {title}")
-        print(f"{'='*60}")
-
-def vprint_subsection(title: str):
-    """Print a subsection header for verbose output"""
-    if VERBOSE:
-        print(f"\n{'-'*40}")
-        print(f" {title}")
-        print(f"{'-'*40}")
+# Get a logger for this module
+logger = logging.getLogger(__name__)
 
 
 SYSTEM_PROMPT = \
@@ -345,38 +327,42 @@ def compile_loop(
     code_path = Path(__file__).parent / "catalog" / "llm_compiled" / f"{name}.py"
     device = get_default_device()
 
-    vprint_section("LLM TRAINING LOOP COMPILATION")
-    vprint(f"Atomic features: {atomic_features}")
-    vprint(f"Generated name: {name}")
-    vprint(f"Output path: {code_path}")
+    logger.debug("=" * 60)
+    logger.debug("LLM TRAINING LOOP COMPILATION")
+    logger.debug("=" * 60)
+    logger.debug(f"Atomic features: {atomic_features}")
+    logger.debug(f"Generated name: {name}")
+    logger.debug(f"Output path: {code_path}")
 
     # Cached success path
     if code_path.exists():
-        vprint_subsection("CACHE CHECK")
-        vprint(f"Found existing file at {code_path}")
+        logger.debug("-" * 40)
+        logger.debug("CACHE CHECK")
+        logger.debug("-" * 40)
+        logger.debug(f"Found existing file at {code_path}")
         try:
             module = import_module_from_path(f"cached_loop", code_path)
-            vprint("✓ Successfully loaded cached loop")
-            print(f"[cache] Using cached compiled loop at {code_path}")
+            logger.debug("✓ Successfully loaded cached loop")
+            logger.info(f"Using cached compiled loop at {code_path}")
             return {
                 "name": name, 
                 "code_path": str(code_path), 
                 "atomic_features": atomic_features,
             }
         except Exception as e:
-            vprint(f"✗ Failed to load cached loop: {e}")
-            print(f"[warning] Failed to load cached loop {code_path}: {e}")
-            print("[info] Will regenerate...")
+            logger.debug(f"✗ Failed to load cached loop: {e}")
+            logger.warning(f"Failed to load cached loop {code_path}: {e}")
+            logger.info("Will regenerate...")
 
     # Build prompts
-    vprint_subsection("PROMPT CONSTRUCTION")
+    logger.debug("-" * 40)
+    logger.debug("PROMPT CONSTRUCTION")
+    logger.debug("-" * 40)
     system_prompt = _build_system_prompt_with_base_loop()
     user_prompt = _build_user_prompt(atomic_features)
     
-    vprint("System prompt:")
-    vprint(f"```\n{system_prompt}\n```")
-    vprint("\nUser prompt:")
-    vprint(f"```\n{user_prompt}\n```")
+    logger.debug(f"System prompt:\n```\n{system_prompt}\n```")
+    logger.debug(f"\nUser prompt:\n```\n{user_prompt}\n```")
 
     # Generate + refine loop
     restarts_left = max_restarts
@@ -384,94 +370,96 @@ def compile_loop(
     code = ""
     attempt_num = 1
     
-    vprint_subsection("CODE GENERATION AND VALIDATION")
+    logger.debug("-" * 40)
+    logger.debug("CODE GENERATION AND VALIDATION")
+    logger.debug("-" * 40)
     
     while restarts_left >= 0:
         try:
             if not last_error_summary:
-                vprint(f"\n🚀 ATTEMPT {attempt_num}: Initial generation")
-                vprint("Calling LLM.generate()...")
+                logger.debug(f"\n🚀 ATTEMPT {attempt_num}: Initial generation")
+                logger.debug("Calling LLM.generate()...")
                 code = llm.generate(system_prompt, user_prompt)
             else:
-                vprint(f"\n🔄 ATTEMPT {attempt_num}: Refinement")
-                vprint("Calling LLM.refine()...")
-                vprint(f"Error to fix: {last_error_summary}")
+                logger.debug(f"\n🔄 ATTEMPT {attempt_num}: Refinement")
+                logger.debug("Calling LLM.refine()...")
+                logger.debug(f"Error to fix: {last_error_summary}")
                 code = llm.refine(system_prompt, user_prompt, prior_code=code, error_summary=last_error_summary)
             
-            vprint("✓ LLM response received")
-            vprint(f"Generated code length: {len(code)} characters")
-            if VERBOSE:
-                print("Generated code preview:")
-                print(f"```python\n{code[:5000]}{'...' if len(code) > 5000 else ''}\n```")
+            logger.debug("✓ LLM response received")
+            logger.debug(f"Generated code length: {len(code)} characters")
+            logger.debug(f"Generated code preview:\n```python\n{code[:5000]}{'...' if len(code) > 5000 else ''}\n```")
 
             # Add metadata and write
-            vprint("\n📝 Adding metadata and writing file...")
+            logger.debug("\n📝 Adding metadata and writing file...")
             code_with_metadata = _add_metadata_to_code(code, atomic_features, str(device))
             _write_file(code_path, code_with_metadata)
-            vprint(f"✓ File written to {code_path}")
+            logger.debug(f"✓ File written to {code_path}")
             
-            vprint("\n🔍 Testing generated code...")
+            logger.debug("\n🔍 Testing generated code...")
             
             # Import test
-            vprint("Testing import...")
+            logger.debug("Testing import...")
             try:
                 module = import_module_from_path(f"compiled_loop", code_path)
-                vprint("✓ Import successful")
+                logger.debug("✓ Import successful")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[import]")
-                vprint(f"✗ Import failed: {err}")
+                logger.debug(f"✗ Import failed: {err}")
                 raise RuntimeError(err)
 
             # Function signature test
-            vprint("Checking for run_training function...")
+            logger.debug("Checking for run_training function...")
             if not hasattr(module, "run_training"):
-                vprint("✗ Missing run_training function")
+                logger.debug("✗ Missing run_training function")
                 raise AssertionError("Generated file must define function 'run_training' with the required signature.")
             run_training_fn = getattr(module, "run_training")
-            vprint("✓ run_training function found")
+            logger.debug("✓ run_training function found")
 
             # Universal test
-            vprint("Running universal learning test...")
+            logger.debug("Running universal learning test...")
             try:
                 universal_learning_test(run_training_fn, device=str(device))
-                vprint("✓ Universal test passed")
+                logger.debug("✓ Universal test passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
-                vprint(f"✗ Universal test failed: {err}")
+                logger.debug(f"✗ Universal test failed: {err}")
                 raise RuntimeError(err)
 
             # Dataset compatibility test
-            vprint("Running dataset type compatibility test...")
+            logger.debug("Running dataset type compatibility test...")
             try:
                 dataset_type_compatibility_test(run_training_fn, device=str(device))
-                vprint("✓ Dataset type compatibility test passed")
+                logger.debug("✓ Dataset type compatibility test passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[dataset_type_compatibility_test]")
-                vprint(f"✗ Dataset type compatibility test failed: {err}")
+                logger.debug(f"✗ Dataset type compatibility test failed: {err}")
                 raise RuntimeError(err)
 
             # Base loop compliance test
-            vprint("Running base_loop compliance test...")
+            logger.debug("Running base_loop compliance test...")
             try:
                 run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features, device=str(device))
-                vprint("✓ Base loop compliance test passed")
+                logger.debug("✓ Base loop compliance test passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
-                vprint(f"✗ Base loop compliance test failed: {err}")
+                logger.debug(f"✗ Base loop compliance test failed: {err}")
                 raise RuntimeError(err)
 
             # Specific tests
-            vprint("Running specific feature tests...")
+            logger.debug("Running specific feature tests...")
             try:
                 run_specific_tests_for_compilation(run_training_fn, atomic_features, device=str(device))
-                vprint("✓ All specific tests passed")
+                logger.debug("✓ All specific tests passed")
             except Exception:
                 err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")
-                vprint(f"✗ Specific tests failed: {err}")
+                logger.debug(f"✗ Specific tests failed: {err}")
                 raise RuntimeError(err)
 
-            vprint_section("COMPILATION SUCCESSFUL")
-            print(f"[ok] Compiled and validated. Cached at {code_path}")
+            logger.info("=" * 60)
+            logger.info("COMPILATION SUCCESSFUL")
+            logger.info("=" * 60)
+            logger.info(f"Compiled and validated. Cached at {code_path}")
             return {
                 "name": name, 
                 "code_path": str(code_path), 
@@ -481,73 +469,75 @@ def compile_loop(
         except Exception as e:
             # Pass only focused, phase-tagged errors into refine loop
             err = str(e)
-            vprint(f"\n❌ ATTEMPT {attempt_num} FAILED: {err}")
-            print(f"[compile/test error]\n{err}")
+            logger.debug(f"\n❌ ATTEMPT {attempt_num} FAILED: {err}")
+            logger.error(f"Compilation/testing failed: {err}")
             
             # Try refine attempts first
-            vprint(f"\n🔧 Starting {max_refine_attempts} refinement attempts...")
+            logger.debug(f"\n🔧 Starting {max_refine_attempts} refinement attempts...")
             for refine_attempt in range(max_refine_attempts):
                 try:
-                    vprint(f"\n🔧 REFINEMENT {refine_attempt + 1}/{max_refine_attempts}")
+                    logger.debug(f"\n🔧 REFINEMENT {refine_attempt + 1}/{max_refine_attempts}")
                     last_error_summary = err
-                    vprint("Calling LLM.refine()...")
+                    logger.debug("Calling LLM.refine()...")
                     code = llm.refine(system_prompt, user_prompt, prior_code=code, error_summary=err)
-                    vprint("✓ Refinement response received")
+                    logger.debug("✓ Refinement response received")
                     
                     code_with_metadata = _add_metadata_to_code(code, atomic_features, str(device))
                     _write_file(code_path, code_with_metadata)
-                    vprint(f"✓ Refined code written to {code_path}")
+                    logger.debug(f"✓ Refined code written to {code_path}")
                     
                     # Test refined code
-                    vprint("Testing refined code...")
+                    logger.debug("Testing refined code...")
                     try:
                         module = import_module_from_path(f"compiled_loop", code_path)
-                        vprint("✓ Import successful")
+                        logger.debug("✓ Import successful")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[import]")
-                        vprint(f"✗ Import failed: {err}")
+                        logger.debug(f"✗ Import failed: {err}")
                         raise RuntimeError(err)
                         
                     if not hasattr(module, "run_training"):
-                        vprint("✗ Missing run_training function")
+                        logger.debug("✗ Missing run_training function")
                         raise AssertionError("Generated file must define function 'run_training'.")
                     run_training_fn = getattr(module, "run_training")
-                    vprint("✓ run_training function found")
+                    logger.debug("✓ run_training function found")
                     
                     try:
                         universal_learning_test(run_training_fn, device=str(device))
-                        vprint("✓ Universal test passed")
+                        logger.debug("✓ Universal test passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[universal_test]")
-                        vprint(f"✗ Universal test failed: {err}")
+                        logger.debug(f"✗ Universal test failed: {err}")
                         raise RuntimeError(err)
                     
                     try:
                         dataset_type_compatibility_test(run_training_fn, device=str(device))
-                        vprint("✓ Dataset type compatibility test passed")
+                        logger.debug("✓ Dataset type compatibility test passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[dataset_type_compatibility_test]")
-                        vprint(f"✗ Dataset type compatibility test failed: {err}")
+                        logger.debug(f"✗ Dataset type compatibility test failed: {err}")
                         raise RuntimeError(err)
                     
                     try:
                         run_base_loop_compliance_test_for_compilation(run_training_fn, atomic_features, device=str(device))
-                        vprint("✓ Base loop compliance test passed")
+                        logger.debug("✓ Base loop compliance test passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[base_loop_compliance]")
-                        vprint(f"✗ Base loop compliance test failed: {err}")
+                        logger.debug(f"✗ Base loop compliance test failed: {err}")
                         raise RuntimeError(err)
                         
                     try:
                         run_specific_tests_for_compilation(run_training_fn, atomic_features, device=str(device))
-                        vprint("✓ All specific tests passed")
+                        logger.debug("✓ All specific tests passed")
                     except Exception:
                         err = _summarize_exception_filtered([str(code_path)], phase="[specific_tests]")
-                        vprint(f"✗ Specific tests failed: {err}")
+                        logger.debug(f"✗ Specific tests failed: {err}")
                         raise RuntimeError(err)
                         
-                    vprint_section("REFINEMENT SUCCESSFUL")
-                    print(f"[ok after refine] Cached at {code_path}")
+                    logger.info("=" * 60)
+                    logger.info("REFINEMENT SUCCESSFUL")
+                    logger.info("=" * 60)
+                    logger.info(f"Successfully refined and cached at {code_path}")
                     return {
                         "name": name, 
                         "code_path": str(code_path), 
@@ -555,18 +545,19 @@ def compile_loop(
                     }
                 except Exception as e2:
                     err = str(e2)
-                    vprint(f"✗ REFINEMENT {refine_attempt + 1} FAILED: {err}")
-                    print(f"[refine error]\n{err}")
+                    logger.debug(f"✗ REFINEMENT {refine_attempt + 1} FAILED: {err}")
+                    logger.error(f"Refinement attempt failed: {err}")
                     continue
                     
             # Restart from scratch
             restarts_left -= 1
             attempt_num += 1
             if restarts_left < 0:
-                vprint_section("COMPILATION FAILED - NO MORE RESTARTS")
+                logger.critical("=" * 60)
+                logger.critical("COMPILATION FAILED - NO MORE RESTARTS")
+                logger.critical("=" * 60)
                 raise
-            vprint(f"\n🔄 RESTART {max_restarts - restarts_left}/{max_restarts}")
-            print("[restart] Starting a fresh attempt...")
+            logger.warning(f"\n🔄 RESTART {max_restarts - restarts_left}/{max_restarts}. Starting a fresh attempt...")
             last_error_summary = ""
 
 
@@ -574,24 +565,31 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("atomic_features", nargs='+', help="List of atomic feature filenames (e.g., grad_accum.py grad_norm_clip.py)")
-    parser.add_argument("--model", type=str, default="anthropic/claude-3-5-sonnet-20240620", 
-                        help="Provider/model string, e.g., 'openai/gpt-4o', 'anthropic/claude-3-5-sonnet-20240620'.")
+    parser.add_argument("--model", type=str, default="anthropic/claude-sonnet-4-20250514", 
+                        help="Provider/model string, e.g., 'openai/gpt-4o', 'anthropic/claude-sonnet-4-20250514'.")
     parser.add_argument("--api_key", type=str, default=None, help="Optional API key; otherwise use env vars.")
     parser.add_argument("--max_refine_attempts", type=int, default=3, help="Maximum number of refine attempts.")
     parser.add_argument("--max_restarts", type=int, default=3, help="Maximum number of restarts.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output showing prompts, LLM responses, and detailed compilation progress.")
     args = parser.parse_args()
 
-    # Set global verbose flag
-    VERBOSE = args.verbose
+    # Configure logging for standalone script execution
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        force=True,  # Override any existing third-party logger configs
+    )
 
-    if VERBOSE:
-        vprint_section("STARTING LLM TRAIN LOOP COMPILER")
-        vprint(f"Model: {args.model}")
-        vprint(f"API Key: {'***' if args.api_key else 'from environment'}")
-        vprint(f"Max refine attempts: {args.max_refine_attempts}")
-        vprint(f"Max restarts: {args.max_restarts}")
-        vprint(f"Atomic features: {args.atomic_features}")
+    logger.info("=" * 60)
+    logger.info("STARTING LLM TRAIN LOOP COMPILER (STANDALONE)")
+    logger.info("=" * 60)
+    logger.info(f"Model: {args.model}")
+    logger.info(f"API Key: {'***' if args.api_key else 'from environment'}")
+    logger.info(f"Max refine attempts: {args.max_refine_attempts}")
+    logger.info(f"Max restarts: {args.max_restarts}")
+    logger.info(f"Atomic features: {args.atomic_features}")
 
     llm = create_llm(args.model, api_key=args.api_key)
     compile_loop(

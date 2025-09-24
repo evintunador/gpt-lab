@@ -1,9 +1,10 @@
-from typing import Optional, Dict, Any
+import logging
+from typing import Dict, Any
 
 import torch
 import torch.nn as nn
 
-from gpt_lab.logger import ExperimentLogger
+logger = logging.getLogger(__name__)
 
 
 def run_training(
@@ -13,17 +14,20 @@ def run_training(
     train_loader,
     *,
     # logging
-    logger: Optional[ExperimentLogger] = None,
+    enable_logging: bool = False,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
     """
-    Atomic training loop demonstrating how to integrate the ExperimentLogger.
+    Atomic training loop demonstrating how to integrate standard Python logging for 
+    both diagnostics and structured metrics.
 
-    LLM Compiler Hint: If a `logger` object is provided, use it to log
-    all relevant metrics and outputs from other combined features. For example,
-    log the `loss` at each step, and if a feature like `validation` is present,
-    log its outputs (e.g., `val_loss`) when they are computed.
+    LLM Compiler Hint: If metric logging is enabled, use the standard `logging` module
+    to log all relevant metrics. Log metrics using logger.info() with an `extra`
+    dictionary for structured data. For example:
+    logger.info("Training step", extra={"metrics": {"train_loss": loss.item()}})
+    If a feature like `validation` is present, also log its outputs (e.g., `val_loss`)
+    when they are computed.
     """
     model.train()
 
@@ -32,8 +36,8 @@ def run_training(
         logits = model(xb)
         loss = loss_fn(logits, yb)
 
-        if logger:
-            logger.log({"train_loss": loss.item()})
+        if enable_logging:
+            logger.info("Training step", extra={"metrics": {"train_loss": loss.item()}})
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()

@@ -102,11 +102,6 @@ class DistributedManager:
         """Destroys the process group."""
         if self.is_distributed:
             dist.destroy_process_group()
-            
-    def print_on_main(self, *args, **kwargs):
-        """Prints only on the main process."""
-        if self.is_main_process:
-            print(*args, **kwargs)
 
     def all_gather_object(self, obj: T) -> List[T]:
         """Gathers a pickleable object from all processes and returns a list."""
