@@ -157,7 +157,7 @@ class ReproducibilityManager:
         self.storage_backend = storage_backend
 
         if self.storage_backend is None and self.is_main_process:
-            self.storage_backend = LocalFileSystemBackend(root_dir=output_dir)
+            self.storage_backend = LocalFileSystemBackend(root_dir=os.getcwd())
 
         # These will be set in __enter__
         self.output_dir: Optional[str] = None
