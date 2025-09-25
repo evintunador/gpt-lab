@@ -1,6 +1,6 @@
 """
 Tests for step_limiting atomic feature.
-Tests that the training loop properly respects max_steps parameter and cycles data when needed.
+Tests that the training loop properly respects total_steps parameter and cycles data when needed.
 """
 
 import pytest
@@ -17,7 +17,7 @@ AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_step_limiting_no_limit(run_training_fn, device):
-    """Test that training runs normally when max_steps is None."""
+    """Test that training runs normally when total_steps is None."""
     torch.manual_seed(42)
     
     # Create a small dataset
@@ -40,7 +40,7 @@ def test_step_limiting_no_limit(run_training_fn, device):
         optimizer=optimizer,
         loss_fn=loss_fn,
         train_loader=dl,
-        max_steps=None
+        total_steps=None
     )
     
     # Verify result format
@@ -55,7 +55,7 @@ def test_step_limiting_no_limit(run_training_fn, device):
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_step_limiting_with_limit(run_training_fn, device):
-    """Test that training stops after max_steps when specified."""
+    """Test that training stops after total_steps when specified."""
     torch.manual_seed(42)
     
     # Create a small dataset that would normally run for 4 batches
@@ -78,7 +78,7 @@ def test_step_limiting_with_limit(run_training_fn, device):
         optimizer=optimizer,
         loss_fn=loss_fn,
         train_loader=dl,
-        max_steps=2
+        total_steps=2
     )
     
     # Verify result format
@@ -93,7 +93,7 @@ def test_step_limiting_with_limit(run_training_fn, device):
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_step_limiting_data_cycling(run_training_fn, device):
-    """Test that data cycles correctly when max_steps exceeds dataset size."""
+    """Test that data cycles correctly when total_steps exceeds dataset size."""
     torch.manual_seed(42)
     
     # Create a very small dataset (2 batches) but request more steps
@@ -110,13 +110,13 @@ def test_step_limiting_data_cycling(run_training_fn, device):
     # Track initial parameters
     initial_param = model[0].weight.clone()
     
-    # Run training with max_steps=5 (should cycle through 2-batch dataset)
+    # Run training with total_steps=5 (should cycle through 2-batch dataset)
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
         train_loader=dl,
-        max_steps=5
+        total_steps=5
     )
     
     # Verify result format
@@ -131,7 +131,7 @@ def test_step_limiting_data_cycling(run_training_fn, device):
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_step_limiting_single_step(run_training_fn, device):
-    """Test that training works correctly with max_steps=1."""
+    """Test that training works correctly with total_steps=1."""
     torch.manual_seed(42)
     
     # Create dataset
@@ -148,13 +148,13 @@ def test_step_limiting_single_step(run_training_fn, device):
     # Track initial parameters
     initial_param = model[0].weight.clone()
     
-    # Run training with max_steps=1
+    # Run training with total_steps=1
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
         loss_fn=loss_fn,
         train_loader=dl,
-        max_steps=1
+        total_steps=1
     )
     
     # Verify result format

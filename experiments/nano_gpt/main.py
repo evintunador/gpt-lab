@@ -2,7 +2,7 @@ import argparse
 import os
 import math
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import torch
 import tiktoken
@@ -13,7 +13,7 @@ from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging, get_system_info
 from gpt_lab.checkpointer import load_checkpoint
-from gpt_lab.data_sources.catalog.pretraining.fineweb import FineWebDataset, FineWebSize
+from gpt_lab.data_sources.catalog.pretraining.fineweb import create_fineweb_dataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
 from gpt_lab.nn_modules.catalog.models import NanoGPT
 from gpt_lab.models.catalog.llms import NanoGPTModel
@@ -24,6 +24,28 @@ from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBe
 
 
 logger = logging.getLogger(__name__)
+
+
+class GPTCollator:
+    def __init__(self, pad_token_id: int):
+        self.pad_token_id = pad_token_id
+
+    def __call__(self, batch: List[List[int]]):
+        tensor_batch = [torch.tensor(tokens, dtype=torch.long) for tokens in batch]
+        
+        padded_x = torch.nn.utils.rnn.pad_sequence(
+            tensor_batch, batch_first=True, padding_value=self.pad_token_id
+        )
+        
+        x = padded_x
+        y = x.clone()
+        y[:, :-1] = x[:, 1:]
+
+        # CrossEntropyLoss's ignore_index expects a specific value. -100 is standard.
+        y[y == self.pad_token_id] = -100
+        y[:, -1] = -100  # The last token has no target.
+        
+        return x, y
 
 
 def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityManager):
@@ -44,13 +66,14 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         "tokenizer_enc_func": enc.encode,
         "max_seq_len": cfg['model']['max_seq_len']
     }
-    train_dataset = FineWebDataset(size=FineWebSize.v10B, seed=cfg['seed'], **common_dataset_args)
-    val_dataset = FineWebDataset(size=FineWebSize.v350B, seed=cfg['seed']+1, **common_dataset_args) 
+    train_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed'], **common_dataset_args)
+    val_dataset = create_fineweb_dataset(size=FineWebSize.v350B, seed=cfg['seed']+1, **common_dataset_args)
         # TODO: real train vs val split; rn i'm in a rush so using the bigger dataset is a proxy w/ only (1/35)*100% overlap
     
     bsz = cfg['data']['batch_size']
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=min(bsz, 4))
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=min(bsz, 4))
+    collator = GPTCollator(pad_token_id=enc.eot_token)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=min(bsz, 4), collate_fn=collator)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=min(bsz, 4), collate_fn=collator)
 
     model = NanoGPT(**cfg['model']).to(dist.device)
     logger.info(f"Model parameters: {model.get_num_params():,}")
@@ -78,7 +101,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         dist.print_on_main(f"Resuming training from step {start_step}")
     """
 
-    loss_fn = CrossEntropyLoss()
+    loss_fn = CrossEntropyLoss(ignore_index=-100)
 
     # Define the lambda function for the learning rate schedule
     def get_lr_lambda(step):
@@ -158,7 +181,7 @@ To specify a different config file:
         help="Path to a checkpoint to resume from.")
     parser.add_argument("--save-best-model", dest="training.atomic_feature_kwargs.save_best_model", action=argparse.BooleanOptionalAction, 
         help="Enable saving best model based on validation loss.")
-    parser.add_argument("--max-steps", dest="training.atomic_feature_kwargs.max_steps", type=int, 
+    parser.add_argument("--total-steps", dest="training.atomic_feature_kwargs.total_steps", type=int, 
         help="Total training steps.")
     parser.add_argument("--accum-steps", dest="training.atomic_feature_kwargs.accum_steps", type=int, 
         help="Gradient accumulation steps.")

@@ -1,10 +1,11 @@
 from typing import Callable, List, Optional, Union, Iterable
 from pathlib import Path
 from enum import Enum
-
-from torch.utils.data import Dataset
-from datasets import load_dataset
 import random
+
+import torch
+from torch.utils.data import Dataset, IterableDataset
+from datasets import load_dataset
 
 from gpt_lab.data_sources.catalog_utils import Split, PrecachedDatasetMixin
 
@@ -35,23 +36,22 @@ class FineWebSize(Enum):
 
 
 class FineWebDataset(Dataset):
+    """Map-style FineWeb dataset."""
     def __init__(
-        self, 
+        self,
         size: FineWebSize = FineWebSize.v350B,
         edu: bool = False,
-        streaming: bool = True,
         seed: Optional[int] = None,
         world_size: int = 1,
         rank: int = 0,
-        tokenizer_enc_func: Callable = None,
-        max_seq_len: int = None,
+        tokenizer_enc_func: Optional[Callable] = None,
+        max_seq_len: Optional[int] = None,
     ):
-        self.streaming = streaming
         fw = load_dataset(
-            "HuggingFaceFW/fineweb" + ("-edu" if edu else ""), 
-            name="sample-" + size.value, 
-            split='train', 
-            streaming=streaming,
+            "HuggingFaceFW/fineweb" + ("-edu" if edu else ""),
+            name="sample-" + size.value,
+            split='train',
+            streaming=False,
             cache_dir='./data/.cache/huggingface_fw',
         )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
@@ -62,44 +62,89 @@ class FineWebDataset(Dataset):
             self.data = self.data.shard(num_shards=world_size, index=rank)
 
     def __len__(self):
-        if self.streaming:
-            raise TypeError("This dataset is in streaming mode and has no defined length.")
         return len(self.data)
-    
-    def __getitem__(self, i: int):
-        if self.streaming:
-            raise TypeError("Indexing not supported when streaming=True. Iterate instead.")
 
+    def __getitem__(self, i: int):
         data = self.data[i]["text"]
-        
         if not self.tokenizer_enc_func:
             return data
-            
         tokens = self.tokenizer_enc_func(data)
-        
         if self.max_seq_len:
             tokens = tokens[:self.max_seq_len]
-            
         return tokens
 
+
+class FineWebStreamingDataset(IterableDataset):
+    """Iterable-style FineWeb dataset."""
+    def __init__(
+        self,
+        size: FineWebSize = FineWebSize.v350B,
+        edu: bool = False,
+        seed: Optional[int] = None,
+        world_size: int = 1,
+        rank: int = 0,
+        tokenizer_enc_func: Optional[Callable] = None,
+        max_seq_len: Optional[int] = None,
+    ):
+        fw = load_dataset(
+            "HuggingFaceFW/fineweb" + ("-edu" if edu else ""),
+            name="sample-" + size.value,
+            split='train',
+            streaming=True,
+            cache_dir='./data/.cache/huggingface_fw',
+        )
+        self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
+        self.tokenizer_enc_func = tokenizer_enc_func
+        self.max_seq_len = max_seq_len
+
+        if world_size > 1:
+            self.data = self.data.shard(num_shards=world_size, index=rank)
+
     def __iter__(self) -> Iterable[dict]:
-        for rec in self.data:
+        worker_info = torch.utils.data.get_worker_info()
+        iter_data = self.data
+        if worker_info is not None:
+            iter_data = self.data.shard(num_shards=worker_info.num_workers, index=worker_info.id)
+
+        for rec in iter_data:
             data = rec["text"]
-            
             if not self.tokenizer_enc_func:
                 yield data
             else:
                 tokens = self.tokenizer_enc_func(data)
-                
                 if self.max_seq_len:
                     tokens = tokens[:self.max_seq_len]
-                    
                 yield tokens
+
+
+def create_fineweb_dataset(
+    streaming: bool = True,
+    size: FineWebSize = FineWebSize.v350B,
+    edu: bool = False,
+    seed: Optional[int] = None,
+    world_size: int = 1,
+    rank: int = 0,
+    tokenizer_enc_func: Optional[Callable] = None,
+    max_seq_len: Optional[int] = None,
+):
+    """Factory function to create either a map-style or iterable-style FineWeb dataset."""
+    common_args = {
+        "size": size,
+        "edu": edu,
+        "seed": seed,
+        "world_size": world_size,
+        "rank": rank,
+        "tokenizer_enc_func": tokenizer_enc_func,
+        "max_seq_len": max_seq_len,
+    }
+    if streaming:
+        return FineWebStreamingDataset(**common_args)
+    return FineWebDataset(**common_args)
 
 
 class PrecachedFineWebDataset(Dataset, PrecachedDatasetMixin):
     def __init__(
-        self, 
+        self,
         save_dir: Union[str, Path],
         tokenizer_encode_fn: Callable[[str], List[int]],
         vocab_size: int,
@@ -127,11 +172,9 @@ class PrecachedFineWebDataset(Dataset, PrecachedDatasetMixin):
         token_dtype = PrecachedDatasetMixin.pick_token_dtype(vocab_size)
 
         if not self.has_cache():
-            raw = FineWebDataset(
+            raw = FineWebStreamingDataset(
                 size=size,
                 edu=edu,
-                split=Split.TRAIN,
-                streaming=True,
                 seed=seed,
             )
             self.build_cache(

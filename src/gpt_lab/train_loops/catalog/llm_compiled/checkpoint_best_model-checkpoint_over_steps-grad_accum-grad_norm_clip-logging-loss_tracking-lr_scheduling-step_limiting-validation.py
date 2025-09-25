@@ -44,87 +44,84 @@ def run_training(
     loss_fn,
     train_loader,
     *,
-    # checkpoint_best_model knobs
-    save_best_model: bool = False,
-    # checkpoint_over_steps knobs  
-    save_every_steps: Optional[int] = None,
-    output_dir: Optional[str] = None,
-    # grad_accum knobs
+    # gradient accumulation
     accum_steps: int = 1,
-    # grad_norm_clip knobs
+    # gradient norm clipping
     norm_clip_value: Optional[float] = None,
-    # logging knobs
-    enable_logging: bool = False,
-    # loss_tracking knobs
+    # loss tracking
     track_loss: bool = False,
     log_interval: int = 1,
-    # lr_scheduling knobs
+    # learning rate scheduling
     lr_scheduler_type: Optional[str] = None,
     scheduler_kwargs: Optional[Dict[str, Any]] = None,
     warmup_steps: int = 0,
     max_lr: Optional[float] = None,
     min_lr: float = 0.0,
+    # step limiting
     total_steps: Optional[int] = None,
-    # step_limiting knobs
-    max_steps: Optional[int] = None,
-    # validation knobs
+    # validation
     val_loader = None,
     val_interval: int = 10,
+    # checkpoint_best_model
+    save_best_model: bool = False,
+    # checkpoint_over_steps
+    save_every_steps: Optional[int] = None,
+    output_dir: Optional[str] = None,
+    # logging
+    enable_logging: bool = False,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
-    """Combined training loop with all atomic features."""
+    """Combined training loop with multiple atomic features."""
     model.train()
     
-    # Initialize accum_steps
+    # Initialize variables
+    train_loss_history: List[float] = []
+    val_loss_history: List[float] = []
+    best_val_loss = float('inf')
+    
+    # Gradient accumulation setup
     if accum_steps is None or accum_steps < 1:
         accum_steps = 1
     
-    # Determine total steps for scheduling
-    if total_steps is None:
-        if max_steps is not None:
-            total_steps = max_steps
-        else:
-            try:
-                total_steps = len(train_loader)
-            except:
-                total_steps = 1000  # fallback
+    # Determine total steps if not provided for LR scheduling
+    if lr_scheduler_type is not None and total_steps is None:
+        try:
+            total_steps = len(train_loader)
+        except:
+            total_steps = 1000  # fallback
     
     # Get current learning rate for max_lr if not specified
-    if max_lr is None:
+    if lr_scheduler_type is not None and max_lr is None:
         max_lr = optimizer.param_groups[0]['lr']
     
     # Create scheduler
     scheduler = None
-    scheduler_kwargs = scheduler_kwargs or {}
-    if lr_scheduler_type == "cosine":
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=total_steps, eta_min=min_lr, **scheduler_kwargs
-        )
-    elif lr_scheduler_type == "linear":
-        def lambda_lr(step):
-            if step < warmup_steps:
-                return step / max(1, warmup_steps)
-            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
-            return max(min_lr / max_lr, 1.0 - progress)
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda_lr, **scheduler_kwargs)
-    elif lr_scheduler_type == "step":
-        step_size = max(1, total_steps // 3)
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1, **scheduler_kwargs)
-    elif lr_scheduler_type == "exponential":
-        gamma = (min_lr / max_lr) ** (1.0 / total_steps)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, **scheduler_kwargs)
-    elif lr_scheduler_type == "lambda_lr":
-        if "lr_lambda" not in scheduler_kwargs:
-            raise ValueError("`scheduler_kwargs` must contain `lr_lambda` function for `lambda_lr` scheduler.")
-        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, **scheduler_kwargs)
+    if lr_scheduler_type is not None:
+        scheduler_kwargs = scheduler_kwargs or {}
+        if lr_scheduler_type == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=total_steps, eta_min=min_lr, **scheduler_kwargs
+            )
+        elif lr_scheduler_type == "linear":
+            def lambda_lr(step):
+                if step < warmup_steps:
+                    return step / max(1, warmup_steps)
+                progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+                return max(min_lr / max_lr, 1.0 - progress)
+            scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda_lr, **scheduler_kwargs)
+        elif lr_scheduler_type == "step":
+            step_size = max(1, total_steps // 3)
+            scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1, **scheduler_kwargs)
+        elif lr_scheduler_type == "exponential":
+            gamma = (min_lr / max_lr) ** (1.0 / total_steps)
+            scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, **scheduler_kwargs)
+        elif lr_scheduler_type == "lambda_lr":
+            if "lr_lambda" not in scheduler_kwargs:
+                raise ValueError("`scheduler_kwargs` must contain `lr_lambda` function for `lambda_lr` scheduler.")
+            scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, **scheduler_kwargs)
     
-    # Initialize tracking variables
-    best_val_loss = float('inf')
-    train_loss_history: List[float] = []
-    val_loss_history: List[float] = []
-    
-    # Save initial checkpoint if checkpoint_over_steps is enabled
+    # Save initial checkpoint if needed
     if save_every_steps is not None and output_dir is not None:
         raw_model = model.module if hasattr(model, 'module') else model
         checkpointer.save_checkpoint(
@@ -135,51 +132,37 @@ def run_training(
             optimizer=optimizer,
         )
     
-    # Initialize counters
+    # Training setup
+    data_iter = iter(train_loader)
     step_count = 0
     micro_idx = 0
     optimizer.zero_grad(set_to_none=True)
-    
-    # Set up data iterator for step limiting
-    if max_steps is None:
-        data_iter = iter(train_loader)
-        use_step_limiting = False
-    else:
-        data_iter = iter(train_loader)
-        use_step_limiting = True
-    
-    # Main training loop
+
     while True:
-        # Get next batch
-        try:
-            if use_step_limiting:
-                if step_count >= max_steps:
-                    break
-                try:
-                    batch = next(data_iter)
-                except StopIteration:
-                    data_iter = iter(train_loader)
-                    batch = next(data_iter)
-            else:
-                batch = next(data_iter)
-        except StopIteration:
+        if total_steps is not None and step_count >= total_steps:
             break
-        
+
+        try:
+            batch = next(data_iter)
+        except StopIteration:
+            if total_steps is None:
+                break
+            data_iter = iter(train_loader)
+            batch = next(data_iter)
+
         xb, yb = batch
         logits = model(xb)
         loss = loss_fn(logits, yb)
         
-        # Apply gradient accumulation scaling
+        # Scale loss for gradient accumulation
         if accum_steps > 1:
             loss = loss / float(accum_steps)
-        
+
         loss.backward()
         micro_idx += 1
-        
-        # Check if we should step the optimizer
-        should_step = (micro_idx % accum_steps == 0)
-        
-        if should_step:
+
+        # Optimizer step with gradient accumulation
+        if micro_idx % accum_steps == 0:
             # Apply gradient clipping
             if norm_clip_value is not None:
                 params = [p for p in model.parameters() if p.grad is not None]
@@ -188,36 +171,37 @@ def run_training(
             
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
+            step_count += 1
             
-            # Step scheduler after optimizer step
+            # Step scheduler if it exists
             if scheduler is not None:
                 scheduler.step()
-        
-        # Track loss (every micro-step for consistency with loss_tracking)
-        if track_loss and (micro_idx - 1) % log_interval == 0:
-            train_loss_history.append(float(loss.detach().cpu().item() * (accum_steps if accum_steps > 1 else 1)))
-        
-        # Logging
-        if enable_logging:
-            log_loss = float(loss.detach().cpu().item() * (accum_steps if accum_steps > 1 else 1))
-            logger.info("Training step", extra={"metrics": {"train_loss": log_loss}})
-        
-        # Only increment step_count after optimizer steps for consistency with checkpointing/validation
-        if should_step:
-            step_count += 1
+            
+            # Track loss if enabled
+            if track_loss and (step_count % log_interval == 0):
+                # Rescale loss back for logging
+                original_loss = loss.item() * accum_steps if accum_steps > 1 else loss.item()
+                train_loss_history.append(float(original_loss))
+            
+            # Logging
+            if enable_logging:
+                original_loss = loss.item() * accum_steps if accum_steps > 1 else loss.item()
+                logger.info("Training step", extra={"metrics": {"train_loss": original_loss}})
             
             # Validation
             if val_loader is not None and step_count > 0 and step_count % val_interval == 0:
                 val_loss = _eval_loss(model, loss_fn, val_loader)
                 val_loss_history.append(val_loss)
                 
+                # Logging validation
                 if enable_logging:
                     logger.info("Validation step", extra={"metrics": {"val_loss": val_loss}})
                 
-                # Check for best model
+                # Check if this is the best model
                 if save_best_model:
                     if output_dir is None:
                         raise ValueError("output_dir must be provided when save_best_model is True.")
+                    
                     if val_loss < best_val_loss:
                         best_val_loss = val_loss
                         raw_model = model.module if hasattr(model, 'module') else model
@@ -229,7 +213,7 @@ def run_training(
                             optimizer=optimizer,
                         )
             
-            # Checkpoint over steps
+            # Checkpoint saving
             if (save_every_steps is not None 
                 and output_dir is not None
                 and step_count > 0 
@@ -242,37 +226,45 @@ def run_training(
                     model=raw_model,
                     optimizer=optimizer,
                 )
-    
-    # Handle incomplete accumulation at end
+
+    # Handle incomplete accumulation window
     if micro_idx % accum_steps != 0:
+        # Apply gradient clipping
         if norm_clip_value is not None:
             params = [p for p in model.parameters() if p.grad is not None]
             if params:
                 clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+        
         optimizer.step()
         step_count += 1
+        
+        # Step scheduler if it exists
+        if scheduler is not None:
+            scheduler.step()
     
-    # Final validation check
+    # Final validation at end of training
     if val_loader is not None and (step_count == 0 or step_count % val_interval != 0):
         final_val_loss = _eval_loss(model, loss_fn, val_loader)
         val_loss_history.append(final_val_loss)
         
+        # Logging final validation
         if enable_logging:
             logger.info("Final validation", extra={"metrics": {"val_loss": final_val_loss}})
         
-        # Final best model check
-        if save_best_model and output_dir is not None and final_val_loss < best_val_loss:
-            best_val_loss = final_val_loss
-            raw_model = model.module if hasattr(model, 'module') else model
-            checkpointer.save_checkpoint(
-                save_dir=os.path.join(output_dir, "checkpoints"),
-                filename="best_model.pt",
-                metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
-                model=raw_model,
-                optimizer=optimizer,
-            )
+        # Check if final validation is the best
+        if save_best_model and output_dir is not None:
+            if final_val_loss < best_val_loss:
+                best_val_loss = final_val_loss
+                raw_model = model.module if hasattr(model, 'module') else model
+                checkpointer.save_checkpoint(
+                    save_dir=os.path.join(output_dir, "checkpoints"),
+                    filename="best_model.pt",
+                    metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
+                    model=raw_model,
+                    optimizer=optimizer,
+                )
     
-    # Final checkpoint over steps
+    # Final checkpoint if needed
     if (save_every_steps is not None
         and output_dir is not None 
         and step_count % save_every_steps != 0):
@@ -284,14 +276,14 @@ def run_training(
             model=raw_model,
             optimizer=optimizer,
         )
-    
+
     # Build result
     result = {"model": model}
     if track_loss:
         result["train_loss_history"] = train_loss_history
     if val_loader is not None:
         result["val_loss_history"] = val_loss_history
-    if save_best_model and 'best_val_loss' in locals():
-        result['best_val_loss'] = best_val_loss
+    if save_best_model and best_val_loss != float('inf'):
+        result["best_val_loss"] = best_val_loss
     
     return result

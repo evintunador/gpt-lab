@@ -34,6 +34,7 @@ Constraints:
 - Assume caller moves/creates model/optimizer/loss/data; you just train.
 - Err on the side of setting default arguments when reasonable; kwargs should have defaults. 
 - All kwarg defaults should be set to values that ensure numerical equivalence with `base_loop.py`.
+- Ensure compatibility with bost map-style and iterable-style datasets. Never call `len()` on a dataloader.
 
 Testing Requirements:
 - Your code will be tested with a universal learning test (loss must decrease by at least 10%)
