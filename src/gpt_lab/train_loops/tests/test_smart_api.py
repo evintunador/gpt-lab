@@ -10,8 +10,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import pytest
 from unittest.mock import MagicMock
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.smart_api import smart_train
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 # Helper function to create test data
@@ -22,20 +22,19 @@ def _create_test_data(device: str):
     y = torch.randint(0, 2, (16,)).to(device)
     dataset = TensorDataset(X, y)
     dataloader = DataLoader(dataset, batch_size=8)
-    model = nn.Linear(4, 2).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    backbone = nn.Linear(4, 2)
     loss_fn = nn.CrossEntropyLoss()
-    return model, optimizer, loss_fn, dataloader
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    return model, optimizer, dataloader
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_no_features(device: str):
     """Test smart_train with no additional features."""
-    model, optimizer, loss_fn, dataloader = _create_test_data(device)
+    model, optimizer, dataloader = _create_test_data(device)
     
-    result = smart_train(model, optimizer, loss_fn, dataloader)
+    result = smart_train(model, optimizer, dataloader)
     
     assert isinstance(result, dict)
     assert 'model' in result
@@ -45,10 +44,10 @@ def test_smart_train_no_features(device: str):
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_single_feature(device: str):
     """Test smart_train with single feature (direct execution)."""
-    model, optimizer, loss_fn, dataloader = _create_test_data(device)
+    model, optimizer, dataloader = _create_test_data(device)
     
     result = smart_train(
-        model, optimizer, loss_fn, dataloader,
+        model, optimizer, dataloader,
         accum_steps=2
     )
     
@@ -60,7 +59,7 @@ def test_smart_train_single_feature(device: str):
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_multi_feature(device: str, monkeypatch):
     """Test smart_train with multiple features, mocking the full compilation chain."""
-    model, optimizer, loss_fn, dataloader = _create_test_data(device)
+    model, optimizer, dataloader = _create_test_data(device)
 
     # 1. Mock `create_llm` to prevent the API key error.
     monkeypatch.setattr(
@@ -86,7 +85,7 @@ def test_smart_train_multi_feature(device: str, monkeypatch):
     )
     
     result = smart_train(
-        model, optimizer, loss_fn, dataloader,
+        model, optimizer, dataloader,
         accum_steps=2, track_loss=True
     )
     
@@ -99,11 +98,11 @@ def test_smart_train_multi_feature(device: str, monkeypatch):
 def test_smart_train_unknown_kwargs():
     """Test that smart_train rejects unknown kwargs."""
     # This test is device-agnostic, so we can just use CPU
-    model, optimizer, loss_fn, dataloader = _create_test_data('cpu')
+    model, optimizer, dataloader = _create_test_data('cpu')
     
     with pytest.raises(ValueError) as exc_info:
         smart_train(
-            model, optimizer, loss_fn, dataloader,
+            model, optimizer, dataloader,
             unknown_parameter=123
         )
     
@@ -114,11 +113,11 @@ def test_smart_train_unknown_kwargs():
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_none_filtering(device: str):
     """Test that smart_train filters out None values."""
-    model, optimizer, loss_fn, dataloader = _create_test_data(device)
+    model, optimizer, dataloader = _create_test_data(device)
     
     # Should work the same as no additional features
     result = smart_train(
-        model, optimizer, loss_fn, dataloader,
+        model, optimizer, dataloader,
         accum_steps=None, val_loader=None
     )
     

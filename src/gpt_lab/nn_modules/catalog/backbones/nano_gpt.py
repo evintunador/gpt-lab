@@ -7,7 +7,7 @@ from torch.nn import functional as F
 from gpt_lab.nn_modules.catalog.layers import NanoGPTBlock
 
 
-class NanoGPT(nn.Module):
+class NanoGPTBackbone(nn.Module):
     def __init__(
         self, 
         n_embd: int = 768,
@@ -67,7 +67,7 @@ class NanoGPT(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
-    def forward(self, idx, targets=None):
+    def forward(self, idx):#, targets=None):
         device = idx.device
         b, t = idx.size()
         assert t <= self.max_seq_len, f"Cannot forward sequence of length {t}, max_seq_len is only {self.max_seq_len}"
@@ -81,16 +81,16 @@ class NanoGPT(nn.Module):
             x = block(x)
         x = self.transformer.ln_f(x)
 
-        if targets is not None:
+        #if targets is not None:
             # if we are given some desired targets also calculate the loss
-            logits = self.lm_head(x)
-            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
-        else:
+        logits = self.lm_head(x)
+            #loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1), ignore_index=-1)
+        #else:
             # inference-time mini-optimization: only forward the lm_head on the very last position
-            logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
-            loss = None
+            #logits = self.lm_head(x[:, [-1], :]) # note: using list [-1] to preserve the time dim
+            #loss = None
 
-        return logits, loss
+        return logits#, loss
 
     def configure_optimizers(self, weight_decay, learning_rate, betas, device_type):
         # start with all of the candidate parameters

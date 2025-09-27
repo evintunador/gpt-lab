@@ -8,11 +8,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.gradient_skipping import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_gradient_skipping_norm_threshold(run_training_fn, device):
@@ -26,15 +24,15 @@ def test_gradient_skipping_norm_threshold(run_training_fn, device):
     dl = DataLoader(ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=1e-1)  # High LR to potentially trigger large gradients
     
     # Run training with gradient skipping enabled
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         grad_skip_threshold=0.1,  # Very low threshold to trigger skipping
         skip_strategy="norm"

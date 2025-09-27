@@ -7,7 +7,6 @@ import torch.nn as nn
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # gradient noise knobs
@@ -22,9 +21,7 @@ def run_training(
     current_noise_std = grad_noise_std
     
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()

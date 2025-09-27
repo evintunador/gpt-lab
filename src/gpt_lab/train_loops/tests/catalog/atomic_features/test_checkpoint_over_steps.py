@@ -4,13 +4,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from unittest.mock import patch, call
 
-import os
 import gpt_lab.checkpointer as checkpointer
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.checkpoint_over_steps import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 @patch('train_loops.catalog.atomic_features.checkpoint_over_steps.checkpointer.save_checkpoint')
@@ -23,9 +21,10 @@ def test_checkpointing_over_steps(mock_save_checkpoint, device, tmp_path):
     ds = TensorDataset(X, y)
     dl = DataLoader(ds, batch_size=2) # 10 steps total
 
-    model = nn.Linear(4, 2).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+    backbone = nn.Linear(4, 2).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
 
     output_dir = tmp_path
     save_interval = 3
@@ -34,7 +33,6 @@ def test_checkpointing_over_steps(mock_save_checkpoint, device, tmp_path):
     run_training(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         save_every_steps=save_interval,
         output_dir=output_dir,

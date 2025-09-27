@@ -8,11 +8,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.loss_tracking import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_loss_tracking_returns_history(run_training_fn, device):
@@ -26,15 +24,15 @@ def test_loss_tracking_returns_history(run_training_fn, device):
     dl = DataLoader(ds, batch_size=32, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         track_loss=True
     )
@@ -63,15 +61,15 @@ def test_loss_tracking_disabled(run_training_fn, device):
     dl = DataLoader(ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with tracking disabled
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         track_loss=False
     )
@@ -93,15 +91,15 @@ def test_loss_tracking_log_interval(run_training_fn, device):
     dl = DataLoader(ds, batch_size=20, shuffle=False)  # 10 batches
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with log_interval=3 (should track every 3rd batch: 0, 3, 6, 9)
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         track_loss=True,
         log_interval=3

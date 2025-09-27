@@ -8,8 +8,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset, IterableDataset
 import pytest
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.catalog_utils import list_all_files_in_folder_and_subdirs, import_module_from_path
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 # --- Path Constants ---
@@ -92,7 +92,6 @@ def generate_compiled_loop_specific_tests():
     specific_tests = discover_specific_tests()
     compiled_dir = CATALOG_DIR / "llm_compiled"
     params = []
-    AVAILABLE_DEVICES, _ = get_available_devices()
     
     for compiled_loop_file in compiled_dir.glob("*.py"):
         try:
@@ -134,22 +133,19 @@ def base_loop_compliance_test(run_training_fn, feature_name: str, device: str):
     
     # Test with two identical models to compare behaviors
     torch.manual_seed(42)
-    model1 = nn.Sequential(nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 3))
-    model1.to(device)
+    backbone1 = nn.Sequential(nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 3))
+    model1 = SimpleTestTrainingModel(backbone1, nn.CrossEntropyLoss()).to(device)
     optimizer1 = torch.optim.SGD(model1.parameters(), lr=0.01)
-    loss_fn1 = nn.CrossEntropyLoss()
     
     torch.manual_seed(42)  # Reset seed for identical initialization
-    model2 = nn.Sequential(nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 3))
-    model2.to(device)
+    backbone2 = nn.Sequential(nn.Linear(16, 8), nn.ReLU(), nn.Linear(8, 3))
+    model2 = SimpleTestTrainingModel(backbone2, nn.CrossEntropyLoss()).to(device)
     optimizer2 = torch.optim.SGD(model2.parameters(), lr=0.01)
-    loss_fn2 = nn.CrossEntropyLoss()
     
     # Run base_loop
     base_result = base_run_training(
         model=model1,
         optimizer=optimizer1,
-        loss_fn=loss_fn1,
         train_loader=dl,
     )
     
@@ -157,7 +153,6 @@ def base_loop_compliance_test(run_training_fn, feature_name: str, device: str):
     feature_result = run_training_fn(
         model=model2,
         optimizer=optimizer2,
-        loss_fn=loss_fn2,
         train_loader=dl,
     )
     
@@ -209,23 +204,22 @@ def universal_learning_test(run_training_fn, device: str):
     ds = TensorDataset(X, y)
     dl = DataLoader(ds, batch_size=64, shuffle=True)
 
-    model = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
-    loss_fn = nn.CrossEntropyLoss()
+    backbone = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    model = SimpleTestTrainingModel(backbone, nn.CrossEntropyLoss()).to(device)
     optim = torch.optim.AdamW(model.parameters(), lr=3e-3)
 
     model.to(device)
     with torch.no_grad():
-        pre = loss_fn(model(X.to(device)), y.to(device)).item()
+        pre = model((X.to(device), y.to(device))).item()
 
     result = run_training_fn(
         model=model,
         optimizer=optim,
-        loss_fn=loss_fn,
         train_loader=dl,
     )
 
     with torch.no_grad():
-        post = loss_fn(model(X.to(device)), y.to(device)).item()
+        post = model((X.to(device), y.to(device))).item()
 
     if not isinstance(result, dict):
         raise AssertionError("run_training(...) must return dict metrics.")
@@ -242,24 +236,23 @@ def dataset_type_compatibility_test(run_training_fn, device: str):
     Tests that a training loop works with both map-style (indexed) and iterable-style datasets
     by running a consistent learning task on both.
     """
-    def run_test_on_loader(loader, X_full, y_full, model, loss_fn, optim, ds_type: str):
+    def run_test_on_loader(loader, X_full, y_full, model, optim, ds_type: str):
         """Helper to run the learning test on a given dataloader."""
         model.to(device)
         with torch.no_grad():
-            pre_loss = loss_fn(model(X_full), y_full).item()
+            pre_loss = model((X_full, y_full)).item()
         
         try:
             run_training_fn(
                 model=model,
                 optimizer=optim,
-                loss_fn=loss_fn,
                 train_loader=loader,
             )
         except Exception as e:
             raise AssertionError(f"Training loop failed with a {ds_type} dataset: {e}") from e
 
         with torch.no_grad():
-            post_loss = loss_fn(model(X_full), y_full).item()
+            post_loss = model((X_full, y_full)).item()
 
         if not (post_loss < pre_loss * 0.9):  # at least 10% relative improvement
             raise AssertionError(
@@ -274,27 +267,23 @@ def dataset_type_compatibility_test(run_training_fn, device: str):
 
     # --- 1. Test with Map-style Dataset (TensorDataset) ---
     torch.manual_seed(1)
-    model_map = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
-    loss_fn_map = nn.CrossEntropyLoss()
+    backbone_map = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    model_map = SimpleTestTrainingModel(backbone_map, nn.CrossEntropyLoss())
     optim_map = torch.optim.AdamW(model_map.parameters(), lr=3e-3)
     
     map_dataset = TensorDataset(X, y)
     map_loader = DataLoader(map_dataset, batch_size=batch_size, shuffle=True)
-    run_test_on_loader(map_loader, X, y, model_map, loss_fn_map, optim_map, "map-style")
+    run_test_on_loader(map_loader, X, y, model_map, optim_map, "map-style")
 
     # --- 2. Test with Iterable-style Dataset ---
     torch.manual_seed(1) # Reset seed for identical model initialization
-    model_iter = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
-    loss_fn_iter = nn.CrossEntropyLoss()
+    backbone_iter = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    model_iter = SimpleTestTrainingModel(backbone_iter, nn.CrossEntropyLoss())
     optim_iter = torch.optim.AdamW(model_iter.parameters(), lr=3e-3)
     
     iterable_dataset = SimpleIterableDataset(X, y, batch_size=batch_size)
     iterable_loader = DataLoader(iterable_dataset, batch_size=None) # batch_size=None as dataset yields batches
-    run_test_on_loader(iterable_loader, X, y, model_iter, loss_fn_iter, optim_iter, "iterable-style")
-
-
-# Get available devices for parameterization
-AVAILABLE_DEVICES, _ = get_available_devices()
+    run_test_on_loader(iterable_loader, X, y, model_iter, optim_iter, "iterable-style")
 
 
 # Create parameterized tests for universal learning across devices

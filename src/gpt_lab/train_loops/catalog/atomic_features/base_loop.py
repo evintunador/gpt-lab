@@ -6,7 +6,6 @@ import torch.nn as nn
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     #*, # feature-specific arguments should follow *
     **kwargs,
@@ -16,10 +15,7 @@ def run_training(
     optimizer.zero_grad(set_to_none=True)
 
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
-
+        loss = model(batch)  # Model is responsible for unpacking batch and calculating loss
         loss.backward()
         optimizer.step()
         optimizer.zero_grad(set_to_none=True)

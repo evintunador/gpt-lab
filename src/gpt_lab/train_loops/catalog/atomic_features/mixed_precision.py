@@ -1,3 +1,4 @@
+# TODO: update this atomic feature to comply with latest pytorch which i think does allow amp on mps
 from typing import Optional, Dict, Any
 
 import torch
@@ -17,7 +18,6 @@ def _is_amp_compatible(device_str: str) -> bool:
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # mixed precision knobs
@@ -53,15 +53,12 @@ def run_training(
             use_amp = False
     
     for batch in train_loader:
-        xb, yb = batch
-        
         optimizer.zero_grad(set_to_none=True)
         
         if use_amp and scaler is not None:
             # Forward pass with autocast
             with torch.amp.autocast(device):
-                logits = model(xb)
-                loss = loss_fn(logits, yb)
+                loss = model(batch)
             
             # Backward pass with gradient scaling
             scaler.scale(loss).backward()
@@ -69,8 +66,7 @@ def run_training(
             scaler.update()
         else:
             # Standard precision training
-            logits = model(xb)
-            loss = loss_fn(logits, yb)
+            loss = model(batch)
             loss.backward()
             optimizer.step()
 

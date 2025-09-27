@@ -8,11 +8,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.gradient_noise import run_training
-
-
-AVAILABLE_DEVICES, _ = get_available_devices()
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
@@ -28,20 +25,20 @@ def test_gradient_noise_adds_randomness(run_training_fn, device):
     
     # Create two identical models
     torch.manual_seed(42)
-    model1 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone1 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model1 = SimpleTestTrainingModel(backbone1, loss_fn).to(device)
     optimizer1 = torch.optim.AdamW(model1.parameters(), lr=1e-3)
     
     torch.manual_seed(42)
-    model2 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone2 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    model2 = SimpleTestTrainingModel(backbone2, loss_fn).to(device)
     optimizer2 = torch.optim.AdamW(model2.parameters(), lr=1e-3)
-    
-    loss_fn = nn.CrossEntropyLoss()
     
     # Run training with gradient noise on model1
     result1 = run_training_fn(
         model=model1,
         optimizer=optimizer1,
-        loss_fn=loss_fn,
         train_loader=dl,
         grad_noise_std=0.01
     )
@@ -52,7 +49,6 @@ def test_gradient_noise_adds_randomness(run_training_fn, device):
     result2 = run_training_fn(
         model=model2,
         optimizer=optimizer2,
-        loss_fn=loss_fn,
         train_loader=dl2,
         grad_noise_std=None
     )

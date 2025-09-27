@@ -7,7 +7,6 @@ import torch.nn as nn
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # gradient monitoring knobs
@@ -25,9 +24,7 @@ def run_training(
     step_count = 0
 
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()

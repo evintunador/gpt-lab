@@ -25,16 +25,17 @@ SYSTEM_PROMPT = \
 Constraints:
 - Output ONLY valid Python code for a single file. No backticks, no prose.
 - Provide a function with EXACT signature:
-  def run_training(model, optimizer, loss_fn, train_loader, **kwargs) -> dict:
+  def run_training(model, optimizer, train_loader, **kwargs) -> dict:
+    - The `model` is an `nn.Module` whose `forward` method takes a batch from the data loader and returns a single loss tensor.
     - Train IN-PLACE on train_loader.
-    - Return a dict with at least keys: {'model': nn.Module}; depending on the atomic feature examples provided there my be others which are relevant.
+    - Return a dict with at least the key: {'model': nn.Module}. Other relevant keys may be added depending on the atomic features provided.
 - Avoid introducing new external dependencies; those used by example scripts are allowed.
 - Keep code deterministic where feasible (set seeds when creating schedulers, etc.).
 - Do not rely on global variables; everything must be self-contained in this file. Those used by example scripts are exceptions.
-- Assume caller moves/creates model/optimizer/loss/data; you just train.
 - Err on the side of setting default arguments when reasonable; kwargs should have defaults. 
 - All kwarg defaults should be set to values that ensure numerical equivalence with `base_loop.py`.
-- Ensure compatibility with bost map-style and iterable-style datasets. Never call `len()` on a dataloader.
+- Ensure compatibility with both map-style and iterable-style datasets. Never call `len()` on a dataloader.
+- Think deeply about how to properly have features interact. For example, if one feature moves items to the correct device and another uses a validation loader, be sure to move the validation items to the correct device. A second examle, if one feature implements a tqdm progress bar and another sets a maximum total steps, adjust the pbar accordingly.
 
 Testing Requirements:
 - Your code will be tested with a universal learning test (loss must decrease by at least 10%)
@@ -43,7 +44,7 @@ Testing Requirements:
 - Make sure your implementation correctly handles all the specific behaviors being tested
 
 Notes:
-- You may add helper functions/classes if needed, or, if re-using, import directly from one of the atomic features by using `from train_loops.catalog.atomic_features.<feature_name> import <function/class_name>`.
+- You may add helper functions/classes if needed, or, if re-using, import directly from one of the atomic features by using `from gpt_lab.train_loops.catalog.atomic_features.<feature_name> import <function/class_name>`.
 """
 
 USER_PROMPT_TEMPLATE = \

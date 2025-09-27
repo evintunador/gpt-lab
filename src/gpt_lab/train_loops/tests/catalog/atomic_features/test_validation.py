@@ -8,11 +8,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.validation import run_training
-
-
-AVAILABLE_DEVICES, _ = get_available_devices()
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
@@ -33,15 +30,15 @@ def test_validation_with_loader(run_training_fn, device):
     val_dl = DataLoader(val_ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(16, 32), nn.ReLU(), nn.Linear(32, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with validation
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=train_dl,
         val_loader=val_dl,
         val_interval=2  # Validate every 2 batches
@@ -71,15 +68,15 @@ def test_validation_without_loader(run_training_fn, device):
     train_dl = DataLoader(train_ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training without validation loader
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=train_dl,
         val_loader=None
     )
@@ -107,15 +104,15 @@ def test_validation_interval(run_training_fn, device):
     val_dl = DataLoader(val_ds, batch_size=15, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with val_interval=3 (should validate at batches 0, 3, 6, 9)
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=train_dl,
         val_loader=val_dl,
         val_interval=3

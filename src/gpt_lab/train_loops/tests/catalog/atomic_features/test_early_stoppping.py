@@ -10,11 +10,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.early_stopping import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_early_stopping_without_val_loader(run_training_fn, device):
@@ -28,18 +26,18 @@ def test_early_stopping_without_val_loader(run_training_fn, device):
     dl = DataLoader(ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Track initial parameters
-    initial_param = model[0].weight.clone()
+    initial_param = model.backbone[0].weight.clone()
     
     # Run training without validation loader (should train normally)
     result = run_training_fn(
         model=model,
         optimizer=optimizer,
-        loss_fn=loss_fn,
         train_loader=dl,
         val_loader=None,
         patience=3,
@@ -51,7 +49,7 @@ def test_early_stopping_without_val_loader(run_training_fn, device):
     assert "model" in result, "Result must contain 'model'"
     
     # Verify training happened (parameters changed)
-    final_param = model[0].weight
+    final_param = model.backbone[0].weight
     assert not torch.allclose(initial_param, final_param, atol=1e-6), \
         "Model parameters should have changed during training"
 
@@ -74,19 +72,18 @@ def test_early_stopping_with_val_loader(run_training_fn, device):
     val_dl = DataLoader(val_ds, batch_size=16, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Track initial parameters
-    initial_param = model[0].weight.clone()
+    initial_param = model.backbone[0].weight.clone()
     
     # Run training with early stopping parameters
     result = run_training_fn(
         model=model,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
-        train_loader=train_dl,
+        optimizer=optimizer, train_loader=train_dl,
         val_loader=val_dl,
         patience=5,
         min_delta=0.01,
@@ -98,7 +95,7 @@ def test_early_stopping_with_val_loader(run_training_fn, device):
     assert "model" in result, "Result must contain 'model'"
     
     # Verify training happened (parameters changed)
-    final_param = model[0].weight
+    final_param = model.backbone[0].weight
     assert not torch.allclose(initial_param, final_param, atol=1e-6), \
         "Model parameters should have changed during training"
 
@@ -120,8 +117,9 @@ def test_early_stopping_parameter_handling(run_training_fn, device):
     val_dl = DataLoader(val_ds, batch_size=8, shuffle=False)
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Test with different parameter combinations
@@ -133,14 +131,14 @@ def test_early_stopping_parameter_handling(run_training_fn, device):
     
     for config in test_configs:
         # Create fresh model for each test
-        model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+        backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+        model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
         
         # Run training with specific config
         result = run_training_fn(
             model=model,
             optimizer=optimizer,
-            loss_fn=loss_fn,
             train_loader=train_dl,
             val_loader=val_dl,
             **config

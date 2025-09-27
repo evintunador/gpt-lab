@@ -7,11 +7,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.adaptive_gradient_clipping import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_adaptive_gradient_clipping_applied(run_training_fn, device):
@@ -26,20 +24,20 @@ def test_adaptive_gradient_clipping_applied(run_training_fn, device):
     
     # Create two identical models
     torch.manual_seed(42)
-    model1 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone1 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model1 = SimpleTestTrainingModel(backbone1, loss_fn).to(device)
     optimizer1 = torch.optim.SGD(model1.parameters(), lr=1e-1)  # High LR to induce large gradients
     
     torch.manual_seed(42)
-    model2 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone2 = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    model2 = SimpleTestTrainingModel(backbone2, loss_fn).to(device)
     optimizer2 = torch.optim.SGD(model2.parameters(), lr=1e-1)
-    
-    loss_fn = nn.CrossEntropyLoss()
     
     # Run training with AGC
     result1 = run_training_fn(
         model=model1,
         optimizer=optimizer1,
-        loss_fn=loss_fn,
         train_loader=dl,
         agc_clip_factor=0.01  # Small clip factor to trigger clipping
     )
@@ -49,7 +47,6 @@ def test_adaptive_gradient_clipping_applied(run_training_fn, device):
     result2 = run_training_fn(
         model=model2,
         optimizer=optimizer2,
-        loss_fn=loss_fn,
         train_loader=dl2,
         agc_clip_factor=None
     )

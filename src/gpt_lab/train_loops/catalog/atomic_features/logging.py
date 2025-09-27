@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # logging
@@ -32,9 +31,7 @@ def run_training(
     model.train()
 
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         if enable_logging:
             logger.info("Training step", extra={"metrics": {"train_loss": loss.item()}})

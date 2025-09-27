@@ -1,2 +1,0 @@
-# nn.Module "models"
-here's where we store the core `nn.Module` of a model ignoring all the extra methods that are useful for inference & benchmarking & whatnot. basically everything here should really only be concerned with the `.forward()` method. throw in an LLM that only knows how to train itself, ViTs, etc.

@@ -5,15 +5,13 @@ import torch.nn as nn
 
 
 @torch.no_grad()
-def _eval_loss(model: nn.Module, loss_fn, loader) -> float:
+def _eval_loss(model: nn.Module, loader) -> float:
     """Helper to compute validation loss."""
     was_training = model.training
     model.eval()
     total, count = 0.0, 0
     for batch in loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
         total += float(loss.detach().cpu().item())
         count += 1
     if was_training:
@@ -24,7 +22,6 @@ def _eval_loss(model: nn.Module, loss_fn, loader) -> float:
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # early stopping knobs
@@ -41,9 +38,7 @@ def run_training(
     if val_loader is None:
         # No validation loader, just train normally
         for batch in train_loader:
-            xb, yb = batch
-            logits = model(xb)
-            loss = loss_fn(logits, yb)
+            loss = model(batch)
 
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -55,9 +50,7 @@ def run_training(
     step_count = 0
 
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
@@ -65,7 +58,7 @@ def run_training(
         
         # Check for early stopping
         if step_count % val_interval == 0:
-            val_loss = _eval_loss(model, loss_fn, val_loader)
+            val_loss = _eval_loss(model, val_loader)
             
             if val_loss < best_val_loss - min_delta:
                 best_val_loss = val_loss

@@ -5,12 +5,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training as run_training_base_loop
 from gpt_lab.train_loops.catalog.atomic_features.grad_accum import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_accumulation_correctness(run_training_fn, device):
@@ -23,12 +21,13 @@ def test_accumulation_correctness(run_training_fn, device):
     dl1 = DataLoader(ds, batch_size=8, shuffle=True)
     dl2 = DataLoader(ds, batch_size=4, shuffle=True)
 
-    model1 = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
-    model2 = copy.deepcopy(model1)
+    backbone1 = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
+    backbone2 = copy.deepcopy(backbone1)
+    loss_fn = nn.CrossEntropyLoss()
+    model1 = SimpleTestTrainingModel(backbone1, loss_fn)
+    model2 = SimpleTestTrainingModel(backbone2, loss_fn)
     optim1 = torch.optim.AdamW(model1.parameters(), lr=3e-3)
     optim2 = torch.optim.AdamW(model2.parameters(), lr=3e-3)
-
-    loss_fn = nn.CrossEntropyLoss()
 
     model1.to(device)
     model2.to(device)
@@ -41,13 +40,11 @@ def test_accumulation_correctness(run_training_fn, device):
     result1 = run_training_base_loop(
         model=model1,
         optimizer=optim1,
-        loss_fn=loss_fn,
         train_loader=dl1,
     )
     result2 = run_training_fn(
         model=model2,
         optimizer=optim2,
-        loss_fn=loss_fn,
         train_loader=dl2,
         accum_steps=2,
     )

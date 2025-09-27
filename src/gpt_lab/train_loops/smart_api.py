@@ -347,7 +347,6 @@ def select_features_from_kwargs(user_kwargs: Dict[str, Any]) -> List[str]:
 def smart_train(
     model,
     optimizer, 
-    loss_fn,
     train_loader,
     *,
     llm_compiler_model="anthropic/claude-sonnet-4-20250514",
@@ -359,9 +358,9 @@ def smart_train(
     based on the provided kwargs, then executes the compiled training loop.
     
     Args:
-        model: PyTorch model to train
+        model: PyTorch model to train. Its forward method must accept a batch from the
+               train_loader and return a single loss tensor.
         optimizer: PyTorch optimizer
-        loss_fn: Loss function  
         train_loader: Training data loader
         llm_compiler_model: "provider/model_name" for LLM code compiler (Default "anthropic/claude-3-5-sonnet-20240620")
         api_key: API key for LLM provider (Default: None - automatically checks .env file)
@@ -375,17 +374,17 @@ def smart_train(
         
     Examples:
         # Simple training with gradient accumulation
-        result = smart_train(model, optimizer, loss_fn, train_loader, accum_steps=4)
+        result = smart_train(model, optimizer, train_loader, accum_steps=4)
         
         # Training with validation and early stopping  
         result = smart_train(
-            model, optimizer, loss_fn, train_loader,
+            model, optimizer, train_loader,
             val_loader=val_loader, patience=5, min_delta=0.01
         )
         
         # Complex training with multiple features
         result = smart_train(
-            model, optimizer, loss_fn, train_loader,
+            model, optimizer, train_loader,
             accum_steps=4, val_loader=val_loader, patience=3, 
             use_amp=True, num_epochs=5, lr_scheduler_type="cosine"
         )
@@ -397,7 +396,7 @@ def smart_train(
         # No additional features requested - use base training loop
         logger.info("No atomic features requested. Using base training loop.")
         from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training
-        return run_training(model, optimizer, loss_fn, train_loader)
+        return run_training(model, optimizer, train_loader)
     
     # Select appropriate atomic features based on kwargs
     selected_features = select_features_from_kwargs(filtered_kwargs)
@@ -406,7 +405,7 @@ def smart_train(
         # No features selected (shouldn't happen if kwargs are valid, but safety check)
         logger.info("No atomic features selected based on kwargs. Using base training loop.")
         from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training
-        return run_training(model, optimizer, loss_fn, train_loader)
+        return run_training(model, optimizer, train_loader)
     
     # Check for feature conflicts
     _check_feature_conflicts(selected_features)
@@ -435,7 +434,7 @@ def smart_train(
         logger.debug(f"Executing atomic feature directly from: {feature_path}")
         
         # Execute the atomic feature directly with user's kwargs
-        return atomic_run_training(model, optimizer, loss_fn, train_loader, **filtered_kwargs)
+        return atomic_run_training(model, optimizer, train_loader, **filtered_kwargs)
     
     # instantiate llm code compiler
     logger.info("Multiple features selected. Proceeding with LLM compilation.")
@@ -452,7 +451,7 @@ def smart_train(
     logger.info(f"Using compiled training loop: {compiled_module_path}")
     
     # Execute the compiled training loop with user's kwargs
-    return compiled_run_training(model, optimizer, loss_fn, train_loader, **filtered_kwargs)
+    return compiled_run_training(model, optimizer, train_loader, **filtered_kwargs)
 
 
 if __name__ == "__main__":

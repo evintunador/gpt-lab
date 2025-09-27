@@ -8,15 +8,13 @@ import gpt_lab.checkpointer as checkpointer
 
 
 @torch.no_grad()
-def _eval_loss(model: nn.Module, loss_fn, loader) -> float:
+def _eval_loss(model: nn.Module, loader) -> float:
     """Helper to compute validation loss."""
     was_training = model.training
     model.eval()
     total, count = 0.0, 0
     for batch in loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
         total += float(loss.detach().cpu().item())
         count += 1
     if was_training:
@@ -27,7 +25,6 @@ def _eval_loss(model: nn.Module, loss_fn, loader) -> float:
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # feature knobs
@@ -47,9 +44,7 @@ def run_training(
     
     step_count = 0
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         loss.backward()
         optimizer.step()
@@ -60,7 +55,7 @@ def run_training(
                 raise ValueError("val_loader and output_dir must be provided when save_best_model is True.")
 
             if step_count % val_interval == 0:
-                val_loss = _eval_loss(model, loss_fn, val_loader)
+                val_loss = _eval_loss(model, val_loader)
                 if val_loss < best_val_loss:
                     best_val_loss = val_loss
                     result['best_val_loss'] = best_val_loss
@@ -82,7 +77,7 @@ def run_training(
         and val_loader is not None 
         and output_dir is not None
         and step_count % val_interval != 0):  # Only do final check if we didn't just do one
-        val_loss = _eval_loss(model, loss_fn, val_loader)
+        val_loss = _eval_loss(model, val_loader)
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             result['best_val_loss'] = best_val_loss

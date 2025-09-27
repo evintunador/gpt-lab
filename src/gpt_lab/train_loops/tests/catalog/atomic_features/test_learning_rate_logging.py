@@ -8,11 +8,9 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.device import get_available_devices
 from gpt_lab.train_loops.catalog.atomic_features.learning_rate_logging import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
-
-AVAILABLE_DEVICES, _ = get_available_devices()
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
 def test_learning_rate_logging_enabled(run_training_fn, device):
@@ -26,16 +24,15 @@ def test_learning_rate_logging_enabled(run_training_fn, device):
     dl = DataLoader(ds, batch_size=30, shuffle=False)  # 4 batches
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with learning rate logging
     result = run_training_fn(
         model=model,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
-        train_loader=dl,
+        optimizer=optimizer, train_loader=dl,
         log_lr_changes=True,
         lr_log_interval=1
     )
@@ -70,16 +67,15 @@ def test_learning_rate_logging_log_interval(run_training_fn, device):
     dl = DataLoader(ds, batch_size=20, shuffle=False)  # 10 batches
     
     # Create model
-    model = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
     loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
     
     # Run training with lr_log_interval=3 (should log at batches 0, 3, 6, 9)
     result = run_training_fn(
         model=model,
-        optimizer=optimizer,
-        loss_fn=loss_fn,
-        train_loader=dl,
+        optimizer=optimizer, train_loader=dl,
         log_lr_changes=True,
         lr_log_interval=3
     )

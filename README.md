@@ -51,18 +51,18 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
     - [x] first-draft implemented but nothing has been run/tested yet since i'm working off a mac and flex attention requires cuda
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded.
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
-- [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed
+- [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's
 - [ ] do first DAGSeq2DAGSeq experiment
 
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 
 ### important / not-urgent
 
-- [x] Refactor the project structure to use a `src`-layout. This will simplify package discovery, eliminate the need to manually update `pyproject.toml` when new top-level modules/packages are added, and align with modern Python packaging standards.
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where. i guess a feature of DistributedManager?
 - [ ] add slurm capabilities to DistributedManager
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager?
+- [ ] add DistributedManager ability to run certain code only on device 0 and sync up whatever it returns with the rest of them (specifically trying to avoid having other processes also call the llm training loop compiler)
 
 ### not important / urgent
 
@@ -78,6 +78,5 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
-- [ ] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
+- [x] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
-- [x] switch tests from current next-to-file setup to one where each catalog directory gets its own test directory (eg. `src/gpt_lab/nn_modules/tests/` and `src/gpt_lab/train_loops/tests/`). will require editing pyproject.toml to tell pytest that there are multiple tests/ folders. better than one single tests/ folder since it's more in line with our modular catalog design

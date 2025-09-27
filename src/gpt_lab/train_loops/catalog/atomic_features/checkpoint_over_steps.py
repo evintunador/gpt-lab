@@ -16,7 +16,6 @@ __smart_train_metadata__ = {
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn,
     train_loader,
     *,
     # feature knobs
@@ -44,9 +43,7 @@ def run_training(
 
     step_count = 0
     for batch in train_loader:
-        xb, yb = batch
-        logits = model(xb)
-        loss = loss_fn(logits, yb)
+        loss = model(batch)
 
         loss.backward()
         optimizer.step()

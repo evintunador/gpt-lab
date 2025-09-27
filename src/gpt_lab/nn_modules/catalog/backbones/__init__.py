@@ -1,8 +1,8 @@
 import torch
-from .nano_gpt import NanoGPT
+from .nano_gpt import NanoGPTBackbone
 
 __all__ = [
-    "NanoGPT",
+    "NanoGPTBackbone",
 ]
 
 # Import CUDA-specific modules if CUDA is available

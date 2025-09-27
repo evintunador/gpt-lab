@@ -58,13 +58,14 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
     def render_example(example: MultipleChoiceItem, tokenizer_encode_fn):
         """
         Given the example as a MultipleChoiceItem, render it as three torch tensors:
-        - tokens (the tokens of context + completion, of size 4xN, as there are always 4 candidates)
+        - tokens (the tokens of context + completion, of size KxN, where K is the number of candidates)
         - mask (is 1 in the region of the candidate completion, where we evaluate likelihoods)
         - label (the index of the correct completion, which we hope has the highest likelihood)
         """
         ctx = example.context
         label = example.label
         endings = example.choices
+        num_choices = len(endings)
 
         # gather up all the tokens
         ctx_tokens = tokenizer_encode_fn(ctx)
@@ -77,8 +78,8 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
 
         # have to be careful during the collation because the number of tokens in each row can differ
         max_len = max(len(row) for row in tok_rows)
-        tokens = torch.zeros((4, max_len), dtype=torch.int32)
-        mask = torch.zeros((4, max_len), dtype=torch.int32)
+        tokens = torch.zeros((num_choices, max_len), dtype=torch.int32)
+        mask = torch.zeros((num_choices, max_len), dtype=torch.int32)
         for i, (tok_row, mask_row) in enumerate(zip(tok_rows, mask_rows)):
             tokens[i, :len(tok_row)] = torch.tensor(tok_row)
             mask[i, :len(mask_row)] = torch.tensor(mask_row)

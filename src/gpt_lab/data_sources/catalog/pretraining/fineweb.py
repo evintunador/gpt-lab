@@ -46,14 +46,23 @@ class FineWebDataset(Dataset):
         rank: int = 0,
         tokenizer_enc_func: Optional[Callable] = None,
         max_seq_len: Optional[int] = None,
+        data_file_url: Optional[str] = None,
     ):
-        fw = load_dataset(
-            "HuggingFaceFW/fineweb" + ("-edu" if edu else ""),
-            name="sample-" + size.value,
-            split='train',
-            streaming=False,
-            cache_dir='./data/.cache/huggingface_fw',
-        )
+        if data_file_url:
+            fw = load_dataset(
+                "parquet",
+                data_files={'train': data_file_url},
+                split='train',
+                cache_dir='./data/.cache/huggingface_fw',
+            )
+        else:
+            fw = load_dataset(
+                "HuggingFaceFW/fineweb" + ("-edu" if edu else ""),
+                name="sample-" + size.value,
+                split='train',
+                streaming=False,
+                cache_dir='./data/.cache/huggingface_fw',
+            )
         self.data = fw.shuffle(seed=seed or random.randint(0, 2**32 - 1))
         self.tokenizer_enc_func = tokenizer_enc_func
         self.max_seq_len = max_seq_len
@@ -126,6 +135,7 @@ def create_fineweb_dataset(
     rank: int = 0,
     tokenizer_enc_func: Optional[Callable] = None,
     max_seq_len: Optional[int] = None,
+    data_file_url: Optional[str] = None,
 ):
     """Factory function to create either a map-style or iterable-style FineWeb dataset."""
     common_args = {
@@ -139,7 +149,8 @@ def create_fineweb_dataset(
     }
     if streaming:
         return FineWebStreamingDataset(**common_args)
-    return FineWebDataset(**common_args)
+    
+    return FineWebDataset(data_file_url=data_file_url, **common_args)
 
 
 class PrecachedFineWebDataset(Dataset, PrecachedDatasetMixin):

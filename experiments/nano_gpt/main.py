@@ -6,7 +6,7 @@ from typing import Dict, Any, List
 
 import torch
 import tiktoken
-from torch.nn import CrossEntropyLoss
+from torch.utils.data import Subset
 
 from gpt_lab.configuration import get_config
 from gpt_lab.distributed import DistributedManager
@@ -15,7 +15,8 @@ from gpt_lab.logger import setup_experiment_logging, get_system_info
 from gpt_lab.checkpointer import load_checkpoint
 from gpt_lab.data_sources.catalog.pretraining.fineweb import create_fineweb_dataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
-from gpt_lab.nn_modules.catalog.models import NanoGPT
+from gpt_lab.nn_modules.catalog.backbones.nano_gpt import NanoGPTBackbone
+from gpt_lab.nn_modules.catalog.training_models.nano_gpt import NanoGPTTrainingModel
 from gpt_lab.models.catalog.llms import NanoGPTModel
 from gpt_lab.train_loops.smart_api import smart_train
 from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
@@ -60,23 +61,25 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     enc = tiktoken.get_encoding("gpt2")
 
     common_dataset_args = {
-        "edu": True,
-        "streaming": True,
+        "streaming": False,
         "world_size": dist.world_size,
         "tokenizer_enc_func": enc.encode,
         "max_seq_len": cfg['model']['max_seq_len']
     }
-    train_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed'], **common_dataset_args)
-    val_dataset = create_fineweb_dataset(size=FineWebSize.v350B, seed=cfg['seed']+1, **common_dataset_args)
+    train_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed'], data_file_url=cfg['data']['train_data_url'], **common_dataset_args)
+    val_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed']+1, data_file_url=cfg['data']['val_data_url'], **common_dataset_args)
+    if cfg['data']['val_set_limit'] is not None and cfg['data']['val_set_limit'] > 0:
+        val_dataset = Subset(val_dataset, range(cfg['data']['val_set_limit']))
         # TODO: real train vs val split; rn i'm in a rush so using the bigger dataset is a proxy w/ only (1/35)*100% overlap
     
     bsz = cfg['data']['batch_size']
     collator = GPTCollator(pad_token_id=enc.eot_token)
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=min(bsz, 4), collate_fn=collator)
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=min(bsz, 4), collate_fn=collator)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
 
-    model = NanoGPT(**cfg['model']).to(dist.device)
-    logger.info(f"Model parameters: {model.get_num_params():,}")
+    backbone = NanoGPTBackbone(**cfg['model']).to(dist.device)
+    logger.info(f"Model parameters: {backbone.get_num_params():,}")
+    model = NanoGPTTrainingModel(backbone).to(dist.device)
 
     param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
     decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
@@ -101,8 +104,6 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         dist.print_on_main(f"Resuming training from step {start_step}")
     """
 
-    loss_fn = CrossEntropyLoss(ignore_index=-100)
-
     # Define the lambda function for the learning rate schedule
     def get_lr_lambda(step):
         # 1) linear warmup for warmup_iters steps
@@ -123,22 +124,24 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         'enable_logging': True,
         'output_dir': rep.output_dir,
         'scheduler_kwargs': {'lr_lambda': get_lr_lambda},
-        #'start_step': start_step
+        #'start_step': start_step,
+        'device': dist.device,
+        "use_tqdm": True,
     })
 
     logger.info("Starting training with smart_train API...")
     result = smart_train(
         model=model, 
         optimizer=optimizer, 
-        loss_fn=loss_fn,
         train_loader=train_loader, 
         **atomic_feature_kwargs
     )
     trained_model = result['model']
+    model_backbone = trained_model.backbone
     
     if dist.is_main_process:
         logger.info("--- Training Complete ---")
-        model_wrapper = NanoGPTModel(trained_model, enc)
+        model_wrapper = NanoGPTModel(model_backbone, enc)
 
         logger.info("--- Generating Samples ---")
         prompts = ["Once upon a time,", "The meaning of life is"]
@@ -188,6 +191,9 @@ To specify a different config file:
     parser.add_argument("--model-dim", dest="model.n_embd", type=int, help="Model dimension.")
     parser.add_argument("--num-layers", dest="model.n_layer", type=int, help="Number of model layers.")
     parser.add_argument("--num-heads", dest="model.n_head", type=int, help="Number of attention heads.")
+    parser.add_argument("--max-seq-len", dest="model.max_seq_len", type=int, help="Maximum sequence length.")
+    parser.add_argument("--batch-size", dest="data.batch_size", type=int, help="Batch size.")
+    parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, help="Number of samples to use for validation. Set to -1 for no limit.")
     
     with DistributedManager() as dist:
         config = get_config(parser)
