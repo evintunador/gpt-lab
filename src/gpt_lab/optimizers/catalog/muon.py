@@ -1,6 +1,5 @@
 from typing import Type, Tuple
 import torch.distributed as dist
-
 try:
     from muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 except ImportError:

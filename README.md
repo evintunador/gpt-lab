@@ -48,7 +48,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ### important / urgent
 
 - [ ] implement nanogpt & moddednanogpt as experiment for demonstration purposes. i'm sure eventually i'll fill in other common models into the catalog as well
-    - [x] first-draft implemented but nothing has been run/tested yet since i'm working off a mac and flex attention requires cuda
+    - [x] nanogpt
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded.
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
 - [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's
@@ -58,6 +58,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ### important / not-urgent
 
+- [ ] add confidence intervals to benchmarks
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add FSDP as an ability somewhere in here, not sure where. i guess a feature of DistributedManager?
 - [ ] add slurm capabilities to DistributedManager

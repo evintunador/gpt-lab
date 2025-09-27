@@ -16,18 +16,31 @@ def get_default_device() -> torch.device:
     return torch.device("cpu")
 
 
-def to_device(item: Any, device: Union[str, torch.device]) -> Any:
+def to_device(item: Any, device: Union[str, torch.device], pin_memory: bool = False, non_blocking: bool = False) -> Any:
     """
     Recursively moves a complex data structure to the specified device.
     Supports lists, tuples, dicts, tensors, and nn.Modules.
+    
+    Args:
+        item: The item to move to device
+        device: Target device
+        pin_memory: If True, pin memory for tensors (only applies to CPU tensors moving to CUDA)
+        non_blocking: If True, use non-blocking transfer when possible
     """
     if isinstance(item, (list, tuple)):
-        return type(item)(to_device(x, device) for x in item)
+        return type(item)(to_device(x, device, pin_memory, non_blocking) for x in item)
     if isinstance(item, dict):
-        return {k: to_device(v, device) for k, v in item.items()}
+        return {k: to_device(v, device, pin_memory, non_blocking) for k, v in item.items()}
     # Check for a 'to()' method to handle tensors, modules, etc.
     if hasattr(item, "to") and callable(item.to):
-        return item.to(device)
+        # For tensors, we can use pin_memory and non_blocking
+        if isinstance(item, torch.Tensor):
+            if pin_memory and item.device.type == 'cpu' and str(device).startswith('cuda'):
+                item = item.pin_memory()
+            return item.to(device, non_blocking=non_blocking)
+        else:
+            # For modules and other objects, just use device
+            return item.to(device)
     return item
 
 

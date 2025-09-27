@@ -27,7 +27,7 @@ from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBe
 logger = logging.getLogger(__name__)
 
 
-class GPTCollator:
+class NanoGPTCollator:
     def __init__(self, pad_token_id: int):
         self.pad_token_id = pad_token_id
 
@@ -73,7 +73,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
         # TODO: real train vs val split; rn i'm in a rush so using the bigger dataset is a proxy w/ only (1/35)*100% overlap
     
     bsz = cfg['data']['batch_size']
-    collator = GPTCollator(pad_token_id=enc.eot_token)
+    collator = NanoGPTCollator(pad_token_id=enc.eot_token)
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
     val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
 

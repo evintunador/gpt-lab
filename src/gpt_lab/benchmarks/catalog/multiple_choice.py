@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 import torch
 
 from gpt_lab.benchmarks.runner import BenchmarkRunner
+from gpt_lab.benchmarks.stats_utils import calculate_bootstrap_ci
 
 
 @dataclass
@@ -28,7 +29,7 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
         super().__init__(model, benchmark_type="multiple_choice")
 
     def _initialize_metrics(self) -> Dict[str, Any]:
-        return {"correct": 0, "total": 0}
+        return {"correct": 0, "total": 0, "results_list": []}
 
     def _process_results_batch(
         self,
@@ -39,7 +40,9 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
         Compares predictions with labels and updates the counts.
         """
         for item, pred in zip(batch, predictions):
-            if pred == item.label:
+            is_correct = 1 if pred == item.label else 0
+            self.results["results_list"].append(is_correct)
+            if is_correct:
                 self.results["correct"] += 1
             self.results["total"] += 1
 
@@ -49,10 +52,16 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
         """
         total = self.results["total"]
         if total == 0:
-            return {"accuracy": 0.0, "total_examples": 0}
+            return {"accuracy": 0.0, "accuracy_ci": (0.0, 0.0), "total_examples": 0}
 
         accuracy = self.results["correct"] / total
-        return {"accuracy": accuracy, "total_examples": total}
+        accuracy_ci = calculate_bootstrap_ci(self.results["results_list"])
+        
+        return {
+            "accuracy": accuracy, 
+            "accuracy_ci": accuracy_ci,
+            "total_examples": total
+        }
 
     @staticmethod
     def render_example(example: MultipleChoiceItem, tokenizer_encode_fn):

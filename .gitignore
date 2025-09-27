@@ -162,3 +162,4 @@ experiments/*/logs/
 experiments/*/runs/
 experiment_artifacts/
 data/
+data_cache/

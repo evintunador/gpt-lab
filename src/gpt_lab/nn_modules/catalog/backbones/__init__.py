@@ -7,5 +7,5 @@ __all__ = [
 
 # Import CUDA-specific modules if CUDA is available
 if torch.cuda.is_available():
-    from .modded_nanogpt import ModdedNanoGPT
-    __all__.append("ModdedNanoGPT")
+    from .modded_nano_gpt import ModdedNanoGPTBackbone
+    __all__.append("ModdedNanoGPTBackbone")

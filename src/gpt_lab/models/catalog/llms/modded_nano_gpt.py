@@ -8,7 +8,7 @@ from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
 # Check for CUDA availability before importing CUDA-specific modules
 ignore_if_no_cuda()
 
-from gpt_lab.nn_modules.catalog.models.modded_nanogpt import ModdedNanoGPT
+from gpt_lab.nn_modules.catalog.backbones import ModdedNanoGPTBackbone
 from gpt_lab.benchmarks import register_handler
 from gpt_lab.benchmarks.catalog import MultipleChoiceItem, MultipleChoiceBenchmark, FillInTheBlankItem
 
@@ -18,20 +18,20 @@ class ModdedNanoGPTModel:
     A high-level wrapper for the ModdedNanoGPT nn.Module that adds
     functionality for generation and benchmarking.
     """
-    def __init__(self, nn_module: ModdedNanoGPT, tokenizer: tiktoken.Encoding):
-        self.nn_module = nn_module
+    def __init__(self, backbone: ModdedNanoGPTBackbone, tokenizer: tiktoken.Encoding):
+        self.backbone = backbone
         self.tokenizer = tokenizer
 
     def to(self, device):
-        self.nn_module.to(device)
+        self.backbone.to(device)
         return self
 
     def eval(self):
-        self.nn_module.eval()
+        self.backbone.eval()
         return self
     
     def train(self):
-        self.nn_module.train()
+        self.backbone.train()
         return self
 
     @torch.no_grad()
@@ -40,9 +40,9 @@ class ModdedNanoGPTModel:
         Take a conditioning sequence of indices idx (LongTensor of shape (t)) and complete
         the sequence max_new_tokens times, feeding the predictions back into the model each time.
         """
-        self.nn_module.eval()
+        self.backbone.eval()
         input_ids = self.tokenizer.encode(prompt)
-        idx = torch.tensor(input_ids, dtype=torch.int32, device=self.nn_module.embed.weight.device)
+        idx = torch.tensor(input_ids, dtype=torch.int32, device=self.backbone.embed.weight.device)
 
         assert idx.ndim == 1
         def cdiv(m, n):
@@ -56,11 +56,11 @@ class ModdedNanoGPTModel:
 
         for _ in range(max_new_tokens):
             # Forward pass to get logits, ensuring we don't exceed max_seq_len
-            input_chunk = idx[-self.nn_module.max_seq_len:] if idx.size(0) > self.nn_module.max_seq_len else idx
-            logits = self.nn_module(input_chunk)
+            input_chunk = idx[-self.backbone.max_seq_len:] if idx.size(0) > self.backbone.max_seq_len else idx
+            logits = self.backbone(input_chunk)
 
             # Focus on the last token's prediction
-            focus_idx = min(seq_len, self.nn_module.max_seq_len) - 1
+            focus_idx = min(seq_len, self.backbone.max_seq_len) - 1
             logits = logits[0, focus_idx, :] / temperature
             
             # Optionally crop the logits to only the top k options
@@ -75,7 +75,7 @@ class ModdedNanoGPTModel:
             idx_next = torch.multinomial(probs, num_samples=1)
             
             # Append sampled index to the running sequence
-            idx[min(seq_len, self.nn_module.max_seq_len)] = idx_next
+            idx[min(seq_len, self.backbone.max_seq_len)] = idx_next
 
             # Iterate sequence count and re-pad if we cross a block boundary
             seq_len += 1
@@ -93,7 +93,7 @@ class ModdedNanoGPTModel:
         Handles fill-in-the-blank benchmarks.
         For each item, it generates a predicted answer and calculates the NLL of the true answer.
         """
-        self.nn_module.eval()
+        self.backbone.eval()
         results = []
 
         for item in batch:
@@ -108,11 +108,11 @@ class ModdedNanoGPTModel:
                 results.append((predicted_answer, 0.0))
                 continue
 
-            full_tokens = torch.tensor(prompt_tokens + answer_tokens, dtype=torch.int32, device=self.nn_module.embed.weight.device)
-            logits = self.nn_module(full_tokens, target_seq=None)
+            full_tokens = torch.tensor(prompt_tokens + answer_tokens, dtype=torch.int32, device=self.backbone.embed.weight.device)
+            logits = self.backbone(full_tokens, target_seq=None)
             
             answer_logits = logits[:, len(prompt_tokens)-1:-1, :]
-            answer_targets = torch.tensor(answer_tokens, dtype=torch.int64, device=self.nn_module.embed.weight.device)
+            answer_targets = torch.tensor(answer_tokens, dtype=torch.int64, device=self.backbone.embed.weight.device)
             
             loss = F.cross_entropy(
                 answer_logits.view(-1, answer_logits.size(-1)),
@@ -132,21 +132,21 @@ class ModdedNanoGPTModel:
         Handles multiple-choice benchmarks for a generative model by calculating
         the perplexity of each completion and choosing the most likely one.
         """
-        self.nn_module.eval()
+        self.backbone.eval()
         predictions = []
 
         for item in batch:
             # Render the example into tokens, mask, and label
             tokens, mask, label = MultipleChoiceBenchmark.render_example(item, self.tokenizer.encode)
-            tokens = tokens.to(self.nn_module.embed.weight.device)
-            mask = mask.to(self.nn_module.embed.weight.device)
+            tokens = tokens.to(self.backbone.embed.weight.device)
+            mask = mask.to(self.backbone.embed.weight.device)
             
             completion_losses = []
             for i in range(tokens.shape[0]): # For each of the 4 choices
                 # Get the logits from the model's forward pass
                 # The nn.Module's forward pass is designed for training and returns loss
                 # So we call it with targets=None to get logits
-                logits = self.nn_module(tokens[i], target_seq=None)
+                logits = self.backbone(tokens[i], target_seq=None)
                 
                 # We only want the logits for the completion part
                 # Slice to targets (remove first token) and apply mask

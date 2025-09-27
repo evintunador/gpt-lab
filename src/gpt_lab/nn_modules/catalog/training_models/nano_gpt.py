@@ -8,7 +8,6 @@ class NanoGPTTrainingModel(nn.Module):
     A "training model" that wraps a backbone nn.Module and handles the loss calculation.
     This allows the training loop to be agnostic to the loss function.
     """
-
     def __init__(self, backbone: NanoGPTBackbone):
         super().__init__()
         self.backbone = backbone

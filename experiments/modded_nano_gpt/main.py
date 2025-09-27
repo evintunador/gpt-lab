@@ -1,9 +1,9 @@
 import argparse
 import os
 import time
-import pickle
 from contextlib import nullcontext
 from typing import Dict, Any
+import logging
 
 import random
 import numpy as np
@@ -11,13 +11,15 @@ import torch
 import tiktoken
 
 from gpt_lab.configuration import get_config
+from gpt_lab.device import to_device
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import ExperimentLogger
+from gpt_lab.logger import setup_experiment_logging, get_system_info
 from gpt_lab.checkpointer import save_checkpoint, load_checkpoint
 from gpt_lab.data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
-from gpt_lab.nn_modules.catalog.models import ModdedNanoGPT
+from gpt_lab.nn_modules.catalog.backbones import ModdedNanoGPTBackbone
+from gpt_lab.nn_modules.catalog.training_models import ModdedNanoGPTTrainingModel
 from gpt_lab.models.catalog.llms import ModdedNanoGPTModel
 from gpt_lab.optimizers.catalog import Muon
 from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
@@ -25,46 +27,30 @@ from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDatas
 from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
 
 
+logger = logging.getLogger(__name__)
+
+
 def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityManager):
-    """Main experiment script for ModdedNanoGPT."""
+    if rep.output_dir:
+        setup_experiment_logging(rep.output_dir, dist.rank, dist.is_main_process)
+
     dist.set_seed(cfg['seed'])
+    
+    logger.info("System Information", extra=get_system_info(rep.get_git_info()))
+    logger.info("Hyperparameters", extra=cfg)
+
     device_type = "cuda" if "cuda" in dist.device.type else "cpu"
     torch_dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float32
     ctx = torch.amp.autocast(device_type=device_type, dtype=torch_dtype) if torch_dtype != torch.float32 else nullcontext()
 
-    logger = ExperimentLogger(rep.output_dir, dist.rank, dist.is_main_process)
-    logger.log_system_info(rep.get_git_info())
-    logger.log_hyperparams(cfg)
-
-    with open(cfg['tokenizer_path'], 'rb') as f:
-        tokenizer_config = pickle.load(f)
-    
-    # Cap tokenizer vocab to match model config
-    num_merges_needed = cfg['model']['vocab_size'] - 257 # 256 base tokens + 1 special
-    if len(tokenizer_config['mergeable_ranks']) < num_merges_needed:
-        raise ValueError(
-            f"Tokenizer vocab is smaller than model vocab size. "
-            f"Tokenizer has {len(tokenizer_config['mergeable_ranks'])} merges, "
-            f"but model needs {num_merges_needed}."
-        )
-    
-    sorted_merges = sorted(tokenizer_config['mergeable_ranks'].items(), key=lambda item: item[1])
-    capped_merges = dict(sorted_merges[:num_merges_needed])
-    eot_token_id = 256 + len(capped_merges)
-
-    enc = tiktoken.Encoding(
-        name=os.path.basename(cfg['tokenizer_path']),
-        pat_str=tokenizer_config['pat_str'],
-        mergeable_ranks=capped_merges,
-        special_tokens={"<|endoftext|>": eot_token_id}
-    )
+    enc = tiktoken.get_encoding("gpt2")
 
     # The PrecachedFineWebDataset will build a cache if it doesn't exist,
     # which will take some time on the first run.
     common_dataset_args = {
-        "save_dir": "./data/fineweb_cache",
+        "save_dir": "./data_cache/pretokenized_fineweb",
         "tokenizer_encode_fn": enc.encode,
-        "vocab_size": cfg['model']['vocab_size'],
+        "vocab_size": enc.n_vocab,
         "doc_separator": enc.eot_token,
         "size": FineWebSize.v10B, # Using 10B subset for faster setup
     }
@@ -78,8 +64,9 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     val_iter = iter(val_loader)
 
     model_args = {**cfg['model'], 'max_seq_len': max(cfg['sequence']['train_seq_len'], cfg['sequence']['val_seq_len'])}
-    model = ModdedNanoGPT(**model_args).to(dist.device)
-    dist.print_on_main(f"Model parameters: {model.get_num_params():,}")
+    backbone = ModdedNanoGPTBackbone(**model_args).to(dist.device)
+    model = ModdedNanoGPTTrainingModel(backbone).to(dist.device)
+    logger.info(f"Model parameters: {model.get_num_params():,}")
 
     # The Muon adapter is designed to handle all parameter groups internally
     all_params = list(model.parameters())
@@ -99,37 +86,17 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
 
-    start_step = 0
-    if cfg['training']['resume_from_checkpoint']:
-        dist.print_on_main(f"Resuming from checkpoint: {cfg['training']['resume_from_checkpoint']}")
-        resume_data = load_checkpoint(
-            cfg['training']['resume_from_checkpoint'],
-            map_location=dist.device,
-            model=model,
-            optimizer=optimizer
-        )
-        
-        start_step = resume_data.get('metadata', {}).get('step', -1) + 1
-        dist.print_on_main(f"Resuming training from step {start_step}")
-        
-        if 'rng_states' in resume_data:
-            rng_states = resume_data['rng_states']
-            torch.set_rng_state(rng_states['torch'].cpu()) # must be on CPU
-            np.random.set_state(rng_states['numpy'])
-            random.setstate(rng_states['random'])
-            dist.print_on_main("Restored RNG states from checkpoint.")
-
     if cfg['training']['use_fp8']:
         # Note: Requires Hopper GPU. Will not error on others but may not use FP8.
-        from nn_modules.catalog.channel_mixing.fp8_linear import is_hopper_available
+        from gpt_lab.nn_modules.catalog.channel_mixing import is_hopper_available
         if is_hopper_available():
-            dist.print_on_main("Compiling model with FP8 support.")
+            logger.info("Compiling model with FP8 support.")
             model = torch.compile(model)
         else:
-            dist.print_on_main("Warning: FP8 requested but Hopper GPU not available. Compiling without FP8.")
+            logger.info("Warning: FP8 requested but Hopper GPU not available. Compiling without FP8.")
             model = torch.compile(model, mode="reduce-overhead")
     else:
-        dist.print_on_main("Compiling model.")
+        logger.info("Compiling model.")
         model = torch.compile(model, mode="reduce-overhead")
 
     if dist.is_distributed:
@@ -143,11 +110,11 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             cooldown_progress = (progress - (1.0 - cfg['training']['cooldown_frac'])) / cfg['training']['cooldown_frac']
             return (1.0 - cooldown_progress) * (1.0 - 0.1) + 0.1 # Decay to 10%
 
-    dist.print_on_main("Starting training...")
+    logger.info("Starting training...")
     training_time_ms = 0
     t0 = time.perf_counter()
 
-    for step in range(start_step, cfg['training']['train_steps']):
+    for step in range(cfg['training']['train_steps']):
         lr_mult = get_lr_multiplier(step)
         for group in optimizer.param_groups:
             group['lr'] = group['initial_lr'] * lr_mult
@@ -158,13 +125,11 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             if group['use_muon']:
                 group['momentum'] = (1 - frac) * 0.85 + frac * 0.95
 
-        for micro_step in range(cfg['training']['grad_acc_steps']):
-            batch = next(train_iter).squeeze(0) # Remove batch dim
-            inputs = batch[:-1].to(dist.device, non_blocking=True)
-            targets = batch[1:].to(dist.device, non_blocking=True)
+        for _ in range(cfg['training']['grad_acc_steps']):
+            batch = to_device(next(train_iter), dist.device, non_blocking=True)
 
             with ctx:
-                loss = model(inputs, targets)
+                loss = model(batch)
                 loss = loss / cfg['training']['grad_acc_steps']
             loss.backward()
 
@@ -284,7 +249,6 @@ using dot notation, which is useful for parameters not exposed below. For exampl
     parser.add_argument("--config", type=str, required=True, help="Path to YAML config file.")
 
     # Key hyperparameters for convenience
-    parser.add_argument("--resume-from-checkpoint", dest="training.resume_from_checkpoint", type=str, help="Path to a checkpoint to resume from. Overrides config.")
     parser.add_argument("--seed", dest="seed", type=int, help="Random seed.")
     parser.add_argument("--save-model", dest="save_model", action=argparse.BooleanOptionalAction, help="Enable/disable model saving.")
     parser.add_argument("--train-steps", dest="training.train_steps", type=int, help="Total training steps.")
@@ -292,6 +256,8 @@ using dot notation, which is useful for parameters not exposed below. For exampl
     parser.add_argument("--model-dim", dest="model.model_dim", type=int, help="Model dimension.")
     parser.add_argument("--num-layers", dest="model.num_layers", type=int, help="Number of model layers.")
     parser.add_argument("--num-heads", dest="model.num_heads", type=int, help="Number of attention heads.")
+    parser.add_argument("--train-seq-len", dest="sequence.train_seq_len", type=int, help="Sequence length used during training.")
+    parser.add_argument("--val-seq-len", dest="sequence.val_seq_len", type=int, help="Sequence length used during evaluation.")
     
     with DistributedManager() as dist:
         config = get_config(parser)

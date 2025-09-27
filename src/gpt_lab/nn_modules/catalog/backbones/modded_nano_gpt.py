@@ -15,9 +15,16 @@ from gpt_lab.nn_modules.catalog.layers import ModdedNanoGPTBlock
 from gpt_lab.nn_modules.catalog.channel_mixing import FP8Linear
 
 
-class ModdedNanoGPT(nn.Module):
-    def __init__(self, 
-    vocab_size: int, num_layers: int, num_val_emb: int, num_heads: int, model_dim: int, max_seq_len: int, mlp_ratio: int
+class ModdedNanoGPTBackbone(nn.Module):
+    def __init__(
+        self, 
+        vocab_size: int, 
+        num_layers: int, 
+        num_val_emb: int, 
+        num_heads: int, 
+        model_dim: int, 
+        max_seq_len: int, 
+        mlp_ratio: int,
     ):
         super().__init__()
         self.model_dim = model_dim
@@ -35,23 +42,23 @@ class ModdedNanoGPT(nn.Module):
         self.skip_weights = nn.Parameter(torch.ones(num_layers//2))
         self.norm = RMSNorm()
 
-    def forward(self, input_seq: Tensor, target_seq: Tensor = None):
-        assert input_seq.ndim == 1 # (B*N)
+    def forward(self, inputs: Tensor):
+        assert inputs.ndim == 1 # (B*N)
 
         # value emeddings provide extra info about a token at the first & final few layers
-        ve = [value_embed(input_seq) for value_embed in self.value_embeds] # each (B*N, D)
+        ve = [value_embed(inputs) for value_embed in self.value_embeds] # each (B*N, D)
         ve = [ve[i] for i in range(len(ve))] + [None] * (len(self.blocks) - len(ve)*2) + [ve[i] for i in range(len(ve))]
         assert len(ve) == len(self.blocks)
 
-        docs = (input_seq == 50256).cumsum(0)
+        docs = (inputs == 50256).cumsum(0)
         def doc_causal(b, h, q_idx, kv_idx):
             causal_mask = q_idx >= kv_idx
             document_mask = docs[q_idx] == docs[kv_idx]
             return causal_mask & document_mask
         # Because the sparsity pattern is independent of batch and heads, we can set them to None.
-        block_mask = create_block_mask(doc_causal, B=None, H=None, Q_LEN=len(input_seq), KV_LEN=len(input_seq))
+        block_mask = create_block_mask(doc_causal, B=None, H=None, Q_LEN=len(inputs), KV_LEN=len(inputs))
 
-        x = x0 = self.norm(self.embed(input_seq)[None]) # use of norm here by @Grad62304977
+        x = x0 = self.norm(self.embed(inputs)[None]) # use of norm here by @Grad62304977
 
         # U-net design by @brendanh0gan
         skip_connections = []
@@ -68,11 +75,7 @@ class ModdedNanoGPT(nn.Module):
         # @Grad62304977 added tanh softcapping following Gemma 2 paper, @KoszarskyB reduced it from 30 to 15, @YouJiacheng shifted it by +15 (2*sigmoid(2*x)=tanh(x)+1)
         logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))
 
-        if target_seq is None:
-            return logits
-        else:
-            return F.cross_entropy(logits.view(-1, logits.size(-1)), target_seq, 
-                                  reduction='sum' if self.training else 'mean')
+        return logits
 
     def get_num_params(self):
         return sum(p.numel() for p in self.parameters())
