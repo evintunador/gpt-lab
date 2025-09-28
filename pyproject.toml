@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gpt-lab"
+version = "0.1.0"
+description = "A repository for modular, testable, and reproducible ML research."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "tqdm",
+    "torch",
+    "pandas",
+    "marimo",
+    "plotly",
+    "matplotlib",
+    "litellm",
+]
+
+[project.optional-dependencies]
+benchmarks = []
+data_sources = [
+    "huggingface",
+    "datasets",
+]
+llm_code_compiler = []
+models = []
+nn_modules = [
+    "triton; sys_platform != 'darwin'",  # Skip triton on macOS
+]
+optimizers = [
+    "muon",
+]
+train_loops = []
+all_catalogs = [
+    "gpt-lab[benchmarks]",
+    "gpt-lab[data_sources]",
+    "gpt-lab[llm_code_compiler]",
+    "gpt-lab[models]",
+    "gpt-lab[nn_modules]",
+    "gpt-lab[optimizers]",
+    "gpt-lab[train_loops]",
+]
+dev = [
+    "gpt-lab[all_catalogs]",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = [
+    "src/gpt_lab",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "ignore:Use 'content=<...>' to upload raw bytes/text content.:DeprecationWarning",
+    "ignore:Pydantic serializer warnings:UserWarning",
+]
+
+[tool.setuptools]
+
+[tool.setuptools.packages.find]
+# Tell setuptools to look for packages inside the 'src' directory.
+where = ["src"]

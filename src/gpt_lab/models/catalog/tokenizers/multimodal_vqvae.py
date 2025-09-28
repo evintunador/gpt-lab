@@ -1,0 +1,1 @@
+# TODO: build a wrapper class that combines an input text tokenizer with an input VQ-VAE (frozen) to create a multimodal tokenizer

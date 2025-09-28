@@ -1,0 +1,209 @@
+import argparse
+import os
+import math
+import logging
+from typing import Dict, Any, List
+
+import torch
+import tiktoken
+from torch.utils.data import Subset
+
+from gpt_lab.configuration import get_config
+from gpt_lab.distributed import DistributedManager
+from gpt_lab.reproducibility import ReproducibilityManager
+from gpt_lab.logger import setup_experiment_logging, get_system_info
+from gpt_lab.checkpointer import load_checkpoint
+from gpt_lab.data_sources.catalog.pretraining.fineweb import create_fineweb_dataset, FineWebSize
+from gpt_lab.data_sources.catalog_utils import Split
+from gpt_lab.nn_modules.catalog.backbones.nano_gpt import NanoGPTBackbone
+from gpt_lab.nn_modules.catalog.training_models.nano_gpt import NanoGPTTrainingModel
+from gpt_lab.models.catalog.llms import NanoGPTModel
+from gpt_lab.train_loops.smart_api import smart_train
+from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
+from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
+from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
+
+
+logger = logging.getLogger(__name__)
+
+
+class NanoGPTCollator:
+    def __init__(self, pad_token_id: int):
+        self.pad_token_id = pad_token_id
+
+    def __call__(self, batch: List[List[int]]):
+        tensor_batch = [torch.tensor(tokens, dtype=torch.long) for tokens in batch]
+        
+        padded_x = torch.nn.utils.rnn.pad_sequence(
+            tensor_batch, batch_first=True, padding_value=self.pad_token_id
+        )
+        
+        x = padded_x
+        y = x.clone()
+        y[:, :-1] = x[:, 1:]
+
+        # CrossEntropyLoss's ignore_index expects a specific value. -100 is standard.
+        y[y == self.pad_token_id] = -100
+        y[:, -1] = -100  # The last token has no target.
+        
+        return x, y
+
+
+def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityManager):
+    if rep.output_dir:
+        setup_experiment_logging(rep.output_dir, dist.rank, dist.is_main_process)
+    
+    dist.set_seed(cfg['seed'])
+    
+    logger.info("System Information", extra=get_system_info(rep.get_git_info()))
+    logger.info("Hyperparameters", extra=cfg)
+
+    enc = tiktoken.get_encoding("gpt2")
+
+    common_dataset_args = {
+        "streaming": False,
+        "world_size": dist.world_size,
+        "tokenizer_enc_func": enc.encode,
+        "max_seq_len": cfg['model']['max_seq_len']
+    }
+    train_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed'], data_file_url=cfg['data']['train_data_url'], **common_dataset_args)
+    val_dataset = create_fineweb_dataset(size=FineWebSize.v10B, seed=cfg['seed']+1, data_file_url=cfg['data']['val_data_url'], **common_dataset_args)
+    if cfg['data']['val_set_limit'] is not None and cfg['data']['val_set_limit'] > 0:
+        val_dataset = Subset(val_dataset, range(cfg['data']['val_set_limit']))
+        # TODO: real train vs val split; rn i'm in a rush so using the bigger dataset is a proxy w/ only (1/35)*100% overlap
+    
+    bsz = cfg['data']['batch_size']
+    collator = NanoGPTCollator(pad_token_id=enc.eot_token)
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=bsz, num_workers=0, collate_fn=collator)
+
+    backbone = NanoGPTBackbone(**cfg['model']).to(dist.device)
+    logger.info(f"Model parameters: {backbone.get_num_params():,}")
+    model = NanoGPTTrainingModel(backbone).to(dist.device)
+
+    param_dict = {pn: p for pn, p in model.named_parameters() if p.requires_grad}
+    decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+    nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+    optim_groups = [
+        {'params': decay_params, 'weight_decay': cfg['optimizer']['weight_decay']},
+        {'params': nodecay_params, 'weight_decay': 0.0}
+    ]
+    optimizer = torch.optim.AdamW(optim_groups, lr=cfg['training']['learning_rate'], betas=(cfg['optimizer']['beta1'], cfg['optimizer']['beta2']))
+
+    """
+    start_step = 0
+    if cfg['training']['resume_from_checkpoint']:
+        dist.print_on_main(f"Resuming from checkpoint: {cfg['training']['resume_from_checkpoint']}")
+        resume_data = load_checkpoint(
+            cfg['training']['resume_from_checkpoint'],
+            map_location=dist.device,
+            model=model,
+            optimizer=optimizer
+        )
+        start_step = resume_data.get('metadata', {}).get('step', -1) + 1
+        dist.print_on_main(f"Resuming training from step {start_step}")
+    """
+
+    # Define the lambda function for the learning rate schedule
+    def get_lr_lambda(step):
+        # 1) linear warmup for warmup_iters steps
+        if step < cfg['training']['warmup_iters']:
+            return step / max(1, cfg['training']['warmup_iters'])
+        # 2) if it > lr_decay_iters, return min learning rate
+        if step > cfg['training']['lr_decay_iters']:
+            return cfg['training']['min_lr'] / cfg['training']['learning_rate']
+        # 3) in between, use cosine decay down to min learning rate
+        decay_ratio = (step - cfg['training']['warmup_iters']) / (cfg['training']['lr_decay_iters'] - cfg['training']['warmup_iters'])
+        coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+        final_lr = cfg['training']['min_lr'] + coeff * (cfg['training']['learning_rate'] - cfg['training']['min_lr'])
+        return final_lr / cfg['training']['learning_rate']
+
+    atomic_feature_kwargs = cfg['training']['atomic_feature_kwargs']
+    atomic_feature_kwargs.update({
+        'val_loader': val_loader,
+        'enable_logging': True,
+        'output_dir': rep.output_dir,
+        'scheduler_kwargs': {'lr_lambda': get_lr_lambda},
+        #'start_step': start_step,
+        'device': dist.device,
+        "use_tqdm": True,
+    })
+
+    logger.info("Starting training with smart_train API...")
+    result = smart_train(
+        model=model, 
+        optimizer=optimizer, 
+        train_loader=train_loader, 
+        **atomic_feature_kwargs
+    )
+    trained_model = result['model']
+    model_backbone = trained_model.backbone
+    
+    if dist.is_main_process:
+        logger.info("--- Training Complete ---")
+        model_wrapper = NanoGPTModel(model_backbone, enc)
+
+        logger.info("--- Generating Samples ---")
+        prompts = ["Once upon a time,", "The meaning of life is"]
+        for prompt in prompts:
+            generation = model_wrapper.generate(prompt, **cfg['generation'])
+            logger.info(f"\nPROMPT: {prompt}\nGENERATION: {generation}")
+
+        if cfg['benchmarks']['run_benchmarks']:
+            logger.info("--- Running Benchmarks ---")
+            benchmarks_to_run = [
+                {"name": "HellaSwag", "dataset": HellaSwagDataset(split=Split.VAL, limit=cfg['benchmarks']['hellaswag_limit']), "runner": MultipleChoiceBenchmark(model_wrapper), "batch_size": 4},
+                {"name": "WikiQA", "dataset": WikiQADataset(split=Split.TEST, in_memory=True, limit=cfg['benchmarks']['wikiqa_limit']), "runner": MultipleChoiceBenchmark(model_wrapper), "batch_size": 4},
+                {"name": "ASDiv", "dataset": ASDivDataset(target="number", limit=cfg['benchmarks']['asdiv_limit']), "runner": FillInTheBlankBenchmark(model_wrapper), "batch_size": 4},
+            ]
+            for benchmark in benchmarks_to_run:
+                logger.info(f"--- {benchmark['name']} Benchmark ---")
+                try:
+                    results = benchmark['runner'].run(benchmark['dataset'], batch_size=benchmark['batch_size'])
+                    logger.info(f"{benchmark['name']} Results", extra={"benchmark": benchmark['name'], "results": results})
+                except Exception as e:
+                    logger.error(f"Failed to run {benchmark['name']} benchmark: {e}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Train NanoGPT using the GPT-Lab harness.",
+        formatter_class=argparse.RawTextHelpFormatter,
+        epilog="""
+NOTE: Any parameter in the YAML configuration can also be overridden from the command line
+using dot notation. For example, to run with the default config but override the number of layers:
+
+  python experiments/nano_gpt/main.py --model.n_layer 16
+
+To specify a different config file:
+
+  python experiments/nano_gpt/main.py --config path/to/your_config.yaml
+"""
+    )
+    parser.add_argument("--resume-from-checkpoint", dest="training.resume_from_checkpoint", type=str, 
+        help="Path to a checkpoint to resume from.")
+    parser.add_argument("--save-best-model", dest="training.atomic_feature_kwargs.save_best_model", action=argparse.BooleanOptionalAction, 
+        help="Enable saving best model based on validation loss.")
+    parser.add_argument("--total-steps", dest="training.atomic_feature_kwargs.total_steps", type=int, 
+        help="Total training steps.")
+    parser.add_argument("--accum-steps", dest="training.atomic_feature_kwargs.accum_steps", type=int, 
+        help="Gradient accumulation steps.")
+    parser.add_argument("--model-dim", dest="model.n_embd", type=int, help="Model dimension.")
+    parser.add_argument("--num-layers", dest="model.n_layer", type=int, help="Number of model layers.")
+    parser.add_argument("--num-heads", dest="model.n_head", type=int, help="Number of attention heads.")
+    parser.add_argument("--max-seq-len", dest="model.max_seq_len", type=int, help="Maximum sequence length.")
+    parser.add_argument("--batch-size", dest="data.batch_size", type=int, help="Batch size.")
+    parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, help="Number of samples to use for validation. Set to -1 for no limit.")
+    
+    with DistributedManager() as dist:
+        config = get_config(parser)
+        
+        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+        with ReproducibilityManager(
+            output_dir=runs_dir,
+            is_main_process=dist.is_main_process
+        ) as rep:
+            # Broadcast the output directory from the main process to all other processes
+            rep.output_dir = dist.broadcast_object(rep.output_dir)
+            
+            main(config, dist, rep)

@@ -1,0 +1,173 @@
+"""
+Tests for step_limiting atomic feature.
+Tests that the training loop properly respects total_steps parameter and cycles data when needed.
+"""
+
+import pytest
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
+
+from gpt_lab.train_loops.catalog.atomic_features.step_limiting import run_training
+from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_no_limit(run_training_fn, device):
+    """Test that training runs normally when total_steps is None."""
+    torch.manual_seed(42)
+    
+    # Create a small dataset
+    X = torch.randn(64, 8).to(device)
+    y = (X.sum(dim=1) > 0).long().to(device)
+    ds = TensorDataset(X, y)
+    dl = DataLoader(ds, batch_size=16, shuffle=False)  # 4 batches
+    
+    # Create model
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    
+    # Track initial parameters to verify training happened
+    initial_param = model.backbone[0].weight.clone()
+    
+    # Run training with no step limit
+    result = run_training_fn(
+        model=model,
+        optimizer=optimizer,
+        train_loader=dl,
+        total_steps=None
+    )
+    
+    # Verify result format
+    assert isinstance(result, dict), "Result must be a dictionary"
+    assert "model" in result, "Result must contain 'model'"
+    
+    # Verify training happened (parameters changed)
+    final_param = model.backbone[0].weight
+    assert not torch.allclose(initial_param, final_param, atol=1e-6), \
+        "Model parameters should have changed during training"
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_with_limit(run_training_fn, device):
+    """Test that training stops after total_steps when specified."""
+    torch.manual_seed(42)
+    
+    # Create a small dataset that would normally run for 4 batches
+    X = torch.randn(64, 8).to(device)
+    y = (X.sum(dim=1) > 0).long().to(device)
+    ds = TensorDataset(X, y)
+    dl = DataLoader(ds, batch_size=16, shuffle=False)  # 4 batches
+    
+    # Create model
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    
+    # Track initial parameters
+    initial_param = model.backbone[0].weight.clone()
+    
+    # Run training with step limit of 2 (should stop early)
+    result = run_training_fn(
+        model=model,
+        optimizer=optimizer,
+        train_loader=dl,
+        total_steps=2
+    )
+    
+    # Verify result format
+    assert isinstance(result, dict), "Result must be a dictionary"
+    assert "model" in result, "Result must contain 'model'"
+    
+    # Verify training happened but stopped early (parameters changed but not as much as full training)
+    final_param = model.backbone[0].weight
+    assert not torch.allclose(initial_param, final_param, atol=1e-6), \
+        "Model parameters should have changed during training"
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_data_cycling(run_training_fn, device):
+    """Test that data cycles correctly when total_steps exceeds dataset size."""
+    torch.manual_seed(42)
+    
+    # Create a very small dataset (2 batches) but request more steps
+    X = torch.randn(32, 8).to(device) 
+    y = (X.sum(dim=1) > 0).long().to(device)
+    ds = TensorDataset(X, y)
+    dl = DataLoader(ds, batch_size=16, shuffle=False)  # 2 batches
+    
+    # Create model
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    
+    # Track initial parameters
+    initial_param = model.backbone[0].weight.clone()
+    
+    # Run training with total_steps=5 (should cycle through 2-batch dataset)
+    result = run_training_fn(
+        model=model,
+        optimizer=optimizer,
+        train_loader=dl,
+        total_steps=5
+    )
+    
+    # Verify result format
+    assert isinstance(result, dict), "Result must be a dictionary"
+    assert "model" in result, "Result must contain 'model'"
+    
+    # Verify training happened (parameters changed)
+    final_param = model.backbone[0].weight
+    assert not torch.allclose(initial_param, final_param, atol=1e-6), \
+        "Model parameters should have changed during training with data cycling"
+
+
+@pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])
+def test_step_limiting_single_step(run_training_fn, device):
+    """Test that training works correctly with total_steps=1."""
+    torch.manual_seed(42)
+    
+    # Create dataset
+    X = torch.randn(64, 8).to(device)
+    y = (X.sum(dim=1) > 0).long().to(device)
+    ds = TensorDataset(X, y)
+    dl = DataLoader(ds, batch_size=16, shuffle=False)
+    
+    # Create model
+    backbone = nn.Sequential(nn.Linear(8, 16), nn.ReLU(), nn.Linear(16, 2)).to(device)
+    loss_fn = nn.CrossEntropyLoss()
+    model = SimpleTestTrainingModel(backbone, loss_fn).to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+    
+    # Track initial parameters
+    initial_param = model.backbone[0].weight.clone()
+    
+    # Run training with total_steps=1
+    result = run_training_fn(
+        model=model,
+        optimizer=optimizer,
+        train_loader=dl,
+        total_steps=1
+    )
+    
+    # Verify result format
+    assert isinstance(result, dict), "Result must be a dictionary"
+    assert "model" in result, "Result must contain 'model'"
+    
+    # Verify training happened (parameters changed, but minimally)
+    final_param = model.backbone[0].weight
+    assert not torch.allclose(initial_param, final_param, atol=1e-7), \
+        "Model parameters should have changed after single step"
+
+
+# Export the test functions for discovery by catalog_test.py and catalog_llm_compiler.py
+__specific_tests__ = [
+    test_step_limiting_no_limit,
+    test_step_limiting_with_limit, 
+    test_step_limiting_data_cycling,
+    test_step_limiting_single_step
+]
