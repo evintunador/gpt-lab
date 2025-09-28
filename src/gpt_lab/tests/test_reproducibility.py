@@ -162,6 +162,11 @@ def test_restore_state_roundtrip(git_repo: Path, tmp_path: Path):
     try:
         os.chdir(git_repo)
         
+        # Get the default branch name to avoid main/master issues
+        default_branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+        ).strip()
+        
         # --- 1. Capture a dirty state ---
         (git_repo / "file1.txt").write_text("final version")
         (git_repo / "new_file.txt").write_text("this is a new file")
@@ -182,7 +187,7 @@ def test_restore_state_roundtrip(git_repo: Path, tmp_path: Path):
         # --- 2. Reset the repo to a clean state ---
         subprocess.run(["git", "reset", "--hard", "HEAD"], check=True, capture_output=True)
         subprocess.run(["git", "clean", "-fd"], check=True, capture_output=True)  # Remove untracked files
-        subprocess.run(["git", "checkout", "main"], check=True, capture_output=True)  # Return to main branch
+        subprocess.run(["git", "checkout", default_branch], check=True, capture_output=True)  # Return to main branch
         
         assert (git_repo / "file1.txt").read_text() == "initial content"
         assert not (git_repo / "new_file.txt").exists()
