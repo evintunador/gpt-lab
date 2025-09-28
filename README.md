@@ -70,6 +70,8 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] find a cooler name for the repo
     - posture (bc it's helping you keep "good posture" when doing experiments)
     - {ml/dl/research/experiment/?}_harness
+    - {ml/dl/?}-lab
+    - lab
 - [ ] design and build a wrapper around other general experiment utilities to make the repo easier to use? do we even have enough stuff for that to be worth it? it's really just the two with statements rn
 - [ ] add more atomic feature training loops
 - [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM which should hopefully help both performance and costs
