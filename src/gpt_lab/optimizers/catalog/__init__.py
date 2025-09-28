@@ -1,5 +1,6 @@
-from .muon import Muon
+from .muon import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 
 __all__ = [
-    "Muon",
+    "MuonWithAuxAdam",
+    "SingleDeviceMuonWithAuxAdam",
 ]

@@ -34,9 +34,18 @@ class DistributedManager:
         self.world_size: int = 1
         self.device: torch.device = torch.device("cpu")
 
+    @staticmethod
+    def is_available() -> bool:
+        """Checks if the distributed package is available."""
+        return dist.is_available()
+
+    def is_initialized(self) -> bool:
+        """Returns True if the distributed process group has been initialized."""
+        return self.is_distributed
+
     def __enter__(self):
         """Initializes the distributed environment."""
-        if dist.is_available() and self._is_dist_env():
+        if self.is_available() and self._is_dist_env():
             self._init_distributed()
         
         self._set_device()
@@ -102,6 +111,7 @@ class DistributedManager:
         """Destroys the process group."""
         if self.is_distributed:
             dist.destroy_process_group()
+            self.is_distributed = False
 
     def all_gather_object(self, obj: T) -> List[T]:
         """Gathers a pickleable object from all processes and returns a list."""

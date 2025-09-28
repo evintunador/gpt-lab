@@ -1,3 +1,4 @@
+import torch
 from torch import nn, Tensor
 import torch.nn.functional as F
 
@@ -12,7 +13,6 @@ class ModdedNanoGPTTrainingModel(nn.Module):
     def __init__(self, backbone: ModdedNanoGPTBackbone):
         super().__init__()
         self.backbone = backbone
-        self.loss_fn
     def forward(
         self, 
         batch: Tensor, # (1, B*N)

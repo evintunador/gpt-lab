@@ -2,14 +2,14 @@
 
 # Maximum number of text characters to use on each GPU during training.
 # 2**27 should fit on a single GPU with 8GB of VRAM.
-samples_per_gpu: 134217728
+samples_per_gpu: 400000000 #134217728
 
 # Size of the vocabulary to train.
 # 2**16 lets us use int16 datatype for efficiency and the -2 are for flags used in the algorithm
 vocab_size: 65534 # 2**16 - 2
 
 # Filename prefix to save the tokenizer.
-name: "gpt4regex"
+tokenizer_name: "gpt5regex"
 
 # Number of top-k unique pairs to be communicated between GPUs in multi-GPU training.
 # Heuristically set to 256.

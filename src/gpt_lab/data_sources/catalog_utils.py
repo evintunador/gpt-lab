@@ -202,7 +202,7 @@ class PrecachedDatasetMixin:
             raise IndexError(idx)
         start = idx * self._seq_len
         end = start + self._seq_len
-        return self._slice_tokens(start, end)
+        return self._slice_tokens(start, end).to(torch.long)
 
     def _slice_tokens(self, start: int, end: int) -> torch.Tensor:
         out = np.empty((end - start,), dtype=self._memmaps[0].dtype)

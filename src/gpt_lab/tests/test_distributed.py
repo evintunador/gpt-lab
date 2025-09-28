@@ -104,7 +104,9 @@ def test_set_seed_rank_aware():
 @mock.patch('torch.distributed.is_available', return_value=True)
 @mock.patch('torch.distributed.init_process_group')
 @mock.patch('torch.distributed.destroy_process_group')
-def test_torchrun_environment_detection(mock_destroy, mock_init, mock_available):
+@mock.patch('torch.cuda.is_available', return_value=True)
+@mock.patch('torch.cuda.set_device')
+def test_torchrun_environment_detection(mock_set_device, mock_cuda_available, mock_destroy, mock_init, mock_available):
     """Test detection of torchrun environment variables."""
     with DistributedManager() as manager:
         # Should detect distributed environment
@@ -127,7 +129,9 @@ def test_torchrun_environment_detection(mock_destroy, mock_init, mock_available)
 @mock.patch('torch.distributed.is_available', return_value=True)
 @mock.patch('torch.distributed.init_process_group')
 @mock.patch('torch.distributed.destroy_process_group')
-def test_slurm_environment_detection(mock_destroy, mock_init, mock_available):
+@mock.patch('torch.cuda.is_available', return_value=True)
+@mock.patch('torch.cuda.set_device')
+def test_slurm_environment_detection(mock_set_device, mock_cuda_available, mock_destroy, mock_init, mock_available):
     """Test detection of SLURM environment variables."""
     with DistributedManager() as manager:
         mock_init.assert_called_once()

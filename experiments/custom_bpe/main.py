@@ -1,6 +1,7 @@
 import os
 import argparse
 import pickle
+import logging
 from itertools import chain
 from typing import List, Dict
 
@@ -12,11 +13,13 @@ from tqdm import tqdm
 import torch
 import torch.distributed as dist
 
-from gpt_lab.data_sources.catalog.pretraining import FineWebDataset
+from gpt_lab.data_sources.catalog.pretraining import create_fineweb_dataset
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.configuration import get_config
 from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import ExperimentLogger
+from gpt_lab.logger import setup_experiment_logging, get_system_info
+
+logger = logging.getLogger(__name__)
 
 
 """
@@ -100,7 +103,7 @@ def prepare_data_tensors(
     pat_str: str,
     seed: int = random.randint(0, 2**32),
 ):
-    dataset = FineWebDataset(
+    dataset = create_fineweb_dataset(
         streaming=True, 
         seed=seed,
         world_size=dist_manager.world_size,
@@ -245,7 +248,7 @@ def bpe_train(
         if dist_manager.world_size > 1:
             best_pair = multi_gpu_best_pair(counts, unique, k, dist_manager)
             if best_pair is None:
-                dist_manager.print_on_main("No more mergeable pairs found. Ending training early.")
+                logger.info("No more mergeable pairs found. Ending training early.")
                 break
         else:
             pair_idx = torch.argmax(counts) # (1)
@@ -270,7 +273,7 @@ def bpe_train(
         if dist_manager.is_main_process:
             demo_words = slow_merge(demo_words, tuple(best_bytes), token_bytes)
             if j % 1000 == 0 or j in (256, vocab_size - 1):
-                dist_manager.print_on_main(
+                logger.info(
                     f"\nThe most common pair {int2nat(best_pair[0])} + {int2nat(best_pair[1])} "
                     f"which makes '{token_bytes}' our {len(ranks)}th token"
                 )
@@ -280,7 +283,7 @@ def bpe_train(
         if dist_manager.is_main_process:
             progress_bar.update(1)
 
-    dist_manager.print_on_main(f"peak memory reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB")
+    logger.info(f"peak memory reserved: {torch.cuda.max_memory_reserved() // 1024 // 1024} MiB")
 
     return ranks
 
@@ -298,35 +301,15 @@ def save_tokenizer(output_dir: str, enc, name, vocab_size, sample_size):
     print(f"Tokenizer saved to {full_filename}")
 
 
-def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager):
-    # --- Configuration ---
-    parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
-    parser.add_argument("-n", "--samples_per_gpu", type=int,
-        help="Maximum number of text characters to use on each GPU during training.")
-    parser.add_argument("-v", "--vocab_size", type=int,
-        help="Size of the vocabulary to train.")
-    parser.add_argument("-f", "--name", type=str,
-        help="Filename prefix to save the tokenizer.")
-    parser.add_argument("-k", type=int,
-        help="Number of top-k unique pairs set to be communicated between GPUs.")
-    parser.add_argument("-p", "--pat_str", type=str,
-        help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
-    parser.add_argument("-s", "--seed", type=int, help="Seed for the data loader.")
-
-    # The get_config function will now automatically look for 'config.yaml'
-    # in the script's directory by default.
-    config = get_config(parser)
-
-    # --- Logger Setup ---
-    logger = None
+def run(config: dict, dist_manager: DistributedManager, repro_manager: ReproducibilityManager):
     if repro_manager.output_dir:
-        logger = ExperimentLogger(
+        setup_experiment_logging(
             log_dir=repro_manager.output_dir,
             rank=dist_manager.rank,
             is_main_process=dist_manager.is_main_process
         )
-        logger.log_system_info(git_info=repro_manager.get_git_info())
-        logger.log_hyperparams(config)
+    logger.info("System Information", extra=get_system_info(git_info=repro_manager.get_git_info()))
+    logger.info("Hyperparameters", extra=config)
 
 
     dtype = torch.int16 if config['vocab_size'] <= 2**16-2 else torch.int32
@@ -364,7 +347,7 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
 
     if dist_manager.is_main_process:
         enc = tiktoken.Encoding(
-            name=config['name'],
+            name=config['tokenizer_name'],
             pat_str=pat_str,
             mergeable_ranks=mergeable_ranks,
             special_tokens={"<|endoftext|>": config['vocab_size']}
@@ -372,27 +355,39 @@ def run(dist_manager: DistributedManager, repro_manager: ReproducibilityManager)
         test_str = f"hello world"
         assert enc.decode(enc.encode(test_str)) == test_str
 
-        if logger:
+        if repro_manager.output_dir:
             peak_mem = torch.cuda.max_memory_reserved() // 1024 // 1024
-            logger.info(f"Final peak memory reserved: {peak_mem} MiB")
+            logger.info(f"Final peak memory reserved: {peak_mem} MiB", extra={"peak_mem_mib": peak_mem})
 
         save_tokenizer(
             output_dir=repro_manager.output_dir,
             enc=enc,
-            name=config['name'],
+            name=config['tokenizer_name'],
             vocab_size=config['vocab_size'],
-            sample_size=config['samples_per_gpu'],
+            sample_size=config['samples_per_gpu'] * dist_manager.world_size,
         )
-
-    if logger:
-        logger.close()
 
 
 if __name__ == "__main__":
+    # --- Configuration ---
+    parser = argparse.ArgumentParser(description="Train a custom BPE tokenizer")
+    parser.add_argument("-n", "--samples-per-gpu", dest="samples_per_gpu", type=int,
+        help="Maximum number of text characters to use on each GPU during training.")
+    parser.add_argument("-v", "--vocab-size", dest="vocab_size", type=int,
+        help="Size of the vocabulary to train.")
+    parser.add_argument("-f", "--tokenizer-name", dest="tokenizer_name", type=str,
+        help="Filename prefix to save the tokenizer.")
+    parser.add_argument("-k", dest="k", type=int,
+        help="Number of top-k unique pairs set to be communicated between GPUs.")
+    parser.add_argument("-p", "--pat-str", dest="pat_str", type=str,
+        help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
+    parser.add_argument("-s", "--seed", dest="seed", type=int, help="Seed for the data loader.")
+
     with DistributedManager() as dist_manager:
+        config = get_config(parser)
         runs_dir = os.path.join(os.path.dirname(__file__), "runs")
         with ReproducibilityManager(
             output_dir=runs_dir,
             is_main_process=dist_manager.is_main_process,
         ) as repro_manager:
-            run(dist_manager, repro_manager)
+            run(config, dist_manager, repro_manager)

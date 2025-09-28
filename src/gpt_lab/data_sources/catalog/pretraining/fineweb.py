@@ -153,7 +153,7 @@ def create_fineweb_dataset(
     return FineWebDataset(data_file_url=data_file_url, **common_args)
 
 
-class PrecachedFineWebDataset(Dataset, PrecachedDatasetMixin):
+class PrecachedFineWebDataset(PrecachedDatasetMixin, Dataset):
     def __init__(
         self,
         save_dir: Union[str, Path],

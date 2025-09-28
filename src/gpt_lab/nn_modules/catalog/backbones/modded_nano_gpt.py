@@ -37,7 +37,7 @@ class ModdedNanoGPTBackbone(nn.Module):
         # Pad vocab to the nearest multiple of 128 for efficiency.
         # From Karpathy's experiments, suggested by @Grad62304977.
         self.lm_head = FP8Linear(model_dim, next_multiple(vocab_size, n=128),
-                                    use_fp8=False, x_s=(model_dim**0.5)/448, w_s=24/448, grad_s=1/448)
+                                    fp8=False, x_s=(model_dim**0.5)/448, w_s=24/448, grad_s=1/448)
         self.lm_head.weight.detach().zero_() # @Grad62304977
         self.skip_weights = nn.Parameter(torch.ones(num_layers//2))
         self.norm = RMSNorm()
@@ -76,6 +76,3 @@ class ModdedNanoGPTBackbone(nn.Module):
         logits = 30 * torch.sigmoid(logits / (7.5 * x.size(-1)**0.5))
 
         return logits
-
-    def get_num_params(self):
-        return sum(p.numel() for p in self.parameters())

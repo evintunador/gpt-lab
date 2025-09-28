@@ -21,7 +21,7 @@ from gpt_lab.data_sources.catalog_utils import Split
 from gpt_lab.nn_modules.catalog.backbones import ModdedNanoGPTBackbone
 from gpt_lab.nn_modules.catalog.training_models import ModdedNanoGPTTrainingModel
 from gpt_lab.models.catalog.llms import ModdedNanoGPTModel
-from gpt_lab.optimizers.catalog import Muon
+from gpt_lab.optimizers.catalog import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
 from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
 from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
 from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
@@ -49,7 +49,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     # which will take some time on the first run.
     common_dataset_args = {
         "save_dir": "./data_cache/pretokenized_fineweb",
-        "tokenizer_encode_fn": enc.encode,
+        "tokenizer_encode_fn": lambda text: enc.encode(text, disallowed_special=()),
         "vocab_size": enc.n_vocab,
         "doc_separator": enc.eot_token,
         "size": FineWebSize.v10B, # Using 10B subset for faster setup
@@ -63,25 +63,45 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     train_iter = iter(train_loader)
     val_iter = iter(val_loader)
 
-    model_args = {**cfg['model'], 'max_seq_len': max(cfg['sequence']['train_seq_len'], cfg['sequence']['val_seq_len'])}
+    model_args = {**cfg['model'], 'vocab_size': enc.n_vocab, 'max_seq_len': max(cfg['sequence']['train_seq_len'], cfg['sequence']['val_seq_len'])}
     backbone = ModdedNanoGPTBackbone(**model_args).to(dist.device)
     model = ModdedNanoGPTTrainingModel(backbone).to(dist.device)
-    logger.info(f"Model parameters: {model.get_num_params():,}")
+    num_params = sum(p.numel() for p in model.parameters())
+    logger.info(f"Model parameters: {num_params:,}")
 
-    # The Muon adapter is designed to handle all parameter groups internally
-    all_params = list(model.parameters())
-    optimizer = Muon(
-        all_params,
-        muon_lr=cfg['training']['muon_lr'],
-        adamw_lr=cfg['training']['adam_embed_lr'], # Use embed_lr as the default AdamW lr
-        momentum=cfg['training']['muon_momentum'],
-    )
+    # Manually create parameter groups to correctly apply Muon optimizer
+    # This is necessary because Muon should not be applied to input/output layers like embeddings or the LM head.
+    hidden_weights = [p for p in model.backbone.blocks.parameters() if p.ndim >= 2]
+    hidden_gains_biases = [p for p in model.backbone.blocks.parameters() if p.ndim < 2]
 
-    # Manually set different LR for head and scalars if needed, as AdamW handles these.
-    for group in optimizer.param_groups:
-        if not group['use_muon']: # This is the AdamW group
-            if any(p in group['params'] for p in model.lm_head.parameters()):
-                group['lr'] = cfg['training']['adam_head_lr']
+    # AdamW parameters
+    adamw_params = [
+        *model.backbone.embed.parameters(),
+        *model.backbone.value_embeds.parameters(),
+        model.backbone.skip_weights,
+        *model.backbone.norm.parameters(),
+        *hidden_gains_biases,
+    ]
+    head_params = list(model.backbone.lm_head.parameters())
+
+    param_groups = [
+        dict(params=hidden_weights, use_muon=True, lr=cfg['training']['muon_lr'], momentum=cfg['training']['muon_momentum']),
+        dict(params=adamw_params, use_muon=False, lr=cfg['training']['adam_embed_lr'], betas=(0.9, 0.95)),
+        dict(params=head_params, use_muon=False, lr=cfg['training']['adam_head_lr'], betas=(0.9, 0.95)),
+    ]
+
+    # Add weight decay to all groups if specified
+    if 'weight_decay' in cfg['training']:
+        for group in param_groups:
+            group['weight_decay'] = cfg['training']['weight_decay']
+
+    # Choose the appropriate optimizer based on the distributed environment
+    if dist.is_available() and dist.is_initialized():
+        optimizer_class = MuonWithAuxAdam
+    else:
+        optimizer_class = SingleDeviceMuonWithAuxAdam
+    
+    optimizer = optimizer_class(param_groups)
 
     for group in optimizer.param_groups:
         group["initial_lr"] = group["lr"]
@@ -126,7 +146,8 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
                 group['momentum'] = (1 - frac) * 0.85 + frac * 0.95
 
         for _ in range(cfg['training']['grad_acc_steps']):
-            batch = to_device(next(train_iter), dist.device, non_blocking=True)
+            batch = next(train_iter)
+            batch = to_device(batch, dist.device, non_blocking=True)
 
             with ctx:
                 loss = model(batch)
@@ -145,11 +166,10 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             val_loss = 0.0
             with torch.no_grad():
                 for _ in range(cfg['validation']['val_steps']):
-                    val_batch = next(val_iter).squeeze(0)
-                    v_inputs = val_batch[:-1].to(dist.device)
-                    v_targets = val_batch[1:].to(dist.device)
+                    batch = next(val_iter)
+                    batch = to_device(batch, dist.device, non_blocking=True)
                     with ctx:
-                        v_loss = model(v_inputs, v_targets)
+                        v_loss = model(batch)
                     val_loss += v_loss.item()
             val_loss /= cfg['validation']['val_steps']
             model.train()
@@ -167,9 +187,9 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
                 "muon_momentum": optimizer.param_groups[0]['momentum'],
                 "avg_step_ms": avg_step_ms,
             }
-            logger.log(log_data, print_to_console=True)
+            logger.info(log_data)
 
-            if cfg['save_model'] and rep.output_dir:
+            if rep.output_dir:
                 raw_model = model.module if dist.is_distributed else model
                 checkpoint_path = save_checkpoint(
                     save_dir=os.path.join(rep.output_dir, "checkpoints"),
@@ -182,11 +202,11 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
 
             t0 = time.perf_counter()
 
-    dist.print_on_main("\n--- Generating Samples ---")
+    logger.info("\n--- Generating Samples ---")
     raw_model = model.module if dist.is_distributed else model
     
     # Wrap the trained nn.Module with the high-level model interface
-    model_wrapper = ModdedNanoGPTModel(raw_model, enc)
+    model_wrapper = ModdedNanoGPTModel(raw_model.backbone, enc)
 
     prompts = [
         "Once upon a time,",
@@ -194,41 +214,41 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     ]
     for prompt in prompts:
         generation = model_wrapper.generate(prompt, max_new_tokens=32, temperature=0.8, top_k=200)
-        dist.print_on_main(f"\nPROMPT: {prompt}")
-        dist.print_on_main(f"GENERATION: {generation}")
+        logger.info(f"\nPROMPT: {prompt}")
+        logger.info(f"GENERATION: {generation}")
 
     if dist.is_main_process:
-        dist.print_on_main("\n--- Running Benchmarks ---")
+        logger.info("\n--- Running Benchmarks ---")
 
-        dist.print_on_main("\n--- HellaSwag Benchmark (Multiple Choice) ---")
+        logger.info("\n--- HellaSwag Benchmark (Multiple Choice) ---")
         try:
             hellaswag_dataset = HellaSwagDataset(split=Split.VAL, limit=500)
             mc_benchmark = MultipleChoiceBenchmark(model_wrapper)
             hellaswag_results = mc_benchmark.run(hellaswag_dataset, batch_size=4) # Small batch for LLMs
-            dist.print_on_main(f"HellaSwag Results: {hellaswag_results}")
+            logger.info(f"HellaSwag Results: {hellaswag_results}")
             logger.log({"type": "benchmark_results", "name": "HellaSwag", "results": hellaswag_results})
         except Exception as e:
-            dist.print_on_main(f"Failed to run HellaSwag benchmark: {e}")
+            logger.info(f"Failed to run HellaSwag benchmark: {e}")
 
-        dist.print_on_main("\n--- WikiQA Benchmark (Multiple Choice) ---")
+        logger.info("\n--- WikiQA Benchmark (Multiple Choice) ---")
         try:
             wiki_dataset = WikiQADataset(split=Split.TEST, in_memory=True, limit=500)
             mc_benchmark = MultipleChoiceBenchmark(model_wrapper)
             wiki_results = mc_benchmark.run(wiki_dataset, batch_size=4) # Small batch for LLMs
-            dist.print_on_main(f"WikiQA Results: {wiki_results}")
+            logger.info(f"WikiQA Results: {wiki_results}")
             logger.log({"type": "benchmark_results", "name": "WikiQA", "results": wiki_results})
         except Exception as e:
-            dist.print_on_main(f"Failed to run WikiQA benchmark: {e}")
+            logger.info(f"Failed to run WikiQA benchmark: {e}")
 
-        dist.print_on_main("\n--- ASDiv Benchmark (Fill-in-the-Blank) ---")
+        logger.info("\n--- ASDiv Benchmark (Fill-in-the-Blank) ---")
         try:
             asdiv_dataset = ASDivDataset(target="number", limit=500)
             fitb_benchmark = FillInTheBlankBenchmark(model_wrapper)
             asdiv_results = fitb_benchmark.run(asdiv_dataset, batch_size=4) # Small batch for LLMs
-            dist.print_on_main(f"ASDiv Results: {asdiv_results}")
+            logger.info(f"ASDiv Results: {asdiv_results}")
             logger.log({"type": "benchmark_results", "name": "ASDiv", "results": asdiv_results})
         except Exception as e:
-            dist.print_on_main(f"Failed to run ASDiv benchmark: {e}")
+            logger.info(f"Failed to run ASDiv benchmark: {e}")
 
 
 if __name__ == "__main__":
@@ -239,14 +259,13 @@ if __name__ == "__main__":
 NOTE: Any parameter in the YAML configuration can also be overridden from the command line
 using dot notation, which is useful for parameters not exposed below. For example:
 
-  python experiments/modded_nano_gpt/main.py --config experiments/modded_nano_gpt/config.yaml \\
-    --model.mlp_ratio 8 \\
-    --training.muon_lr 0.01
+  python experiments/modded_nano_gpt/main.py --model.mlp_ratio 8 --training.muon_lr 0.01
+
+To specify a different config file:
+
+  python experiments/modded_nano_gpt/main.py --config path/to/your_config.yaml
 """
     )
-
-    # Core arguments
-    parser.add_argument("--config", type=str, required=True, help="Path to YAML config file.")
 
     # Key hyperparameters for convenience
     parser.add_argument("--seed", dest="seed", type=int, help="Random seed.")

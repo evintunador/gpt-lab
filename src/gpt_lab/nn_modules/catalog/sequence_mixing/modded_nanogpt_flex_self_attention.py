@@ -54,6 +54,7 @@ class ModdedNanoGPTFlexSelfAttention(nn.Module):
             v = self.lambdas[0] * v + self.lambdas[1] * ve.view_as(v) # @KoszarskyB & @Grad62304977
         else: # skip mid-layers token value embeddings by @YouJiacheng
             v = self.lambdas[0] * v
+        v = v.to(q.dtype) # since self.lambdas are stored in fp32
         y = flex_attention(
             q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2), 
             block_mask=block_mask, 
