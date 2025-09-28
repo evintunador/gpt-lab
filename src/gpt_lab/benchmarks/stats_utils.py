@@ -32,4 +32,4 @@ def calculate_bootstrap_ci(
     lower_bound = np.percentile(bootstrap_statistics, lower_percentile)
     upper_bound = np.percentile(bootstrap_statistics, upper_percentile)
 
-    return (lower_bound, upper_bound)
+    return (float(lower_bound), float(upper_bound))

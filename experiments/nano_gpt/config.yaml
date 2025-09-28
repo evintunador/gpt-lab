@@ -36,7 +36,7 @@ training:
 
   atomic_feature_kwargs:
     # kwargs that'll trigger atomic features
-    total_steps: 600000
+    total_steps: 2 #600000
     accum_steps: 40
     lr_scheduler_type: 'lambda_lr'
     norm_clip_value: 1.0

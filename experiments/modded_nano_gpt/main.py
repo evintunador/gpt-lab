@@ -226,7 +226,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             mc_benchmark = MultipleChoiceBenchmark(model_wrapper)
             hellaswag_results = mc_benchmark.run(hellaswag_dataset, batch_size=4) # Small batch for LLMs
             logger.info(f"HellaSwag Results: {hellaswag_results}")
-            logger.log({"type": "benchmark_results", "name": "HellaSwag", "results": hellaswag_results})
+            logger.info({"type": "benchmark_results", "name": "HellaSwag", "results": hellaswag_results})
         except Exception as e:
             logger.info(f"Failed to run HellaSwag benchmark: {e}")
 
@@ -236,7 +236,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             mc_benchmark = MultipleChoiceBenchmark(model_wrapper)
             wiki_results = mc_benchmark.run(wiki_dataset, batch_size=4) # Small batch for LLMs
             logger.info(f"WikiQA Results: {wiki_results}")
-            logger.log({"type": "benchmark_results", "name": "WikiQA", "results": wiki_results})
+            logger.info({"type": "benchmark_results", "name": "WikiQA", "results": wiki_results})
         except Exception as e:
             logger.info(f"Failed to run WikiQA benchmark: {e}")
 
@@ -246,7 +246,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
             fitb_benchmark = FillInTheBlankBenchmark(model_wrapper)
             asdiv_results = fitb_benchmark.run(asdiv_dataset, batch_size=4) # Small batch for LLMs
             logger.info(f"ASDiv Results: {asdiv_results}")
-            logger.log({"type": "benchmark_results", "name": "ASDiv", "results": asdiv_results})
+            logger.info({"type": "benchmark_results", "name": "ASDiv", "results": asdiv_results})
         except Exception as e:
             logger.info(f"Failed to run ASDiv benchmark: {e}")
 
@@ -286,4 +286,7 @@ To specify a different config file:
             output_dir=runs_dir,
             is_main_process=dist.is_main_process
         ) as rep:
+            # Broadcast the output directory from the main process to all other processes
+            rep.output_dir = dist.broadcast_object(rep.output_dir)
+            
             main(config, dist, rep)

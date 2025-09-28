@@ -42,7 +42,7 @@ class ModdedNanoGPTModel:
         """
         self.backbone.eval()
         input_ids = self.tokenizer.encode(prompt)
-        idx = torch.tensor(input_ids, dtype=torch.int32, device=self.backbone.embed.weight.device)
+        idx = torch.tensor(input_ids, dtype=torch.int32, device=next(self.backbone.parameters()).device)
 
         assert idx.ndim == 1
         def cdiv(m, n):
@@ -61,18 +61,23 @@ class ModdedNanoGPTModel:
 
             # Focus on the last token's prediction
             focus_idx = min(seq_len, self.backbone.max_seq_len) - 1
-            logits = logits[0, focus_idx, :] / temperature
+            logits = logits[0, focus_idx, :]
             
-            # Optionally crop the logits to only the top k options
-            if top_k is not None:
-                v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
-                logits[logits < v[-1]] = -float('Inf')
-            
-            # Apply softmax to convert logits to (normalized) probabilities
-            probs = F.softmax(logits, dim=-1)
-            
-            # Sample from the distribution
-            idx_next = torch.multinomial(probs, num_samples=1)
+            # Handle greedy decoding for temperature=0
+            if temperature == 0.0:
+                idx_next = torch.argmax(logits, dim=-1, keepdim=True)
+            else:
+                logits = logits / temperature
+                # Optionally crop the logits to only the top k options
+                if top_k is not None:
+                    v, _ = torch.topk(logits, min(top_k, logits.size(-1)))
+                    logits[logits < v[-1]] = -float('Inf')
+                
+                # Apply softmax to convert logits to (normalized) probabilities
+                probs = F.softmax(logits, dim=-1)
+                
+                # Sample from the distribution
+                idx_next = torch.multinomial(probs, num_samples=1)
             
             # Append sampled index to the running sequence
             idx[min(seq_len, self.backbone.max_seq_len)] = idx_next
@@ -108,11 +113,11 @@ class ModdedNanoGPTModel:
                 results.append((predicted_answer, 0.0))
                 continue
 
-            full_tokens = torch.tensor(prompt_tokens + answer_tokens, dtype=torch.int32, device=self.backbone.embed.weight.device)
-            logits = self.backbone(full_tokens, target_seq=None)
+            full_tokens = torch.tensor(prompt_tokens + answer_tokens, dtype=torch.int32, device=next(self.backbone.parameters()).device)
+            logits = self.backbone(full_tokens)
             
             answer_logits = logits[:, len(prompt_tokens)-1:-1, :]
-            answer_targets = torch.tensor(answer_tokens, dtype=torch.int64, device=self.backbone.embed.weight.device)
+            answer_targets = torch.tensor(answer_tokens, dtype=torch.int64, device=next(self.backbone.parameters()).device)
             
             loss = F.cross_entropy(
                 answer_logits.view(-1, answer_logits.size(-1)),
@@ -138,15 +143,15 @@ class ModdedNanoGPTModel:
         for item in batch:
             # Render the example into tokens, mask, and label
             tokens, mask, label = MultipleChoiceBenchmark.render_example(item, self.tokenizer.encode)
-            tokens = tokens.to(self.backbone.embed.weight.device)
-            mask = mask.to(self.backbone.embed.weight.device)
+            tokens = tokens.to(next(self.backbone.parameters()).device)
+            mask = mask.to(next(self.backbone.parameters()).device)
             
             completion_losses = []
             for i in range(tokens.shape[0]): # For each of the 4 choices
                 # Get the logits from the model's forward pass
                 # The nn.Module's forward pass is designed for training and returns loss
                 # So we call it with targets=None to get logits
-                logits = self.backbone(tokens[i], target_seq=None)
+                logits = self.backbone(tokens[i])
                 
                 # We only want the logits for the completion part
                 # Slice to targets (remove first token) and apply mask

@@ -390,4 +390,7 @@ if __name__ == "__main__":
             output_dir=runs_dir,
             is_main_process=dist_manager.is_main_process,
         ) as repro_manager:
+            # Broadcast the output directory from the main process to all other processes
+            repro_manager.output_dir = dist_manager.broadcast_object(repro_manager.output_dir)
+            
             run(config, dist_manager, repro_manager)

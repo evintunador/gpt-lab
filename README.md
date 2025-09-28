@@ -47,8 +47,10 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## todo
 ### important / urgent
 
-- [ ] implement nanogpt & moddednanogpt as experiment for demonstration purposes. i'm sure eventually i'll fill in other common models into the catalog as well
+- [x] implement nanogpt & moddednanogpt as experiment for demonstration purposes. i'm sure eventually i'll fill in other common models into the catalog as well
     - [x] nanogpt
+    - [x] modded_nano_gpt
+    - [x] custom_bpe
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded.
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
 - [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's

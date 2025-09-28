@@ -122,6 +122,26 @@ class DistributedManager:
         dist.all_gather_object(output_list, obj)
         return output_list
 
+    def broadcast_object(self, obj: T, src: int = 0) -> T:
+        """
+        Broadcasts a pickleable object from a source rank to all other processes.
+        
+        Args:
+            obj: The object to broadcast. On ranks other than src, this is a placeholder
+                 and its value is ignored.
+            src: The rank of the process to broadcast from.
+
+        Returns:
+            The object broadcasted from the source rank.
+        """
+        if not self.is_distributed:
+            return obj
+        
+        # The object needs to be in a list for broadcast_object_list
+        obj_list = [obj] if self.rank == src else [None]
+        dist.broadcast_object_list(obj_list, src=src)
+        return obj_list[0]
+
     def all_reduce(self, tensor: torch.Tensor, op: dist.ReduceOp = dist.ReduceOp.SUM) -> torch.Tensor:
         """Reduces the tensor data across all processes."""
         if self.is_distributed:

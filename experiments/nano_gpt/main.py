@@ -203,4 +203,7 @@ To specify a different config file:
             output_dir=runs_dir,
             is_main_process=dist.is_main_process
         ) as rep:
+            # Broadcast the output directory from the main process to all other processes
+            rep.output_dir = dist.broadcast_object(rep.output_dir)
+            
             main(config, dist, rep)

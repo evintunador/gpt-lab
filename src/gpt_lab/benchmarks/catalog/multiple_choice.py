@@ -87,8 +87,8 @@ class MultipleChoiceBenchmark(BenchmarkRunner):
 
         # have to be careful during the collation because the number of tokens in each row can differ
         max_len = max(len(row) for row in tok_rows)
-        tokens = torch.zeros((num_choices, max_len), dtype=torch.int32)
-        mask = torch.zeros((num_choices, max_len), dtype=torch.int32)
+        tokens = torch.zeros((num_choices, max_len), dtype=torch.long)
+        mask = torch.zeros((num_choices, max_len), dtype=torch.long)
         for i, (tok_row, mask_row) in enumerate(zip(tok_rows, mask_rows)):
             tokens[i, :len(tok_row)] = torch.tensor(tok_row)
             mask[i, :len(mask_row)] = torch.tensor(mask_row)
