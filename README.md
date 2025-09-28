@@ -37,8 +37,6 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
    pip install -e '.[dev]'
    ```
    If you only need core dependencies, you can run `pip install -e .`. To install dependencies for a specific catalog, use `pip install -e '.[<catalog_name>]'` (e.g., `pip install -e '.[optimizers]'`). To install all catalog dependencies at once, use `pip install -e '.[all_catalogs]'`.
-   
-   **Note:** The quotes around `.[...]` are required for zsh users (default shell on macOS) to prevent glob expansion.
 
 2. run tests to confirm it all works: `pytest`
 3. add to the various component catalogues.
@@ -47,10 +45,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## todo
 ### important / urgent
 
-- [x] implement nanogpt & moddednanogpt as experiment for demonstration purposes. i'm sure eventually i'll fill in other common models into the catalog as well
-    - [x] nanogpt
-    - [x] modded_nano_gpt
-    - [x] custom_bpe
+- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using namespace packages
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded.
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
 - [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's
@@ -60,12 +55,12 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ### important / not-urgent
 
-- [ ] add confidence intervals to benchmarks
+- [ ] setup a docker container to develop in to ensure consistent behavior across systems
+- [x] add confidence intervals to benchmarks
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
-- [ ] add FSDP as an ability somewhere in here, not sure where. i guess a feature of DistributedManager?
 - [ ] add slurm capabilities to DistributedManager
-- [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager?
-- [ ] add DistributedManager ability to run certain code only on device 0 and sync up whatever it returns with the rest of them (specifically trying to avoid having other processes also call the llm training loop compiler)
+- [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
+- [x] add DistributedManager ability to run certain code only on device 0 and sync up whatever it returns with the rest of them
 
 ### not important / urgent
 
@@ -73,6 +68,8 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ### not important / not urgent
 
 - [ ] find a cooler name for the repo
+    - posture (bc it's helping you keep "good posture" when doing experiments)
+    - {ml/dl/research/experiment/?}_harness
 - [ ] design and build a wrapper around other general experiment utilities to make the repo easier to use? do we even have enough stuff for that to be worth it? it's really just the two with statements rn
 - [ ] add more atomic feature training loops
 - [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM which should hopefully help both performance and costs
@@ -81,5 +78,4 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
-- [x] really a loss function as input to a training loop is an assumption rather than always being the case since someone could fold the loss function into the `nn.Module` itself. edit all the atomic features to remove this as an assumption and create a `loss_function.py` atomic feature
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
