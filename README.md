@@ -66,6 +66,7 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ### not important / not urgent
 
+- [ ] build a tool to allow the experiment to dynamically increase or decrease the number of nodes it's taking up by periodically checking for outside requests. it'd have to effectively re-adjust gradient accumulation settings in order to make the experiment numerically equivalent to when it had more/fewer nodes. i guess it wouldn't have to be aware of VRAM utilization since we'd keep the micro batch size the same and only change number of nodes and number of gradient accumulation steps? ugly that this'd have to be aware of the gradient accumulation atomic feature
 - [ ] figure out a way to combine hyperparameter search, mu-parameterization, and model size & gpu vram awareness to allow for a model to scale itself up. this might be asking too much
 - [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's built-in (it has one right?)
 - [ ] find a cooler name for the repo

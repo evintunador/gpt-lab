@@ -1,0 +1,36 @@
+# Multi-run configuration for hyperparameter sweeps
+# This example shows how to run multiple training runs with different learning rates and weight decay values
+
+name: "nano_gpt_lr_wd_sweep"
+
+# Define the command structure
+command:
+  type: torchrun  # Options: python, torchrun, sbatch
+  script: experiments/nano_gpt/main.py
+  nproc_per_node: 1  # Number of GPUs per node for torchrun
+  # Optional torchrun parameters:
+  # nnodes: 1
+  # node_rank: 0
+  # master_addr: localhost
+  # master_port: 29500
+
+# Define parameters to pass to the script
+# Parameters with list values will be swept over (grid search)
+# Parameters with single values will be constant across all runs
+parameters:
+  config: experiments/nano_gpt/config.yaml
+  
+  # Sweep parameters - will generate all combinations
+  training.learning_rate: [1.e-4, 3.e-4, 1.e-3]
+  optimizer.weight_decay: [0.0, 0.1]
+  
+  # Static parameters - same for all runs
+  training.atomic_feature_kwargs.total_steps: 1000
+  data.val_set_limit: 100
+  benchmarks.run_benchmarks: false
+
+# Execution settings
+execution:
+  mode: parallel  # Options: sequential, parallel
+  max_workers: 2  # Only used when mode is parallel
+
