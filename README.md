@@ -45,10 +45,9 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## todo
 ### important / urgent
 
-- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using namespace packages
-- [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded.
 - [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
-- [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's
+- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later
+- [ ] design & build a mu-parametrization utility
 - [ ] do first DAGSeq2DAGSeq experiment
 
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
@@ -56,28 +55,27 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ### important / not-urgent
 
 - [ ] setup a docker container to develop in to ensure consistent behavior across systems
-- [x] add confidence intervals to benchmarks
-- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later. this will be used to inform experiments. design & build a mu-parametrization utility to be used in experimentation. design & build a system that does the former and then utilizes its results to inform the latter when running experiments. maybe like does hyperparameter search at small scale, uses those results to rank choices for hyperparameters of big scale model, and then from those choices goes down the list of priority until one fits into gpu memory, and then runs that for real. obvi needs to incorporate mu parametrization
 - [ ] add slurm capabilities to DistributedManager
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
-- [x] add DistributedManager ability to run certain code only on device 0 and sync up whatever it returns with the rest of them
+- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
+- [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded. maybe a benchmark is a specific type of evaluation that takes in an external dataset? does regular validation count as a type of evaluation? idk how this works
+- [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 
 ### not important / urgent
 
 
 ### not important / not urgent
 
+- [ ] figure out a way to combine hyperparameter search, mu-parameterization, and model size & gpu vram awareness to allow for a model to scale itself up. this might be asking too much
+- [ ] build a profiling system, likely for experiments themselves since what you care about at the end of the day is the full training loop's speed. hopefully i can use pytorch's built-in (it has one right?)
 - [ ] find a cooler name for the repo
     - posture (bc it's helping you keep "good posture" when doing experiments)
     - {ml/dl/research/experiment/?}_harness
     - {ml/dl/?}-lab
     - lab
-- [ ] design and build a wrapper around other general experiment utilities to make the repo easier to use? do we even have enough stuff for that to be worth it? it's really just the two with statements rn
-- [ ] add more atomic feature training loops
+- [ ] design and build a wrapper around other general experiment utilities that need to be called at initialization to make the repo easier to use? do we even have enough stuff for that to be worth it?
 - [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM which should hopefully help both performance and costs
 - [ ] abstract out some of what's in `src/gpt_lab/train_loops/` into `src/gpt_lab/llm_code_compiler/` and find other use cases for our llm compiler system
-- [ ] add more benchmark datasets
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
-- [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
