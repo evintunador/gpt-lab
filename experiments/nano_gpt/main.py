@@ -193,7 +193,8 @@ To specify a different config file:
     parser.add_argument("--num-heads", dest="model.n_head", type=int, help="Number of attention heads.")
     parser.add_argument("--max-seq-len", dest="model.max_seq_len", type=int, help="Maximum sequence length.")
     parser.add_argument("--batch-size", dest="data.batch_size", type=int, help="Batch size.")
-    parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, help="Number of samples to use for validation. Set to -1 for no limit.")
+    parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, 
+    help="Number of samples to use for validation. Set to -1 for no limit.")
     
     with DistributedManager() as dist:
         config = get_config(parser)
