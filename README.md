@@ -38,13 +38,62 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
    ```
    If you only need core dependencies, you can run `pip install -e .`. To install dependencies for a specific catalog, use `pip install -e '.[<catalog_name>]'` (e.g., `pip install -e '.[optimizers]'`). To install all catalog dependencies at once, use `pip install -e '.[all_catalogs]'`.
 
+   Optional domain packs are provided as extras:
+   ```bash
+   pip install -e '.[nlp]'
+   pip install -e '.[cv]'
+   ```
+
 2. run tests to confirm it all works: `pytest`
 3. add to the various component catalogues.
 4. write and run your experiment over in `experiments/`
 
+### activating catalogs (ENV or YAML)
+
+- ENV (quick):
+  - `export GPT_LAB_CURRENT_EXPERIMENT=nano_gpt`
+  - `export GPT_LAB_ACTIVE_EXPERIMENTS=nano_gpt`
+  - `export GPT_LAB_ACTIVE_PACKS=nlp`
+
+- YAML (persistent):
+  - repo-level `gpt_lab.yaml`:
+    ```yaml
+    include_experiments: []
+    include_packs: []
+    ```
+  - per-experiment `experiments/<name>/gpt_lab.yaml`:
+    ```yaml
+    include_experiments: []
+    include_packs: [nlp]
+    ```
+
+- Debug current activation:
+  ```bash
+  python tools/CLIs/print_active_paths.py -v
+  ```
+
+### creating a new experiment
+
+```bash
+python tools/CLIs/scaffold_experiment.py my_new_exp
+```
+This creates `experiments/my_new_exp/` with `gpt_lab/` + `artifacts/`, a `gpt_lab.yaml`, and a stub `main.py`.
+
+### adding catalog items inside an experiment
+
+- Place modules under `experiments/<name>/gpt_lab/<catalog_type>/` (e.g., `nn_modules/`, `train_loops/`, etc.).
+- Set activation via ENV or the experiment’s `gpt_lab.yaml` so tools/tests see them.
+
+### colocated tests for atomic train loops
+
+- Put `*_test.py` alongside your atomic loop files under `gpt_lab/train_loops/`.
+- Export a list named `__specific_tests__ = [callables...]` inside that test module.
+- When the experiment is active, these tests are auto-discovered and applied to compiled loops.
+
 ## todo
 ### important / urgent
 
+- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
 - [ ] design & build a mu-parametrization utility
 - [ ] do first DAGSeq2DAGSeq experiment
 
@@ -60,7 +109,6 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 - [ ] setup a docker container to develop in to ensure consistent behavior across systems
 - [ ] add slurm capabilities to DistributedManager
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
-- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded. maybe a benchmark is a specific type of evaluation that takes in an external dataset? does regular validation count as a type of evaluation? idk how this works
 - [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 

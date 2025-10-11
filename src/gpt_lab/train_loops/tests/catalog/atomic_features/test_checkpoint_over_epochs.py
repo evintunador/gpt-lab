@@ -4,12 +4,12 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from unittest.mock import patch, call
 
-from gpt_lab.train_loops.catalog.atomic_features.checkpoint_over_epochs import run_training
+from gpt_lab.train_loops.checkpoint_over_epochs import run_training
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
-@patch('train_loops.catalog.atomic_features.checkpoint_over_epochs.checkpointer.save_checkpoint')
+@patch('gpt_lab.checkpointer.save_checkpoint')
 def test_checkpointing_over_epochs(mock_save_checkpoint, device, tmp_path):
     """Test that checkpointing is triggered correctly every N epochs."""
     torch.manual_seed(0)

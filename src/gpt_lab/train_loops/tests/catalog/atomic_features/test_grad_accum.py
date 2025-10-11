@@ -5,8 +5,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.train_loops.catalog.atomic_features.base_loop import run_training as run_training_base_loop
-from gpt_lab.train_loops.catalog.atomic_features.grad_accum import run_training
+from gpt_lab.train_loops.base_loop import run_training as run_training_base_loop
+from gpt_lab.train_loops.grad_accum import run_training
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 

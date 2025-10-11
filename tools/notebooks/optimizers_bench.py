@@ -12,8 +12,8 @@ def _():
     import plotly.graph_objects as go
     import glob
     import os
-    from pathlib import Path
-    return glob, go, mo, os, pd, px, Path
+    from gpt_lab.catalog_bootstrap import get_artifact_root
+    return glob, go, mo, os, pd, px, get_artifact_root
 
 
 @app.cell
@@ -23,7 +23,7 @@ def _(mo):
 
 
 @app.cell
-def _(glob, mo, os, Path):
+def _(glob, mo, os, get_artifact_root):
     plot_titles = [
         "avg_step_time_ms",
         "loss_reduction_pct",
@@ -31,9 +31,7 @@ def _(glob, mo, os, Path):
         "loss_reduction_per_ms",
     ]
 
-    # Find the project root and look for the bench_results directory
-    project_root = Path(__file__).resolve().parent.parent
-    bench_dir = project_root / "bench_results" / "optimizers"
+    bench_dir = get_artifact_root() / "optimizers"
     csv_files = glob.glob(str(bench_dir / '*.csv'))
 
     if not csv_files:

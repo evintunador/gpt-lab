@@ -16,15 +16,15 @@ from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging, get_system_info
 from gpt_lab.checkpointer import save_checkpoint, load_checkpoint
-from gpt_lab.data_sources.catalog.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
+from gpt_lab.data_sources.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
-from gpt_lab.nn_modules.catalog.backbones import ModdedNanoGPTBackbone
-from gpt_lab.nn_modules.catalog.training_models import ModdedNanoGPTTrainingModel
-from gpt_lab.models.catalog.llms import ModdedNanoGPTModel
+from gpt_lab.nn_modules.backbones import ModdedNanoGPTBackbone
+from gpt_lab.nn_modules.training_models import ModdedNanoGPTTrainingModel
+from gpt_lab.models.llms import ModdedNanoGPTModel
 from gpt_lab.optimizers.catalog import MuonWithAuxAdam, SingleDeviceMuonWithAuxAdam
-from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
-from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
-from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
+from gpt_lab.data_sources.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
+from gpt_lab.data_sources.benchmarks.fill_in_the_blank import ASDivDataset
+from gpt_lab.benchmarks import MultipleChoiceBenchmark, FillInTheBlankBenchmark
 
 
 logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
 
     if cfg['training']['use_fp8']:
         # Note: Requires Hopper GPU. Will not error on others but may not use FP8.
-        from gpt_lab.nn_modules.catalog.channel_mixing import is_hopper_available
+        from gpt_lab.nn_modules.channel_mixing import is_hopper_available
         if is_hopper_available():
             logger.info("Compiling model with FP8 support.")
             model = torch.compile(model)

@@ -16,12 +16,14 @@ dependencies = [
     "plotly",
     "matplotlib",
     "litellm",
+    "numpy",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]
 benchmarks = []
 data_sources = [
-    "huggingface",
+    "huggingface_hub",
     "datasets",
 ]
 llm_code_compiler = []
@@ -42,8 +44,16 @@ all_catalogs = [
     "gpt-lab[optimizers]",
     "gpt-lab[train_loops]",
 ]
+# Domain packs (optional)
+nlp = [
+    "datasets",
+    "tiktoken",
+]
+cv = []
 dev = [
     "gpt-lab[all_catalogs]",
+    "gpt-lab[nlp]",
+    "gpt-lab[cv]",
     "pytest",
 ]
 

@@ -1,4 +1,4 @@
-from typing import List, Sequence, Union, Callable
+from typing import List, Sequence, Union, Callable, Optional
 import os
 import sys
 import time
@@ -12,15 +12,12 @@ import pandas as pd
 
 from gpt_lab.nn_modules.catalog_utils import BenchmarkConfig, get_total_loss
 from gpt_lab.device import get_available_devices
-from gpt_lab.catalog_utils import discover_dunder_objects
+from gpt_lab.catalog_utils import discover_dunder_objects_in_package
+from gpt_lab.catalog_bootstrap import get_artifact_root
 
 
 # --- Path Constants ---
 NN_MODULES_ROOT = Path(__file__).parent
-SRC_ROOT = NN_MODULES_ROOT.parent.parent
-PROJECT_ROOT = SRC_ROOT.parent
-BENCH_RESULTS_DIR = PROJECT_ROOT / "bench_results" / "nn_modules"
-CATALOG_DIR = NN_MODULES_ROOT / "catalog"
 
 
 def measure_performance(
@@ -121,7 +118,9 @@ def measure_performance(
     return {k: v for k, v in results.items() if v is not None}
 
 
-def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Path = BENCH_RESULTS_DIR):
+def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Optional[Path] = None):
+    if output_dir is None:
+        output_dir = get_artifact_root() / "nn_modules"
     output_dir.mkdir(parents=True, exist_ok=True)
     device_type = torch.device(device).type
 
@@ -192,10 +191,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    all_benchmark_configs, discovery_errors = discover_dunder_objects(
+    all_benchmark_configs, discovery_errors = discover_dunder_objects_in_package(
         dunder='__benchmark_config__', 
         object=BenchmarkConfig,
-        search_folders=str(CATALOG_DIR)
+        package_name='gpt_lab.nn_modules'
     )
 
     if discovery_errors:

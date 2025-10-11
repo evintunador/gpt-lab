@@ -15,6 +15,7 @@ from gpt_lab.train_loops.tests.test_train_loops_catalog import (
 from gpt_lab.llm_code_compiler import LLMClient, create_llm
 from gpt_lab.device import get_default_device
 from gpt_lab.catalog_utils import import_module_from_path
+from gpt_lab.catalog_bootstrap import get_active_context, get_artifact_root, get_all_artifact_roots_for_active
 
 # Get a logger for this module
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ Testing Requirements:
 - Make sure your implementation correctly handles all the specific behaviors being tested
 
 Notes:
-- You may add helper functions/classes if needed, or, if re-using, import directly from one of the atomic features by using `from gpt_lab.train_loops.catalog.atomic_features.<feature_name> import <function/class_name>`.
+- You may add helper functions/classes if needed, or, if re-using, import directly from one of the atomic features by using `from gpt_lab.train_loops.<feature_name> import <function/class_name>`.
 """
 
 USER_PROMPT_TEMPLATE = \
@@ -57,6 +58,25 @@ USER_PROMPT_TEMPLATE = \
 
 def _build_system_prompt_with_base_loop() -> str:
     """Build the system prompt including base_loop.py content for reference."""
+    # Resolve base_loop via active namespace. Prefer core if ambiguous.
+    try:
+        import importlib
+        module = importlib.import_module("gpt_lab.train_loops.base_loop")
+        import inspect as _inspect
+        base_loop_content = _inspect.getsource(module)
+        base_loop_section = f"""
+
+Base Loop Reference (base_loop.py):
+Your generated code must be numerically equivalent to this when default kwargs are used:
+
+```python
+{base_loop_content}
+```
+"""
+        return SYSTEM_PROMPT + base_loop_section
+    except Exception:
+        pass
+
     base_loop_path = Path(__file__).parent / "catalog" / "atomic_features" / "base_loop.py"
     
     try:
@@ -132,8 +152,19 @@ def _summarize_exception_filtered(focus_paths: List[str], phase: str) -> str:
     return header + "\n" + focused
 
 
-def _atomic_dir() -> Path:
-    return Path(__file__).resolve().parent / "catalog" / "atomic_features"
+def _atomic_dirs() -> List[Path]:
+    # Collect all active roots' train_loops directories
+    ctx = get_active_context()
+    dirs: List[Path] = []
+    for root in ctx.get("ordered_roots", []):
+        p = Path(root) / "train_loops"
+        if p.is_dir():
+            dirs.append(p)
+    # Include legacy fallback
+    legacy = Path(__file__).resolve().parent / "catalog" / "atomic_features"
+    if legacy.is_dir():
+        dirs.append(legacy)
+    return dirs
 
 
 def _get_atomic_files(atomic_features: List[str]) -> List[Path]:
@@ -141,18 +172,26 @@ def _get_atomic_files(atomic_features: List[str]) -> List[Path]:
     Get paths to the specified atomic feature files.
     """
     paths: List[Path] = []
-    root = _atomic_dir()
-
+    roots = _atomic_dirs()
+    
     for feature in atomic_features:
-        # Add .py extension if not present
         filename = feature if feature.endswith('.py') else f"{feature}.py"
-        p = root / filename
-        if p.exists() and p.is_file() and p.stat().st_size > 0:
-            paths.append(p)
+        found = None
+        for root in roots:
+            p = root / filename
+            if p.exists() and p.is_file() and p.stat().st_size > 0:
+                found = p
+                break
+        if found is not None:
+            paths.append(found)
         else:
-            # List available features for better error messages
-            available = [f.stem for f in root.glob("*.py") if f.is_file()]
-            raise ValueError(f"Atomic feature file not found: {feature}\nAvailable features: {', '.join(available)}")
+            available = []
+            for root in roots:
+                available.extend([f.stem for f in root.glob("*.py") if f.is_file()])
+            raise ValueError(f"Atomic feature file not found: {feature}\nAvailable features: {', '.join(sorted(set(available)))}")
+
+    if paths:
+        logger.info("Selected atomic feature files: %s", [str(p) for p in paths])
 
     return paths
 
@@ -326,8 +365,13 @@ def compile_loop(
     
     llm = llm or LLMClient()
     name = _make_descriptive_name(atomic_features)
-    code_path = Path(__file__).parent / "catalog" / "llm_compiled" / f"{name}.py"
+    # Write compiled loops to artifacts: artifacts/train_loops/llm_compiled/<name>.py
+    artifacts_root = get_artifact_root()
+    compiled_root = artifacts_root / "train_loops" / "llm_compiled"
+    compiled_root.mkdir(parents=True, exist_ok=True)
+    code_path = compiled_root / f"{name}.py"
     device = get_default_device()
+    logger.info("Compiler output target: %s", code_path)
 
     logger.debug("=" * 60)
     logger.debug("LLM TRAINING LOOP COMPILATION")

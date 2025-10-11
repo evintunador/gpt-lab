@@ -2,6 +2,7 @@ import importlib
 import importlib.util
 import os
 import sys
+import pkgutil
 from pathlib import Path
 from typing import List, Union, Tuple, Any, Dict
 
@@ -100,5 +101,35 @@ def discover_dunder_objects(
             continue
         except Exception as e:
             errors[file] = e
+
+    return objects, errors
+
+
+def discover_dunder_objects_in_package(
+        dunder: str,
+        object: Any,
+        package_name: str,
+    ) -> Tuple[List[Any], Dict[str, Exception]]:
+    """
+    Discover objects with a given dunder name by iterating all modules reachable
+    under a namespace package's __path__ via pkgutil.walk_packages.
+    """
+    objects: List[Any] = []
+    errors: Dict[str, Exception] = {}
+    try:
+        pkg = importlib.import_module(package_name)
+    except Exception as e:
+        return [], {package_name: e}
+
+    for _, name, _ in pkgutil.walk_packages(pkg.__path__, prefix=pkg.__name__ + "."):
+        try:
+            m = importlib.import_module(name)
+            obj = getattr(m, dunder, None)
+            if isinstance(obj, object):
+                objects.append(obj)
+        except SkipModuleException:
+            continue
+        except Exception as e:
+            errors[name] = e
 
     return objects, errors

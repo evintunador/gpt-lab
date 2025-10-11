@@ -2,6 +2,8 @@ from typing import Dict, Any, List, Tuple, Type, Optional
 import os
 import inspect
 from pathlib import Path
+import importlib
+import pkgutil
 
 import torch
 import torch.nn as nn
@@ -9,7 +11,6 @@ from torch.utils.data import DataLoader, TensorDataset
 import pytest
 
 from gpt_lab.device import get_default_device
-from gpt_lab.catalog_utils import list_all_files_in_folder_and_subdirs, import_module_from_path
 from gpt_lab.optimizers.catalog_utils import OptimizerConfig, create_smart_optimizer
 
 
@@ -19,44 +20,48 @@ device = get_default_device()
 # --- Path Constants ---
 TESTS_ROOT = Path(__file__).parent
 OPTIMIZERS_ROOT = TESTS_ROOT.parent
-CATALOG_DIR = OPTIMIZERS_ROOT / "catalog"
 
 
-all_optimizer_files = list_all_files_in_folder_and_subdirs(str(CATALOG_DIR))
-all_optimizer_files = [opt_file for opt_file in all_optimizer_files if Path(opt_file).name != "__init__.py"]
+def _iter_optimizer_modules():
+    try:
+        pkg = importlib.import_module("gpt_lab.optimizers")
+    except Exception:
+        return []
+    mods = []
+    for _, name, _ in pkgutil.walk_packages(pkg.__path__, prefix=pkg.__name__ + "."):
+        if name.endswith(".tests") or name.endswith(".__init__"):
+            continue
+        try:
+            m = importlib.import_module(name)
+            mods.append(m)
+        except Exception:
+            continue
+    return mods
 
 # Import modules and extract optimizer classes
-all_optimizer_modules = []
+all_optimizer_modules = _iter_optimizer_modules()
 all_optimizer_classes = []
 all_optimizer_configs = []
 
-for optimizer_file in all_optimizer_files:
+for module in all_optimizer_modules:
     try:
-        module = import_module_from_path(f"optimizer_module_{len(all_optimizer_modules)}", str(CATALOG_DIR / optimizer_file))
-        all_optimizer_modules.append(module)
-        
-        # Look for optimizer classes in the module
         for name, obj in inspect.getmembers(module):
             if (inspect.isclass(obj) and 
                 issubclass(obj, torch.optim.Optimizer) and 
                 obj != torch.optim.Optimizer):
-                
-                # Get default config if available, otherwise None for auto-detection
                 test_config = getattr(module, '__test_config__', None)
-                
                 all_optimizer_classes.append(obj)
                 all_optimizer_configs.append(test_config)
                 break
     except Exception as e:
-        print(f"[WARNING] Failed to import optimizer from {optimizer_file}: {e}")
+        print(f"[WARNING] Failed to import optimizer from {getattr(module, '__name__', '<unknown>')}: {e}")
 
 
 def test_optimizer_discovery():
     """Test that we successfully discovered optimizers from the catalog."""
     if not all_optimizer_classes:
         pytest.fail(
-            f"No optimizer classes discovered from {len(all_optimizer_files)} files in {CATALOG_DIR}. "
-            f"Files found: {all_optimizer_files}"
+            f"No optimizer classes discovered under gpt_lab.optimizers"
         )
 
 
@@ -166,7 +171,7 @@ for optimizer_class, config in zip(all_optimizer_classes, all_optimizer_configs)
 
 # Handle case where no optimizers are found
 if len(optimizer_test_params) == 0:
-    print("[WARNING] No optimizer classes found in catalog/")
+    print("[WARNING] No optimizer classes found in gpt_lab.optimizers")
     # Add a dummy test to prevent pytest from failing
     optimizer_test_params.append(
         pytest.param(None, None, id="no_optimizers_found")
@@ -180,6 +185,6 @@ def test_universal_optimizer_learning(optimizer_class, config):
     Uses smart creation to handle constraints automatically.
     """
     if optimizer_class is None:
-        pytest.fail("No optimizer classes found. Check the catalog/ directory.")
+        pytest.fail("No optimizer classes found under gpt_lab.optimizers.")
     
     universal_optimizer_test(optimizer_class, config)

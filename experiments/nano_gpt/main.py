@@ -13,15 +13,17 @@ from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging, get_system_info
 from gpt_lab.checkpointer import load_checkpoint
-from gpt_lab.data_sources.catalog.pretraining.fineweb import create_fineweb_dataset, FineWebSize
+from gpt_lab.data_sources.pretraining.fineweb import create_fineweb_dataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
-from gpt_lab.nn_modules.catalog.backbones.nano_gpt import NanoGPTBackbone
-from gpt_lab.nn_modules.catalog.training_models.nano_gpt import NanoGPTTrainingModel
-from gpt_lab.models.catalog.llms import NanoGPTModel
+from gpt_lab.nn_modules.backbone import NanoGPTBackbone
+from gpt_lab.nn_modules.training_model import NanoGPTTrainingModel
+from gpt_lab.models.nano_gpt import NanoGPTModel
 from gpt_lab.train_loops.smart_api import smart_train
-from gpt_lab.data_sources.catalog.benchmarks.multiple_choice import WikiQADataset, HellaSwagDataset
-from gpt_lab.data_sources.catalog.benchmarks.fill_in_the_blank import ASDivDataset
-from gpt_lab.benchmarks.catalog import MultipleChoiceBenchmark, FillInTheBlankBenchmark
+from gpt_lab.data_sources.benchmarks.multiple_choice.wiki_qa import WikiQADataset
+from gpt_lab.data_sources.benchmarks.multiple_choice.hellaswag import HellaSwagDataset
+from gpt_lab.data_sources.benchmarks.fill_in_the_blank.asdiv import ASDivDataset
+from gpt_lab.benchmarks.multiple_choice import MultipleChoiceBenchmark
+from gpt_lab.benchmarks.fill_in_the_blank import FillInTheBlankBenchmark
 
 
 logger = logging.getLogger(__name__)

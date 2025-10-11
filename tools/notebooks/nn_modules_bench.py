@@ -12,8 +12,8 @@ def _():
     import plotly.graph_objects as go
     import glob
     import os
-    from pathlib import Path
-    return glob, go, mo, os, pd, px, Path
+    from gpt_lab.catalog_bootstrap import get_artifact_root
+    return glob, go, mo, os, pd, px, Path, get_artifact_root
 
 
 @app.cell
@@ -23,7 +23,7 @@ def _(mo):
 
 
 @app.cell
-def _(glob, mo, os, Path):
+def _(glob, mo, os, get_artifact_root):
     plot_titles = [
         "Forward Time (ms)",
         "Backward Time (ms)",
@@ -31,9 +31,7 @@ def _(glob, mo, os, Path):
         "Backward Peak Memory (GB)",
     ]
 
-    # Find the project root and look for the bench_results directory
-    project_root = Path(__file__).resolve().parent.parent
-    bench_dir = project_root / "bench_results" / "nn_modules"
+    bench_dir = get_artifact_root() / "nn_modules"
     csv_files = glob.glob(str(bench_dir / '*.csv'))
 
     if not csv_files:

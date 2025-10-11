@@ -1,6 +1,8 @@
 from typing import Optional
 
-from .catalog import LLMClient, OpenAILLM, AnthropicLLM
+from .abstract_base import LLMClient
+from .openai import OpenAILLM
+from .anthropic import AnthropicLLM
 
 
 def create_llm(model: str, api_key: Optional[str] = None) -> LLMClient:

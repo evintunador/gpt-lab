@@ -1,0 +1,46 @@
+name: CI (core)
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Install dependencies (dev)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Print active paths (debug)
+        run: |
+          python tools/CLIs/print_active_paths.py -v || true
+      - name: Run unit tests (core-only)
+        env:
+          # No activation envs set -> core-only
+          PYTHONWARNINGS: default
+        run: |
+          pytest -q
+
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - name: Install minimal deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Validate repo layout and YAML
+        run: |
+          python tools/CLIs/validate_layout.py
+
+

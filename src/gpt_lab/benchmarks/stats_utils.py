@@ -1,6 +1,7 @@
 import numpy as np
 from typing import List, Callable, Tuple
 
+
 def calculate_bootstrap_ci(
     data: List[float],
     statistic_fn: Callable[[np.ndarray], float] = np.mean,

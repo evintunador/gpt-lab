@@ -6,12 +6,12 @@ from unittest.mock import patch, call
 
 import gpt_lab.checkpointer as checkpointer
 
-from gpt_lab.train_loops.catalog.atomic_features.checkpoint_over_steps import run_training
+from gpt_lab.train_loops.checkpoint_over_steps import run_training
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
-@patch('train_loops.catalog.atomic_features.checkpoint_over_steps.checkpointer.save_checkpoint')
+@patch('gpt_lab.checkpointer.save_checkpoint')
 def test_checkpointing_over_steps(mock_save_checkpoint, device, tmp_path):
     """Test that checkpointing is triggered correctly every N steps."""
     torch.manual_seed(0)
