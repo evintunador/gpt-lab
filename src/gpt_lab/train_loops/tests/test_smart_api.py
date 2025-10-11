@@ -4,13 +4,14 @@ Tests the visual validations as proper unit tests.
 """
 
 from typing import Dict, Any
+import sys
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import pytest
 from unittest.mock import MagicMock
+from importlib import reload
 
-from gpt_lab.train_loops.smart_api import smart_train
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
@@ -32,6 +33,8 @@ def _create_test_data(device: str):
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_no_features(device: str):
     """Test smart_train with no additional features."""
+    from gpt_lab.train_loops.smart_api import smart_train
+    
     model, optimizer, dataloader = _create_test_data(device)
     
     result = smart_train(model, optimizer, dataloader)
@@ -44,6 +47,8 @@ def test_smart_train_no_features(device: str):
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_single_feature(device: str):
     """Test smart_train with single feature (direct execution)."""
+    from gpt_lab.train_loops.smart_api import smart_train
+    
     model, optimizer, dataloader = _create_test_data(device)
     
     result = smart_train(
@@ -57,46 +62,29 @@ def test_smart_train_single_feature(device: str):
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
-def test_smart_train_multi_feature(device: str, monkeypatch):
-    """Test smart_train with multiple features, mocking the full compilation chain."""
-    model, optimizer, dataloader = _create_test_data(device)
-
-    # 1. Mock `create_llm` to prevent the API key error.
-    monkeypatch.setattr(
-        "gpt_lab.train_loops.smart_api.create_llm",
-        lambda **kwargs: MagicMock()
-    )
-
-    # 2. Mock `compile_loop` to return a dictionary with a dummy path.
-    #    The path doesn't need to exist because we will mock the import function next.
-    dummy_path = "/tmp/mock_compiled_loop.py"
-    monkeypatch.setattr(
-        "gpt_lab.train_loops.smart_api.compile_loop",
-        lambda *args, **kwargs: {"code_path": dummy_path}
-    )
-
-    # 3. Mock `import_module_from_path` to return a mock module.
-    #    This mock module has a `run_training` function that returns our expected result.
-    mock_module = MagicMock()
-    mock_module.run_training.return_value = {"model": model}
-    monkeypatch.setattr(
-        "gpt_lab.train_loops.smart_api.import_module_from_path",
-        lambda *args, **kwargs: mock_module
-    )
+def test_smart_train_multi_feature(device: str):
+    """Test smart_train with multiple features (uses cached or real compilation)."""
+    from gpt_lab.train_loops.smart_api import smart_train
     
+    model, optimizer, dataloader = _create_test_data(device)
+    
+    # This test uses the real compilation chain (or cached results)
+    # We're just verifying that smart_train works with multiple features
     result = smart_train(
         model, optimizer, dataloader,
         accum_steps=2, track_loss=True
     )
     
-    # Assert that the final, mocked training function was called and returned its value.
-    mock_module.run_training.assert_called_once()
-    assert result == {"model": model}
+    # Assert that training completed and returned a valid result
+    assert isinstance(result, dict)
+    assert 'model' in result
     assert isinstance(result['model'], nn.Module)
 
 
 def test_smart_train_unknown_kwargs():
     """Test that smart_train rejects unknown kwargs."""
+    from gpt_lab.train_loops.smart_api import smart_train
+    
     # This test is device-agnostic, so we can just use CPU
     model, optimizer, dataloader = _create_test_data('cpu')
     
@@ -113,6 +101,8 @@ def test_smart_train_unknown_kwargs():
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
 def test_smart_train_none_filtering(device: str):
     """Test that smart_train filters out None values."""
+    from gpt_lab.train_loops.smart_api import smart_train
+    
     model, optimizer, dataloader = _create_test_data(device)
     
     # Should work the same as no additional features

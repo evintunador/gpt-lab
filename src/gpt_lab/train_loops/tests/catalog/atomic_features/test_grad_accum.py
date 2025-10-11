@@ -18,8 +18,10 @@ def test_accumulation_correctness(run_training_fn, device):
     y = (X.sum(dim=1) > 0).long().to(device)
     ds = TensorDataset(X, y)
 
-    dl1 = DataLoader(ds, batch_size=8, shuffle=True)
-    dl2 = DataLoader(ds, batch_size=4, shuffle=True)
+    # Use shuffle=False to ensure consistent sample ordering between different batch sizes
+    # With shuffle=True, different batch sizes produce different shuffle orders even with same seed
+    dl1 = DataLoader(ds, batch_size=8, shuffle=False)
+    dl2 = DataLoader(ds, batch_size=4, shuffle=False)
 
     backbone1 = nn.Sequential(nn.Linear(32, 64), nn.ReLU(), nn.Linear(64, 2))
     backbone2 = copy.deepcopy(backbone1)

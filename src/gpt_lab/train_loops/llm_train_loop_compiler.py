@@ -320,14 +320,32 @@ __llm_compiled__ = True
 
 
 def run_specific_tests_for_compilation(run_training_fn: Callable, atomic_features: List[str], device: str):
-    """Run all applicable specific tests during compilation - validation only."""
+    """
+    Run all applicable specific tests during compilation - validation only.
+    Filters out tests that require pytest fixtures (monkeypatch, tmp_path, etc.)
+    since those can't be called directly during compilation.
+    """
     specific_tests = discover_specific_tests()
     
     for feature in atomic_features:
         clean_feature = feature.replace('.py', '')  # Handle both formats
         if clean_feature in specific_tests:
             for test_func in specific_tests[clean_feature]:
-                # Just run the test - if it fails, compilation fails
+                # Check if test function has compatible signature
+                # It should accept exactly (run_training_fn, device) - no pytest fixtures
+                sig = inspect.signature(test_func)
+                params_list = list(sig.parameters.keys())
+                
+                # Skip tests that require pytest fixtures
+                if len(params_list) != 2:
+                    logger.debug(f"Skipping {test_func.__name__} - requires {len(params_list)} parameters (expected 2)")
+                    continue
+                if any(p in params_list for p in ['tmp_path', 'monkeypatch', 'request', 'capsys', 'capfd']):
+                    logger.debug(f"Skipping {test_func.__name__} - requires pytest fixtures")
+                    continue
+                
+                # Run the test - if it fails, compilation fails
+                logger.debug(f"Running specific test: {test_func.__name__} for feature {clean_feature}")
                 test_func(run_training_fn, device)
 
 

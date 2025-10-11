@@ -1,16 +1,16 @@
 import pytest
+import sys
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
-from unittest.mock import patch, call
+from unittest.mock import patch, call, MagicMock
+from importlib import reload
 
-from gpt_lab.train_loops.checkpoint_over_epochs import run_training
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
-@patch('gpt_lab.checkpointer.save_checkpoint')
-def test_checkpointing_over_epochs(mock_save_checkpoint, device, tmp_path):
+def test_checkpointing_over_epochs(device, tmp_path, monkeypatch):
     """Test that checkpointing is triggered correctly every N epochs."""
     torch.manual_seed(0)
     X = torch.randn(20, 4).to(device)
@@ -27,6 +27,17 @@ def test_checkpointing_over_epochs(mock_save_checkpoint, device, tmp_path):
     save_interval = 3
     num_epochs = 10
 
+    # Mock save_checkpoint to prevent actual file saving
+    mock_save_checkpoint = MagicMock()
+    monkeypatch.setattr("gpt_lab.checkpointer.save_checkpoint", mock_save_checkpoint)
+    
+    # Reload the module to pick up the patched function
+    if 'gpt_lab.train_loops.checkpoint_over_epochs' in sys.modules:
+        import gpt_lab.train_loops.checkpoint_over_epochs as checkpoint_module
+        reload(checkpoint_module)
+    
+    from gpt_lab.train_loops.checkpoint_over_epochs import run_training
+    
     run_training(
         model=model,
         optimizer=optimizer,

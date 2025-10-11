@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Callable
 import os
 import sys
 from pathlib import Path
+import inspect
 
 import torch
 import torch.nn as nn
@@ -64,8 +65,13 @@ def discover_specific_tests() -> Dict[str, List[Callable]]:
     # 1) Discover tests colocated in repo tests folder (back-compat)
     atomic_tests_dir = TESTS_ROOT / "catalog" / "atomic_features"
     if atomic_tests_dir.exists():
-        for test_file in atomic_tests_dir.glob("*_test.py"):
-            feature_name = test_file.stem.replace("_test", "")
+        # Support both test_*.py (prefix) and *_test.py (suffix) naming patterns
+        for test_file in list(atomic_tests_dir.glob("test_*.py")) + list(atomic_tests_dir.glob("*_test.py")):
+            # Extract feature name from both patterns
+            if test_file.stem.startswith("test_"):
+                feature_name = test_file.stem[5:]  # Remove "test_" prefix
+            else:
+                feature_name = test_file.stem.replace("_test", "")  # Remove "_test" suffix
             try:
                 module = import_module_from_path(f"test_{feature_name}", test_file)
                 if hasattr(module, "__specific_tests__"):
@@ -78,12 +84,17 @@ def discover_specific_tests() -> Dict[str, List[Callable]]:
         train_pkg = importlib.import_module("gpt_lab.train_loops")
         for _, name, _ in pkgutil.walk_packages(train_pkg.__path__, prefix=train_pkg.__name__ + "."):
             leaf = name.split(".")[-1]
-            if not leaf.endswith("_test"):
+            # Support both test_* (prefix) and *_test (suffix) naming patterns
+            if not (leaf.endswith("_test") or leaf.startswith("test_")):
                 continue
             try:
                 m = importlib.import_module(name)
                 if hasattr(m, "__specific_tests__"):
-                    feature_name = leaf.replace("_test", "")
+                    # Extract feature name from both patterns
+                    if leaf.startswith("test_"):
+                        feature_name = leaf[5:]  # Remove "test_" prefix
+                    else:
+                        feature_name = leaf.replace("_test", "")  # Remove "_test" suffix
                     specific_tests[feature_name] = m.__specific_tests__
             except Exception as e:
                 print(f"Warning: Failed to load specific tests from module {name}: {e}")
@@ -114,6 +125,33 @@ def discover_atomic_features() -> List[Callable]:
     return atomic_functions
 
 
+def discover_compiled_loops() -> List[tuple]:
+    """
+    Discover all compiled training loops from artifact directories.
+    Returns list of (run_training_fn, loop_name, loop_path) tuples.
+    """
+    compiled_loops = []
+    compiled_files = []
+    
+    # Search artifacts across all active roots
+    for art_root in get_all_artifact_roots_for_active():
+        cand = art_root / "train_loops" / "llm_compiled"
+        if cand.is_dir():
+            compiled_files.extend(sorted(cand.glob("*.py")))
+    
+    for compiled_path in compiled_files:
+        try:
+            module = import_module_from_path(f"compiled_loop_{compiled_path.stem}", compiled_path)
+            if hasattr(module, 'run_training'):
+                # Use the filename as the loop name
+                loop_name = f"compiled_{compiled_path.stem}"
+                compiled_loops.append((module.run_training, loop_name, str(compiled_path)))
+        except Exception as e:
+            print(f"Warning: Failed to load compiled loop from {compiled_path}: {e}")
+    
+    return compiled_loops
+
+
 def generate_compiled_loop_specific_tests():
     """Generate pytest parameters for specific tests on compiled loops."""
     specific_tests = discover_specific_tests()
@@ -128,9 +166,21 @@ def generate_compiled_loop_specific_tests():
         try:
             module = import_module_from_path(f"compiled_test_{compiled_path.stem}", compiled_path)
             atomic_features = getattr(module, '__atomic_features__', [])
+            
             for feature in atomic_features:
                 if feature in specific_tests:
                     for test_func in specific_tests[feature]:
+                        # Check if test function has compatible signature
+                        # It should accept exactly (run_training_fn, device) - no pytest fixtures
+                        sig = inspect.signature(test_func)
+                        params_list = list(sig.parameters.keys())
+                        
+                        # Skip tests that require pytest fixtures (more than 2 params, or params like tmp_path, monkeypatch, etc.)
+                        if len(params_list) != 2:
+                            continue
+                        if any(p in params_list for p in ['tmp_path', 'monkeypatch', 'request', 'capsys', 'capfd']):
+                            continue
+                        
                         for device in AVAILABLE_DEVICES:
                             params.append(pytest.param(
                                 test_func, module.run_training, str(compiled_path), feature, device,
@@ -320,6 +370,13 @@ for run_training_fn in all_loop_functions:
             pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_{device}")
         )
 
+# Add compiled loops to universal tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        universal_test_params.append(
+            pytest.param(fn, device, id=f"{name}_{device}")
+        )
+
 
 # Create parameterized tests for atomic feature compliance across devices
 atomic_compliance_params = []
@@ -329,6 +386,13 @@ for fn, name in discover_atomic_features():
             pytest.param(fn, name, device, id=f"{name}_{device}")
         )
 
+# Add compiled loops to base compliance tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        atomic_compliance_params.append(
+            pytest.param(fn, name, device, id=f"{name}_compliance_{device}")
+        )
+
 
 # Create parameterized tests for dataset compatibility across devices
 dataset_type_compatibility_params = []
@@ -336,6 +400,13 @@ for run_training_fn in all_loop_functions:
     for device in AVAILABLE_DEVICES:
         dataset_type_compatibility_params.append(
             pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_dataset_compat_{device}")
+        )
+
+# Add compiled loops to dataset compatibility tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        dataset_type_compatibility_params.append(
+            pytest.param(fn, device, id=f"{name}_dataset_compat_{device}")
         )
 
 
