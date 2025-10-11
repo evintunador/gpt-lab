@@ -45,8 +45,6 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 ## todo
 ### important / urgent
 
-- [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
-- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later
 - [ ] design & build a mu-parametrization utility
 - [ ] do first DAGSeq2DAGSeq experiment
 
@@ -54,6 +52,11 @@ Each catalog has some combination of unit tests and/or performance benchmarks th
 
 ### important / not-urgent
 
+- [ ] design and build a system for comparing performance between two experiments or/and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
+    - [x] initial direct metric comparison
+    - [ ] time series
+    - [ ] more adaptable to whatever's available in the experiments
+- [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later
 - [ ] setup a docker container to develop in to ensure consistent behavior across systems
 - [ ] add slurm capabilities to DistributedManager
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
