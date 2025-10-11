@@ -24,15 +24,24 @@ from gpt_lab.device import to_device
 logger = logging.getLogger(__name__)
 
 
+def _is_amp_compatible(device_str: str) -> bool:
+    """Check if device supports AMP properly."""
+    if device_str.startswith('cuda'):
+        return True
+    elif device_str == 'mps':
+        # MPS has issues with GradScaler in certain PyTorch versions
+        return False
+    return False
+
+
 @torch.no_grad()
-def _eval_loss(model: nn.Module, loader, device: Optional[str] = None) -> float:
+def _eval_loss(model: nn.Module, loader, device: str) -> float:
     """Helper to compute validation loss."""
     was_training = model.training
     model.eval()
     total, count = 0.0, 0
     for batch in loader:
-        if device is not None:
-            batch = to_device(batch, device)
+        batch = to_device(batch, device)
         loss = model(batch)
         total += float(loss.detach().cpu().item())
         count += 1
@@ -41,58 +50,49 @@ def _eval_loss(model: nn.Module, loader, device: Optional[str] = None) -> float:
     return total / max(count, 1)
 
 
-def _is_amp_compatible(device_str: str) -> bool:
-    """Check if device supports AMP properly."""
-    if device_str.startswith('cuda'):
-        return True
-    elif device_str == 'mps':
-        return False
-    return False
-
-
 def run_training(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     train_loader,
     *,
+    # checkpoint_best_model knobs
+    save_best_model: bool = False,
+    # checkpoint_over_steps knobs
+    save_every_steps: Optional[int] = None,
+    output_dir: Optional[str] = None,
     # device knobs
     device: Optional[str] = None,
-    # grad accum knobs
+    # grad_accum knobs
     accum_steps: int = 1,
-    # grad norm clipping knobs
+    # grad_norm_clip knobs
     norm_clip_value: Optional[float] = None,
-    # mixed precision knobs
+    # logging knobs
+    enable_logging: bool = False,
+    # loss_tracking knobs
+    track_loss: bool = False,
+    log_interval: int = 1,
+    # lr_scheduling knobs
+    lr_scheduler_type: Optional[str] = None,
+    scheduler_kwargs: Optional[Dict[str, Any]] = None,
+    warmup_steps: int = 0,
+    max_lr: Optional[float] = None,
+    min_lr: float = 0.0,
+    # mixed_precision knobs
     use_amp: bool = False,
     loss_scale: Optional[float] = None,
-    # step limiting knobs
+    # step_limiting knobs
     total_steps: Optional[int] = None,
     # tqdm knobs
     use_tqdm: bool = False,
     # validation knobs
     val_loader = None,
     val_interval: int = 10,
-    # loss tracking knobs
-    track_loss: bool = False,
-    log_interval: int = 1,
-    # learning rate scheduling knobs
-    lr_scheduler_type: Optional[str] = None,
-    scheduler_kwargs: Optional[Dict[str, Any]] = None,
-    warmup_steps: int = 0,
-    max_lr: Optional[float] = None,
-    min_lr: float = 0.0,
-    # logging
-    enable_logging: bool = False,
-    # checkpoint_over_steps knobs
-    save_every_steps: Optional[int] = None,
-    output_dir: Optional[str] = None,
-    # checkpoint_best_model knobs
-    save_best_model: bool = False,
     # misc
     **kwargs,
 ) -> Dict[str, Any]:
-    """Combined training loop with multiple atomic features."""
+    """Combined training loop with all atomic features."""
     
-    # Determine target device
+    # Device setup
     if device is None:
         device = str(next(model.parameters()).device)
     
@@ -100,11 +100,7 @@ def run_training(
     model = model.to(device)
     model.train()
     
-    # Validate parameters
-    if accum_steps is None or accum_steps < 1:
-        accum_steps = 1
-    
-    # Set up mixed precision
+    # Mixed precision setup
     if use_amp and not _is_amp_compatible(device):
         print(f"Warning: AMP requested but not compatible with {device}. Falling back to FP32.")
         use_amp = False
@@ -117,12 +113,17 @@ def run_training(
             print(f"Warning: Failed to create GradScaler for {device}: {e}. Falling back to FP32.")
             use_amp = False
     
-    # Determine total steps for scheduling and progress bar
-    if total_steps is None:
+    # Grad accumulation setup
+    if accum_steps is None or accum_steps < 1:
+        accum_steps = 1
+    
+    # Step calculation for scheduler
+    scheduler_total_steps = total_steps
+    if scheduler_total_steps is None:
         try:
-            total_steps = len(train_loader)
+            scheduler_total_steps = len(train_loader)
         except:
-            total_steps = 1000  # fallback
+            scheduler_total_steps = 1000  # fallback
     
     # Get current learning rate for max_lr if not specified
     if max_lr is None:
@@ -133,42 +134,39 @@ def run_training(
     scheduler_kwargs = scheduler_kwargs or {}
     if lr_scheduler_type == "cosine":
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=total_steps, eta_min=min_lr, **scheduler_kwargs
+            optimizer, T_max=scheduler_total_steps, eta_min=min_lr, **scheduler_kwargs
         )
     elif lr_scheduler_type == "linear":
         def lambda_lr(step):
             if step < warmup_steps:
                 return step / max(1, warmup_steps)
-            progress = (step - warmup_steps) / max(1, total_steps - warmup_steps)
+            progress = (step - warmup_steps) / max(1, scheduler_total_steps - warmup_steps)
             return max(min_lr / max_lr, 1.0 - progress)
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda_lr, **scheduler_kwargs)
     elif lr_scheduler_type == "step":
-        step_size = max(1, total_steps // 3)
+        step_size = max(1, scheduler_total_steps // 3)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=0.1, **scheduler_kwargs)
     elif lr_scheduler_type == "exponential":
-        gamma = (min_lr / max_lr) ** (1.0 / total_steps)
+        gamma = (min_lr / max_lr) ** (1.0 / scheduler_total_steps)
         scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=gamma, **scheduler_kwargs)
     elif lr_scheduler_type == "lambda_lr":
         if "lr_lambda" not in scheduler_kwargs:
             raise ValueError("`scheduler_kwargs` must contain `lr_lambda` function for `lambda_lr` scheduler.")
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, **scheduler_kwargs)
     
-    # Initialize tracking variables
+    # Tracking variables
     train_loss_history: List[float] = []
     val_loss_history: List[float] = []
     best_val_loss = float('inf')
     
-    # Set up progress bar
+    # Progress bar setup
     pbar = None
     is_map_style = not isinstance(train_loader.dataset, IterableDataset)
     if use_tqdm and is_map_style:
-        # Adjust total based on step limiting
-        pbar_total = len(train_loader)
-        if total_steps is not None and total_steps < pbar_total:
-            pbar_total = total_steps
+        pbar_total = total_steps if total_steps is not None else len(train_loader)
         pbar = tqdm_auto(desc="Training", leave=False, total=pbar_total)
     
-    # Save initial checkpoint before training begins
+    # Initial checkpoint save for step checkpointing
     if save_every_steps is not None and output_dir is not None:
         raw_model = model.module if hasattr(model, 'module') else model
         checkpointer.save_checkpoint(
@@ -181,6 +179,7 @@ def run_training(
     
     optimizer.zero_grad(set_to_none=True)
     
+    # Training loop with step limiting
     step_count = 0
     micro_idx = 0
     should_break = False
@@ -192,76 +191,80 @@ def run_training(
                     should_break = True
                     break
                 
-                # Move batch data to device
+                # Move batch to device
                 batch = to_device(batch, device)
                 
+                # Forward pass
                 if use_amp and scaler is not None:
-                    # Forward pass with autocast
                     with torch.amp.autocast(device):
                         loss = model(batch)
-                else:
-                    loss = model(batch)
-                
-                # Scale loss for gradient accumulation
-                if accum_steps > 1:
-                    loss = loss / float(accum_steps)
-                
-                # Backward pass
-                if use_amp and scaler is not None:
+                    
+                    if accum_steps > 1:
+                        loss = loss / float(accum_steps)
+                    
                     scaler.scale(loss).backward()
                 else:
+                    loss = model(batch)
+                    
+                    if accum_steps > 1:
+                        loss = loss / float(accum_steps)
+                    
                     loss.backward()
                 
                 micro_idx += 1
                 
-                # Optimizer step with accumulation
+                # Optimizer step with gradient accumulation
                 if micro_idx % accum_steps == 0:
                     if use_amp and scaler is not None:
-                        # Gradient clipping before scaler step
+                        # Gradient clipping for AMP
                         if norm_clip_value is not None:
                             scaler.unscale_(optimizer)
                             params = [p for p in model.parameters() if p.grad is not None]
                             if params:
                                 clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+                        
                         scaler.step(optimizer)
                         scaler.update()
                     else:
-                        # Gradient clipping
+                        # Gradient clipping for regular precision
                         if norm_clip_value is not None:
                             params = [p for p in model.parameters() if p.grad is not None]
                             if params:
                                 clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+                        
                         optimizer.step()
                     
                     optimizer.zero_grad(set_to_none=True)
+                    step_count += 1
                     
-                    # Step scheduler if it exists
+                    # Learning rate scheduling
                     if scheduler is not None:
                         scheduler.step()
                     
-                    # Track loss if enabled
-                    if track_loss and (step_count % log_interval == 0):
-                        # Unscale loss for tracking
-                        actual_loss = loss * float(accum_steps) if accum_steps > 1 else loss
-                        train_loss_history.append(float(actual_loss.detach().cpu().item()))
+                    # Loss tracking
+                    if track_loss and (step_count - 1) % log_interval == 0:
+                        # Get actual loss value (undo accumulation scaling)
+                        actual_loss = loss.item() * accum_steps if accum_steps > 1 else loss.item()
+                        train_loss_history.append(float(actual_loss))
                     
                     # Logging
                     if enable_logging:
-                        actual_loss = loss * float(accum_steps) if accum_steps > 1 else loss
-                        logger.info("Training step", extra={"metrics": {"train_loss": actual_loss.item()}})
+                        actual_loss = loss.item() * accum_steps if accum_steps > 1 else loss.item()
+                        logger.info("Training step", extra={"metrics": {"train_loss": actual_loss}})
                     
                     # Validation
-                    if val_loader is not None and step_count > 0 and step_count % val_interval == 0:
+                    if val_loader is not None and step_count % val_interval == 0:
                         val_loss = _eval_loss(model, val_loader, device)
                         val_loss_history.append(val_loss)
                         
                         if enable_logging:
                             logger.info("Validation step", extra={"metrics": {"val_loss": val_loss}})
                         
-                        # Check for best model
+                        # Best model checkpointing
                         if save_best_model:
                             if output_dir is None:
                                 raise ValueError("output_dir must be provided when save_best_model is True.")
+                            
                             if val_loss < best_val_loss:
                                 best_val_loss = val_loss
                                 raw_model = model.module if hasattr(model, 'module') else model
@@ -273,75 +276,78 @@ def run_training(
                                     optimizer=optimizer,
                                 )
                     
-                    # Step-based checkpointing
+                    # Step checkpointing
                     if (save_every_steps is not None 
                         and output_dir is not None
                         and step_count > 0 
                         and step_count % save_every_steps == 0):
-                            raw_model = model.module if hasattr(model, 'module') else model
-                            checkpointer.save_checkpoint(
-                                save_dir=os.path.join(output_dir, "checkpoints"),
-                                filename=f"step_{step_count}.pt",
-                                metadata={"step": step_count, "config": kwargs.get("config", {})},
-                                model=raw_model,
-                                optimizer=optimizer,
-                            )
+                        raw_model = model.module if hasattr(model, 'module') else model
+                        checkpointer.save_checkpoint(
+                            save_dir=os.path.join(output_dir, "checkpoints"),
+                            filename=f"step_{step_count}.pt",
+                            metadata={"step": step_count, "config": kwargs.get("config", {})},
+                            model=raw_model,
+                            optimizer=optimizer,
+                        )
                     
-                    # Update progress bar
+                    # Progress bar update
                     if pbar:
-                        actual_loss = loss * float(accum_steps) if accum_steps > 1 else loss
+                        actual_loss = loss.item() * accum_steps if accum_steps > 1 else loss.item()
                         pbar.update(1)
-                        pbar.set_postfix(loss=f"{actual_loss.item():.4f}")
-                    
-                    step_count += 1
+                        pbar.set_postfix(loss=f"{actual_loss:.4f}")
+                
+                # For iterable-style datasets, break if no step limit
+                if total_steps is None:
+                    continue
             
-            # For iterable-style datasets, we'll only do one pass if total_steps is not set
+            # Exit condition for datasets without step limit
             if total_steps is None:
                 should_break = True
         
-        # Handle case where last accumulation window is incomplete
+        # Handle incomplete accumulation window
         if micro_idx % accum_steps != 0:
             if use_amp and scaler is not None:
-                # Gradient clipping before scaler step
                 if norm_clip_value is not None:
                     scaler.unscale_(optimizer)
                     params = [p for p in model.parameters() if p.grad is not None]
                     if params:
                         clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+                
                 scaler.step(optimizer)
                 scaler.update()
             else:
-                # Gradient clipping
                 if norm_clip_value is not None:
                     params = [p for p in model.parameters() if p.grad is not None]
                     if params:
                         clip_grad_norm_(params, norm_clip_value, norm_type=2.0)
+                
                 optimizer.step()
             
             optimizer.zero_grad(set_to_none=True)
             step_count += 1
         
-        # Final validation at end of training
+        # Final validation
         if val_loader is not None and (step_count == 0 or step_count % val_interval != 0):
-            final_val_loss = _eval_loss(model, val_loader, device)
-            val_loss_history.append(final_val_loss)
+            val_loss = _eval_loss(model, val_loader, device)
+            val_loss_history.append(val_loss)
             
             if enable_logging:
-                logger.info("Final validation", extra={"metrics": {"val_loss": final_val_loss}})
+                logger.info("Final validation", extra={"metrics": {"val_loss": val_loss}})
             
             # Final best model check
-            if save_best_model and output_dir is not None and final_val_loss < best_val_loss:
-                best_val_loss = final_val_loss
-                raw_model = model.module if hasattr(model, 'module') else model
-                checkpointer.save_checkpoint(
-                    save_dir=os.path.join(output_dir, "checkpoints"),
-                    filename="best_model.pt",
-                    metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
-                    model=raw_model,
-                    optimizer=optimizer,
-                )
+            if save_best_model and output_dir is not None:
+                if val_loss < best_val_loss:
+                    best_val_loss = val_loss
+                    raw_model = model.module if hasattr(model, 'module') else model
+                    checkpointer.save_checkpoint(
+                        save_dir=os.path.join(output_dir, "checkpoints"),
+                        filename="best_model.pt",
+                        metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
+                        model=raw_model,
+                        optimizer=optimizer,
+                    )
         
-        # Save final checkpoint if not already saved
+        # Final step checkpoint
         if (save_every_steps is not None
             and output_dir is not None 
             and step_count % save_every_steps != 0):
@@ -353,17 +359,20 @@ def run_training(
                 model=raw_model,
                 optimizer=optimizer,
             )
-        
+    
     finally:
         if pbar:
             pbar.close()
     
-    # Build result
+    # Build result dictionary
     result = {"model": model}
+    
     if track_loss:
         result["train_loss_history"] = train_loss_history
+    
     if val_loader is not None:
         result["val_loss_history"] = val_loss_history
+    
     if save_best_model and best_val_loss != float('inf'):
         result['best_val_loss'] = best_val_loss
     
