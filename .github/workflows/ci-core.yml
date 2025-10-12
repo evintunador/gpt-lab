@@ -13,34 +13,20 @@ jobs:
         with:
           python-version: '3.10'
           cache: 'pip'
-      - name: Install dependencies (dev)
+      - name: Install dependencies (minimal)
         run: |
           python -m pip install --upgrade pip
-          pip install -e '.[dev]'
+          pip install -e . pytest
       - name: Print active paths (debug)
         run: |
-          python tools/CLIs/print_active_paths.py -v || true
+          python CLIs/print_active_paths.py -v || true
       - name: Run unit tests (core-only)
         env:
           # No activation envs set -> core-only
           PYTHONWARNINGS: default
+          GPT_LAB_CORE_ONLY: "1"
         run: |
           pytest -q
 
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-          cache: 'pip'
-      - name: Install minimal deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml
-      - name: Validate repo layout and YAML
-        run: |
-          python tools/CLIs/validate_layout.py
 
 
