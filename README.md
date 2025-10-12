@@ -281,3 +281,4 @@ particularly thinking of `src/gpt_lab/nn_modules/`)
 - [ ] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
 - [ ] make configuration.py not require any input argparser at all so users can rely 
 entirely on config if they want
+- [ ] make the example submodule experiment an actual submodule

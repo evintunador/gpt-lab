@@ -16,6 +16,16 @@ def run_one(exp_name: str, extra_pytest_args: list[str]) -> int:
     return proc.returncode
 
 
+def find_repo_root(start_path: Path) -> Path:
+    """Find repository root by looking for pyproject.toml or .git directory."""
+    current = start_path.resolve()
+    while current != current.parent:
+        if (current / "pyproject.toml").exists() or (current / ".git").exists():
+            return current
+        current = current.parent
+    raise RuntimeError("Could not find repository root (no pyproject.toml or .git found)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run pytest per experiment in isolation")
     parser.add_argument("--include", nargs="*", default=None, help="Experiment names to include")
@@ -23,7 +33,7 @@ def main():
     parser.add_argument("--pytest-args", nargs=argparse.REMAINDER, help="Additional args passed to pytest")
     args = parser.parse_args()
 
-    repo = Path(__file__).resolve().parents[2]
+    repo = find_repo_root(Path(__file__))
     exps = [p.name for p in (repo / "experiments").iterdir() if p.is_dir()]
     if args.include:
         exps = [e for e in exps if e in set(args.include)]
