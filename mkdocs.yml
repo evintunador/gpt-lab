@@ -1,0 +1,39 @@
+site_name: GPT-Lab
+site_description: Documentation for modular, testable, and reproducible ML research with GPT-Lab
+nav:
+  - Home: index.md
+  - Concepts:
+    - Architecture: architecture.md
+    - Configuration: config.md
+    - Testing: testing.md
+  - Importable Tools:
+    - Reproducibility: components-reproducibility.md
+    - Device: components-device.md
+    - Distributed: components-distributed.md
+    - Logger: components-logger.md
+    - Checkpointer: components-checkpointer.md
+    - Configuration: components-configuration.md
+    - Smart Training Loop: components-smart-train.md
+  - CLIs:
+    - Pytest All Experiments: cli-pytest-all-experiments.md
+    - Run Multiple Experiments: cli-run-multi.md
+    - Scaffold New Experiment: cli-scaffold-experiment.md
+    - Misc:
+      - Print Active Paths: cli-print-active-paths.md
+      - Validate Repo Layout: cli-validate-layout.md
+  - Notebooks:
+    - About Marimo Notebooks: notebooks-about-marimo.md
+    - Experiment Comparison: notebooks-experiment-comparison.md
+    - nn.Module Benchmark: notebooks-nn_module-bench.md
+    - Optimizers Benchmark: notebooks-optimizers-bench.md
+  - Buildable Catalogs:
+    - Train Loops: catalogs-train-loops.md
+    - nn.Modules: catalogs-modules.md
+    - Optimizers: catalogs-optimizers.md
+    - Benchmarks: catalogs-benchmarks.md
+    - Models: catalogs-models.md
+  - Existing Catalog Packs:
+    - Core: packs-core.md
+    - NLP: packs-nlp.md
+    - CV: packs-cv.md
+docs_dir: docs

@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
-from gpt_lab.train_loops.catalog.atomic_features.early_stopping import run_training
+from gpt_lab.train_loops.early_stopping import run_training
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 

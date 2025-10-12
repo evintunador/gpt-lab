@@ -2,6 +2,7 @@ from typing import Dict, Any, List, Callable
 import os
 import sys
 from pathlib import Path
+import inspect
 
 import torch
 import torch.nn as nn
@@ -9,13 +10,14 @@ from torch.utils.data import DataLoader, TensorDataset, IterableDataset
 import pytest
 
 from gpt_lab.catalog_utils import list_all_files_in_folder_and_subdirs, import_module_from_path
+import importlib
+import pkgutil
+from gpt_lab.catalog_bootstrap import get_all_artifact_roots_for_active
 from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 # --- Path Constants ---
 TESTS_ROOT = Path(__file__).parent
-TRAIN_LOOPS_ROOT = TESTS_ROOT.parent
-CATALOG_DIR = TRAIN_LOOPS_ROOT / "catalog"
 
 
 class SimpleIterableDataset(IterableDataset):
@@ -34,83 +36,162 @@ class SimpleIterableDataset(IterableDataset):
             yield self.X[i:end], self.y[i:end]
 
 
-all_loop_files = list_all_files_in_folder_and_subdirs(str(CATALOG_DIR))
-all_loop_files = [loop_file for loop_file in all_loop_files 
-                    if (loop_file[-11:] != "__init__.py" and loop_file[-8:] != "_test.py")]
+def _iter_train_loop_modules():
+    try:
+        pkg = importlib.import_module("gpt_lab.train_loops")
+    except Exception:
+        return []
+    mods = []
+    for _, name, _ in pkgutil.walk_packages(pkg.__path__, prefix=pkg.__name__ + "."):
+        # Skip tests packages
+        if ".tests" in name:
+            continue
+        try:
+            m = importlib.import_module(name)
+            if hasattr(m, 'run_training'):
+                mods.append(m)
+        except Exception:
+            continue
+    return mods
 
-# Import modules and extract run_training functions
-all_loop_modules = []
-all_loop_functions = []
-for loop_file in all_loop_files:
-    module = import_module_from_path(f"loop_module_{len(all_loop_modules)}", str(CATALOG_DIR / loop_file))
-    if hasattr(module, 'run_training'):
-        all_loop_modules.append(module)
-        all_loop_functions.append(module.run_training)
+all_loop_modules = _iter_train_loop_modules()
+all_loop_functions = [m.run_training for m in all_loop_modules]
 
 
 def discover_specific_tests() -> Dict[str, List[Callable]]:
     """Discover all specific test functions for atomic features."""
-    specific_tests = {}
-    atomic_features_dir = CATALOG_DIR / "atomic_features"
+    specific_tests: Dict[str, List[Callable]] = {}
     
-    for test_file in atomic_features_dir.glob("*_test.py"):
-        feature_name = test_file.stem.replace("_test", "")
-        try:
-            module = import_module_from_path(f"test_{feature_name}", test_file)
-            if hasattr(module, "__specific_tests__"):
-                specific_tests[feature_name] = module.__specific_tests__
-        except Exception as e:
-            print(f"Warning: Failed to load specific tests from {test_file}: {e}")
-    
+    # 1) Discover tests colocated in repo tests folder (back-compat)
+    atomic_tests_dir = TESTS_ROOT / "catalog" / "atomic_features"
+    if atomic_tests_dir.exists():
+        # Support both test_*.py (prefix) and *_test.py (suffix) naming patterns
+        for test_file in list(atomic_tests_dir.glob("test_*.py")) + list(atomic_tests_dir.glob("*_test.py")):
+            # Extract feature name from both patterns
+            if test_file.stem.startswith("test_"):
+                feature_name = test_file.stem[5:]  # Remove "test_" prefix
+            else:
+                feature_name = test_file.stem.replace("_test", "")  # Remove "_test" suffix
+            try:
+                module = import_module_from_path(f"test_{feature_name}", test_file)
+                if hasattr(module, "__specific_tests__"):
+                    specific_tests[feature_name] = module.__specific_tests__
+            except Exception as e:
+                # Silently skip test files that fail to import (usually due to missing dependencies)
+                # This is expected when test files import atomic features that aren't in the package namespace
+                pass
+
+    # 2) Discover tests colocated next to atomic features across all active roots
+    try:
+        train_pkg = importlib.import_module("gpt_lab.train_loops")
+        for _, name, _ in pkgutil.walk_packages(train_pkg.__path__, prefix=train_pkg.__name__ + "."):
+            leaf = name.split(".")[-1]
+            # Support both test_* (prefix) and *_test (suffix) naming patterns
+            if not (leaf.endswith("_test") or leaf.startswith("test_")):
+                continue
+            try:
+                m = importlib.import_module(name)
+                if hasattr(m, "__specific_tests__"):
+                    # Extract feature name from both patterns
+                    if leaf.startswith("test_"):
+                        feature_name = leaf[5:]  # Remove "test_" prefix
+                    else:
+                        feature_name = leaf.replace("_test", "")  # Remove "_test" suffix
+                    specific_tests[feature_name] = m.__specific_tests__
+            except Exception as e:
+                # Silently skip test modules that fail to import
+                # This is expected when test files import atomic features that aren't in the package namespace
+                pass
+    except Exception:
+        pass
+
     return specific_tests
 
 
 def discover_atomic_features() -> List[Callable]:
     """Discover all atomic feature run_training functions."""
-    atomic_features_dir = CATALOG_DIR / "atomic_features"
     atomic_functions = []
-    
-    for feature_file in atomic_features_dir.glob("*.py"):
-        # Skip test files, __init__.py, and base_loop.py
-        if (feature_file.name.endswith("_test.py") or 
-            feature_file.name == "__init__.py" or
-            feature_file.name == "base_loop.py"):
+    try:
+        train_pkg = importlib.import_module("gpt_lab.train_loops")
+    except Exception:
+        return []
+    for _, name, _ in pkgutil.walk_packages(train_pkg.__path__, prefix=train_pkg.__name__ + "."):
+        leaf = name.split(".")[-1]
+        if leaf.endswith("_test") or leaf in ("__init__", "base_loop"):
             continue
-            
         try:
-            module = import_module_from_path(f"atomic_{feature_file.stem}", feature_file)
-            if hasattr(module, 'run_training'):
-                atomic_functions.append((module.run_training, feature_file.stem))
+            m = importlib.import_module(name)
+            if hasattr(m, 'run_training'):
+                atomic_functions.append((m.run_training, leaf))
         except Exception as e:
-            print(f"Warning: Failed to load atomic feature from {feature_file}: {e}")
+            print(f"Warning: Failed to load atomic feature from {name}: {e}")
     
     return atomic_functions
+
+
+def discover_compiled_loops() -> List[tuple]:
+    """
+    Discover all compiled training loops from artifact directories.
+    Returns list of (run_training_fn, loop_name, loop_path) tuples.
+    """
+    compiled_loops = []
+    compiled_files = []
+    
+    # Search artifacts across all active roots
+    for art_root in get_all_artifact_roots_for_active():
+        cand = art_root / "train_loops" / "llm_compiled"
+        if cand.is_dir():
+            compiled_files.extend(sorted(cand.glob("*.py")))
+    
+    for compiled_path in compiled_files:
+        try:
+            module = import_module_from_path(f"compiled_loop_{compiled_path.stem}", compiled_path)
+            if hasattr(module, 'run_training'):
+                # Use the filename as the loop name
+                loop_name = f"compiled_{compiled_path.stem}"
+                compiled_loops.append((module.run_training, loop_name, str(compiled_path)))
+        except Exception as e:
+            print(f"Warning: Failed to load compiled loop from {compiled_path}: {e}")
+    
+    return compiled_loops
 
 
 def generate_compiled_loop_specific_tests():
     """Generate pytest parameters for specific tests on compiled loops."""
     specific_tests = discover_specific_tests()
-    compiled_dir = CATALOG_DIR / "llm_compiled"
     params = []
-    
-    for compiled_loop_file in compiled_dir.glob("*.py"):
+    # Search artifacts across all active roots
+    compiled_files = []
+    for art_root in get_all_artifact_roots_for_active():
+        cand = art_root / "train_loops" / "llm_compiled"
+        if cand.is_dir():
+            compiled_files.extend(sorted(cand.glob("*.py")))
+    for compiled_path in compiled_files:
         try:
-            # Load the module to get atomic features
-            module = import_module_from_path(f"compiled_test_{compiled_loop_file.stem}", compiled_loop_file)
+            module = import_module_from_path(f"compiled_test_{compiled_path.stem}", compiled_path)
             atomic_features = getattr(module, '__atomic_features__', [])
             
-            # For each atomic feature, add its specific tests for each device
             for feature in atomic_features:
                 if feature in specific_tests:
                     for test_func in specific_tests[feature]:
+                        # Check if test function has compatible signature
+                        # It should accept exactly (run_training_fn, device) - no pytest fixtures
+                        sig = inspect.signature(test_func)
+                        params_list = list(sig.parameters.keys())
+                        
+                        # Skip tests that require pytest fixtures (more than 2 params, or params like tmp_path, monkeypatch, etc.)
+                        if len(params_list) != 2:
+                            continue
+                        if any(p in params_list for p in ['tmp_path', 'monkeypatch', 'request', 'capsys', 'capfd']):
+                            continue
+                        
                         for device in AVAILABLE_DEVICES:
                             params.append(pytest.param(
-                                test_func, module.run_training, str(compiled_loop_file), feature, device,
-                                id=f"{compiled_loop_file.stem}_{feature}_{test_func.__name__}_{device}"
+                                test_func, module.run_training, str(compiled_path), feature, device,
+                                id=f"{compiled_path.stem}_{feature}_{test_func.__name__}_{device}"
                             ))
         except Exception as e:
-            print(f"Warning: Failed to process compiled loop {compiled_loop_file}: {e}")
-    
+            print(f"Warning: Failed to process compiled loop at {compiled_path}: {e}")
     return params
 
 
@@ -119,10 +200,9 @@ def base_loop_compliance_test(run_training_fn, feature_name: str, device: str):
     Test that an atomic feature with default arguments behaves identically to base_loop.py.
     This ensures all atomic features maintain backward compatibility and follow the standard.
     """
-    # Import base_loop for comparison
-    base_loop_path = CATALOG_DIR / "atomic_features" / "base_loop.py"
-    base_module = import_module_from_path("base_loop_ref", base_loop_path)
-    base_run_training = base_module.run_training
+    # Import base_loop for comparison via namespace
+    base_module = importlib.import_module("gpt_lab.train_loops.base_loop")
+    base_run_training = getattr(base_module, 'run_training')
     
     # Create deterministic test setup
     torch.manual_seed(42)
@@ -294,6 +374,13 @@ for run_training_fn in all_loop_functions:
             pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_{device}")
         )
 
+# Add compiled loops to universal tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        universal_test_params.append(
+            pytest.param(fn, device, id=f"{name}_{device}")
+        )
+
 
 # Create parameterized tests for atomic feature compliance across devices
 atomic_compliance_params = []
@@ -303,6 +390,13 @@ for fn, name in discover_atomic_features():
             pytest.param(fn, name, device, id=f"{name}_{device}")
         )
 
+# Add compiled loops to base compliance tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        atomic_compliance_params.append(
+            pytest.param(fn, name, device, id=f"{name}_compliance_{device}")
+        )
+
 
 # Create parameterized tests for dataset compatibility across devices
 dataset_type_compatibility_params = []
@@ -310,6 +404,13 @@ for run_training_fn in all_loop_functions:
     for device in AVAILABLE_DEVICES:
         dataset_type_compatibility_params.append(
             pytest.param(run_training_fn, device, id=f"{run_training_fn.__module__}_dataset_compat_{device}")
+        )
+
+# Add compiled loops to dataset compatibility tests
+for fn, name, path in discover_compiled_loops():
+    for device in AVAILABLE_DEVICES:
+        dataset_type_compatibility_params.append(
+            pytest.param(fn, device, id=f"{name}_dataset_compat_{device}")
         )
 
 

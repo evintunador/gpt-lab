@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,25 +7,27 @@ name = "gpt-lab"
 version = "0.1.0"
 description = "A repository for modular, testable, and reproducible ML research."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "GPT-Lab" }]
 dependencies = [
-    "tqdm",
     "torch",
+    "numpy",
+    "pyyaml",
+    "tqdm",
     "pandas",
-    "marimo",
-    "plotly",
-    "matplotlib",
-    "litellm",
 ]
 
 [project.optional-dependencies]
-benchmarks = []
+docs = ["mkdocs"]
+viz = ["plotly", "matplotlib"]
+notebooks = ["marimo"]
+llm_code_compiler = ["litellm"]
 data_sources = [
-    "huggingface",
+    "huggingface_hub",
     "datasets",
+    "tiktoken",
 ]
-llm_code_compiler = []
-models = []
 nn_modules = [
     "triton; sys_platform != 'darwin'",  # Skip triton on macOS
 ]
@@ -33,17 +35,28 @@ optimizers = [
     "muon",
 ]
 train_loops = []
+benchmarks = []
 all_catalogs = [
-    "gpt-lab[benchmarks]",
     "gpt-lab[data_sources]",
-    "gpt-lab[llm_code_compiler]",
-    "gpt-lab[models]",
     "gpt-lab[nn_modules]",
     "gpt-lab[optimizers]",
     "gpt-lab[train_loops]",
+    "gpt-lab[llm_code_compiler]",
+    "gpt-lab[benchmarks]",
 ]
+# Domain packs (optional)
+nlp = [
+    "datasets",
+    "tiktoken",
+]
+cv = []
 dev = [
     "gpt-lab[all_catalogs]",
+    "gpt-lab[nlp]",
+    "gpt-lab[cv]",
+    "gpt-lab[docs]",
+    "gpt-lab[viz]",
+    "gpt-lab[notebooks]",
     "pytest",
 ]
 

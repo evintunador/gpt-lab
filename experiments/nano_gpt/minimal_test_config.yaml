@@ -1,0 +1,57 @@
+experiment_name: "nanogpt-gpt2-small"
+seed: 1337
+
+model:
+  max_seq_len: 128
+  vocab_size: 50257 # GPT-2 vocab size
+  n_layer: 2
+  n_head: 2
+  n_embd: 64
+  dropout: 0.1
+  bias: True
+
+data:
+  batch_size: 2
+  # URL for a single shard of the training data.
+  # This file is ~2.15GB, but downloading it directly avoids pulling multiple shards.
+  train_data_url: "https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu/resolve/main/sample/10BT/000_00000.parquet"
+  # URL for a single shard of the validation data.
+  val_data_url: "https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu/resolve/main/sample/10BT/001_00000.parquet"
+  val_set_limit: 2
+
+optimizer:
+  # Note: learning_rate is now under training kwargs for the scheduler feature
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+
+training:
+  # kwargs related to training that are directly used in main.py
+  device: "cuda"
+  learning_rate: .0006 # This will be the max_lr
+  warmup_iters: 2
+  lr_decay_iters: 4
+  min_lr: .00006
+  #resume_from_checkpoint: null
+
+  atomic_feature_kwargs:
+    # kwargs that'll trigger atomic features
+    total_steps: 10 #600000
+    accum_steps: 2
+    lr_scheduler_type: 'lambda_lr'
+    norm_clip_value: 1.0
+    val_interval: 5
+    save_every_steps: 5
+    save_best_model: True
+    track_loss: True
+
+# Benchmarking and generation after training
+benchmarks:
+  run_benchmarks: True
+  hellaswag_limit: 10
+  wikiqa_limit: 10
+  asdiv_limit: 10
+generation:
+  max_new_tokens: 32
+  temperature: 0.8
+  top_k: 200

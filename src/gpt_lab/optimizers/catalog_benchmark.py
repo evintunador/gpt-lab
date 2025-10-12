@@ -13,16 +13,13 @@ from tqdm import tqdm
 import pandas as pd
 
 from gpt_lab.device import get_available_devices
-from gpt_lab.catalog_utils import discover_dunder_objects
+from gpt_lab.catalog_utils import discover_dunder_objects_in_package
 from gpt_lab.optimizers.catalog_utils import OptimizerConfig, OptimizerBenchmarkConfig, create_smart_optimizer
+from gpt_lab.catalog_bootstrap import get_artifact_root
 
 
 # --- Path Constants ---
 OPTIMIZERS_ROOT = Path(__file__).parent
-SRC_ROOT = OPTIMIZERS_ROOT.parent.parent
-PROJECT_ROOT = SRC_ROOT.parent
-BENCH_RESULTS_DIR = PROJECT_ROOT / "bench_results" / "optimizers"
-CATALOG_DIR = OPTIMIZERS_ROOT / "catalog"
 
 
 def create_complex_synthetic_dataset(
@@ -277,9 +274,11 @@ def benchmark_optimizer(
     }
 
 
-def run_optimizer_benchmarks(configs: List[OptimizerBenchmarkConfig], device: str, output_dir: Path = BENCH_RESULTS_DIR):
+def run_optimizer_benchmarks(configs: List[OptimizerBenchmarkConfig], device: str, output_dir: Optional[Path] = None):
     """Run benchmarks for optimizer configurations following the module pattern"""
     
+    if output_dir is None:
+        output_dir = get_artifact_root() / "optimizers"
     output_dir.mkdir(parents=True, exist_ok=True)
     device_type = torch.device(device).type
     
@@ -353,10 +352,10 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    all_benchmark_configs, discovery_errors = discover_dunder_objects(
+    all_benchmark_configs, discovery_errors = discover_dunder_objects_in_package(
         dunder='__benchmark_config__', 
         object=OptimizerBenchmarkConfig,
-        search_folders=str(CATALOG_DIR)
+        package_name='gpt_lab.optimizers'
     )
 
     if discovery_errors:

@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 
 from gpt_lab.nn_modules.catalog_utils import ModuleTestConfig, get_total_loss
 from gpt_lab.device import get_available_devices
-from gpt_lab.catalog_utils import discover_dunder_objects
+from gpt_lab.catalog_utils import discover_dunder_objects_in_package, list_all_files_in_folder_and_subdirs, import_module_from_path
+from gpt_lab.catalog_bootstrap import get_active_context
 
 
 # --- Path Constants ---
@@ -222,18 +223,45 @@ def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: Li
     return test_suite
 
 
-ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects(
+ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects_in_package(
     dunder='__test_config__', 
     object=ModuleTestConfig,
-    search_folders=str(NN_MODULES_ROOT / "catalog")
+    package_name='gpt_lab.nn_modules'
 )
+
+# Fallback discovery by filesystem if package-based discovery yields nothing
+if len(ALL_TEST_CONFIGS) == 0 and not DISCOVERY_ERRORS:
+    try:
+        ctx = get_active_context()
+        roots = [Path(r) / 'nn_modules' for r in ctx.get('ordered_roots', [])]
+        seen = set()
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for rel_path in list_all_files_in_folder_and_subdirs(str(root)):
+                if not rel_path.endswith('.py') or rel_path.endswith('__init__.py'):
+                    continue
+                abs_path = root / rel_path
+                key = str(abs_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    module = import_module_from_path(f"nnm_fs_{len(seen)}", abs_path)
+                    obj = getattr(module, '__test_config__', None)
+                    if isinstance(obj, ModuleTestConfig):
+                        ALL_TEST_CONFIGS.append(obj)
+                except Exception:
+                    continue
+    except Exception:
+        pass
 AVAILABLE_DEVICES, _ = get_available_devices()
 TEST_SUITE = build_test_suite(ALL_TEST_CONFIGS, AVAILABLE_DEVICES)
 
 # Add this to make pytest show more info about parameterized tests
 if len(TEST_SUITE) == 0 and not DISCOVERY_ERRORS:
     print("[ERROR] No tests generated!")
-    pytest.skip("No tests generated - check module discovery")
+    pytest.skip("No tests generated - check module discovery", allow_module_level=True)
 
 
 def test_module_discovery_errors():
