@@ -24,11 +24,10 @@ CATALOG_TYPES: List[str] = [
 
 
 def _is_repo_root(path: Path) -> bool:
-    if (path / "gpt_lab.yaml").exists():
-        return True
+    # Prefer explicit sentinel file to avoid misclassifying experiment dirs
     if (path / ".gpt_lab_root").exists():
         return True
-    # Heuristic: has both src/ and catalogs/
+    # Heuristic: top-level repo should have both src/ and catalogs/
     if (path / "src").is_dir() and (path / "catalogs").is_dir():
         return True
     return False
@@ -74,6 +73,9 @@ def _load_repo_yaml(repo_root: Path) -> Dict:
 
 
 def _infer_current_experiment(repo_root: Path) -> str:
+    # In core-only mode, do not infer any experiment
+    if os.getenv("GPT_LAB_CORE_ONLY", ""):
+        return ""
     # 1) Explicit env
     cur_exp = os.getenv("GPT_LAB_CURRENT_EXPERIMENT")
     if cur_exp:
@@ -121,6 +123,9 @@ def _parse_csv_env(name: str) -> List[str]:
 
 
 def _resolve_active_roots(repo_root: Path) -> Tuple[str, List[str], List[str]]:
+    # Core-only mode disables experiments and packs
+    if os.getenv("GPT_LAB_CORE_ONLY", ""):
+        return "", [], []
     repo_cfg = _load_repo_yaml(repo_root)
     cur_exp = _infer_current_experiment(repo_root)
     exp_cfg = _load_experiment_yaml(repo_root, cur_exp)
