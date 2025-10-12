@@ -16,7 +16,8 @@ jobs:
       - name: Install dependencies (minimal)
         run: |
           python -m pip install --upgrade pip
-          pip install -e . pytest
+          pip install --index-url https://download.pytorch.org/whl/cpu torch --extra-index-url https://pypi.org/simple
+          pip install -e .[llm_code_compiler] pytest
       - name: Print active paths (debug)
         run: |
           python CLIs/print_active_paths.py -v || true
