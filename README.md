@@ -2,6 +2,12 @@
 
 A framework for modular, testable, and reproducible ML research. GPT-Lab helps researchers build experiments with strong reproducibility guarantees while enabling rapid iteration.
 
+# WARNING
+
+This repo is in early alpha and frequently undergoing major restructuring.
+It is my belief that we are somewhat close to the final structure but the implementation is definitely not as clean as it could be.
+At the vary least, you should be able to rely on working on experiments inside `experiments/<experiment_name>/` to stay consistent in structure, but the same cannot be said for experiments in separate repos or git submodules.
+
 ## Key Features
 
 - **Modular Catalogs**: Composable components for models, optimizers, train loops, and data sources
