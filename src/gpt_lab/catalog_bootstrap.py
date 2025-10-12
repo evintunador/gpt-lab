@@ -216,14 +216,16 @@ def bootstrap_namespace_paths() -> None:
         except Exception:
             continue
         # We add the base type dir (not deeper) so subpackages resolve naturally
-        for base in roots:
+        # Iterate in reverse and insert at front so the first root ends up first
+        for base in reversed(roots):
             candidate = base / cat
             if candidate.is_dir():
                 # Avoid duplicates
                 candidate_str = str(candidate)
-                if candidate_str not in getattr(pkg, "__path__", []):
+                path_list = getattr(pkg, "__path__", [])
+                if candidate_str not in path_list:
                     try:
-                        pkg.__path__.append(candidate_str)  # type: ignore[attr-defined]
+                        path_list.insert(0, candidate_str)  # type: ignore[attr-defined]
                     except Exception:
                         # Some packages may not expose __path__ properly; skip
                         pass
