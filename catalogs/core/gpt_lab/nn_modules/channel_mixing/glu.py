@@ -33,7 +33,7 @@ torch._dynamo.config.recompile_limit = 100
 ##################################################
 
 
-class GatedMLP(nn.Module):
+class GLU(nn.Module):
     def __init__(
         self, 
         in_dim: int, 
@@ -77,7 +77,7 @@ def fwd(inp, w_up_gate, w_down, act_fn, dropout):
     up, gate = up_gate.chunk(2, dim=-1)
     return dropout(w_down(up * act_fn(gate)))
 
-class PreCompiledGatedMLP(GatedMLP):
+class PreCompiledGLU(GLU):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return fwd(x, self.Wup_gate, self.Wdown, self.act_fn, self.dropout)
     
@@ -86,7 +86,7 @@ def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
     """
     Many custom modules are only appropriate for use under a subset of all the conditions where a regular pytorch nn.module can run.
     Use this function to ensure that testing is only attempted on that subset.
-    Here, for example, our PreCompiledGatedMLP should only be run on a GPU since it uses torch.compile.
+    Here, for example, our PreCompiledGLU should only be run on a GPU since it uses torch.compile.
     """
     if 'cpu' in str(inputs[0].device):
         return False
@@ -99,14 +99,14 @@ def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
 
 
 __competitors__ = {
-    'GatedMLP': Competitor(module_class=GatedMLP),
-    'PreCompiledGatedMLP': Competitor(module_class=PreCompiledGatedMLP, run_filter=pre_compiled_run_filter),
+    'GLU': Competitor(module_class=GLU),
+    'PreCompiledGLU': Competitor(module_class=PreCompiledGLU, run_filter=pre_compiled_run_filter),
 }
 
 
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
-    reference_competitor='GatedMLP',
+    reference_competitor='GLU',
     test_cases=[
         {
             'init_args': {'in_dim': dim, 'activation': act, 'fp8': fp8},
@@ -129,7 +129,7 @@ __test_config__ = ModuleTestConfig(
 
 
 __benchmark_config__ = BenchmarkConfig(
-    module_name='GatedMLP',
+    module_name='GLU',
     competitors=__competitors__,
     parameter_space={
         'dim': dims_to_bench,
