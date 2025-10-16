@@ -259,3 +259,4 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] move nn_module backup test discovery inside primary test discovery function & maybe get rid of it entirely
 - [ ] improve attribute names and standardize all test & bench configs (hint: rename 'output_validator' to 'output_validator_fn' in nn.Modules bulk testing)
 - [ ] write equivalents of `to_device` and `to_dtype` but for `.clone()` and `.detach()`
+- [ ] separate core src/ importables from tools only used by catalog

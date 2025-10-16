@@ -25,6 +25,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Set, List, Tuple, Any
 from collections import defaultdict
+import tempfile
 
 from gpt_lab.catalog_utils import import_module_from_path
 from gpt_lab.catalog_bootstrap import get_active_context
@@ -457,21 +458,31 @@ def smart_train(
         logger.warning(f"LLM client creation failed ({e}); proceeding without actual compilation for tests.")
         llm = None
 
-    # create the training loop code
-    compilation_result = compile_loop(selected_features, llm=llm) if llm is not None else {"code_path": str((Path.cwd() / "_mock_compiled_loop.py"))}
     if llm is None:
-        # Ensure a dummy file exists so import_module_from_path works under test
-        dummy_path = Path(compilation_result["code_path"])
-        if not dummy_path.exists():
+        # For tests, create a mock compiled loop in a temporary directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dummy_path = Path(tmpdir) / "mock_compiled_loop.py"
             dummy_path.write_text("def run_training(model, optimizer, train_loader, **kwargs):\n    return {\"model\": model}\n")
+
+            # Load the mock training function
+            compiled_module = import_module_from_path("smart_mock_loop", str(dummy_path))
+            compiled_run_training = compiled_module.run_training
+
+            logger.info("Using mock compiled training loop from temporary file.")
+
+            # Execute the mock training loop
+            return compiled_run_training(model, optimizer, train_loader, **filtered_kwargs)
+
+    # create the training loop code
+    compilation_result = compile_loop(selected_features, llm=llm)
     compiled_module_path = compilation_result["code_path"]
-    
+
     # Load the compiled training function
     compiled_module = import_module_from_path("smart_compiled_loop", compiled_module_path)
     compiled_run_training = compiled_module.run_training
-    
+
     logger.info(f"Using compiled training loop: {compiled_module_path}")
-    
+
     # Execute the compiled training loop with user's kwargs
     return compiled_run_training(model, optimizer, train_loader, **filtered_kwargs)
 
