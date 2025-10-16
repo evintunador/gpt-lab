@@ -5,6 +5,7 @@ import logging
 
 import numpy as np
 import torch
+import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
@@ -47,10 +48,17 @@ def save_checkpoint(
             'random': random.getstate(),
         }
 
-    # Save state dict for any object that has one
     for key, obj in stateful_objects.items():
         if hasattr(obj, 'state_dict'):
-            state[key] = obj.state_dict()
+            state_dict_obj = obj
+            if isinstance(state_dict_obj, nn.parallel.DistributedDataParallel):
+                logger.debug(f"Unwrapping '{key}' (DDP model) before saving state_dict.")
+                state_dict_obj = state_dict_obj.module
+            if hasattr(state_dict_obj, '_orig_mod'):
+                logger.debug(f"Unwrapping '{key}' (compiled model) before saving state_dict.")
+                state_dict_obj = state_dict_obj._orig_mod
+
+            state[key] = state_dict_obj.state_dict()
             logger.debug(f"Added state_dict for '{key}' to checkpoint")
         else:
             logger.warning(f"Object '{key}' has no .state_dict() method and will not be checkpointed")
@@ -60,13 +68,44 @@ def save_checkpoint(
     return filepath
 
 
+def _normalize_state_dict_keys(state_dict: Dict[str, Any], model: nn.Module) -> Dict[str, Any]:
+    """
+    Normalizes state_dict keys to handle inconsistencies from DDP.
+
+    - If loading into a DDP model, it adds the 'module.' prefix to keys if absent.
+    - If loading into a non-DDP model, it removes the 'module.' prefix if present.
+
+    Args:
+        state_dict: The state dictionary loaded from a checkpoint.
+        model: The model instance to load the state into.
+
+    Returns:
+        The adjusted state dictionary.
+    """
+    has_module_prefix = any(k.startswith("module.") for k in state_dict.keys())
+    is_ddp_model = isinstance(model, nn.parallel.DistributedDataParallel)
+
+    if is_ddp_model and not has_module_prefix:
+        logger.info("Adding 'module.' prefix to state_dict keys for DDP model compatibility.")
+        return {"module." + k: v for k, v in state_dict.items()}
+    elif not is_ddp_model and has_module_prefix:
+        logger.info("Removing 'module.' prefix from state_dict keys for non-DDP model compatibility.")
+        return {k[len("module.") :] : v for k, v in state_dict.items()}
+
+    return state_dict
+
+
 def load_checkpoint(
     filepath: str,
-    map_location: str = 'cpu',
+    map_location: str = "cpu",
     **stateful_objects: Any,
 ) -> Dict[str, Any]:
     """
     Loads a flexible training checkpoint.
+
+    This function can automatically handle common state_dict key mismatches
+    that occur when saving/loading models wrapped with `torch.nn.parallel.DistributedDataParallel`
+    or optimized with `torch.compile`.
 
     Args:
         filepath: The path to the checkpoint file.
@@ -90,19 +129,32 @@ def load_checkpoint(
     # Set weights_only=False to allow loading of arbitrary python objects
     # like numpy RNG states, which are not considered "safe" by default.
     checkpoint = torch.load(filepath, map_location=map_location, weights_only=False)
-    
-    # Load state into the provided objects
+
     for key, obj in stateful_objects.items():
         if key in checkpoint:
-            if hasattr(obj, 'load_state_dict'):
-                logger.debug(f"Loading state for '{key}'")
-                obj.load_state_dict(checkpoint[key])
+            if hasattr(obj, "load_state_dict"):
+                state_to_load = checkpoint[key]
+
+                target_obj = obj
+                if isinstance(target_obj, nn.Module):
+                    if isinstance(target_obj, nn.parallel.DistributedDataParallel):
+                        target_obj = target_obj.module
+                    if hasattr(target_obj, '_orig_mod'):
+                        target_obj = target_obj._orig_mod
+                try:
+                    logger.debug(f"Loading state for '{key}'")
+                    target_obj.load_state_dict(state_to_load)
+                except RuntimeError as e:
+                    logger.error(
+                        f"Failed to load state_dict for '{key}'. This can happen if the "
+                        f"architecture does not match the checkpoint. Error: {e}"
+                    )
+                    logger.warning(f"Skipping state loading for '{key}'.")
             else:
                 logger.warning(f"Object '{key}' has no .load_state_dict() method. Skipping")
         else:
             logger.warning(f"Key '{key}' not found in checkpoint. Skipping")
 
-    # Return all data that isn't a state_dict for the passed objects
     returned_data = {}
     stateful_keys = set(stateful_objects.keys())
     for key, value in checkpoint.items():

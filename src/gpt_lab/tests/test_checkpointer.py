@@ -1,9 +1,12 @@
 import os
+import random
 
 import pytest
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
 from gpt_lab.checkpointer import save_checkpoint, load_checkpoint
 from gpt_lab.device import get_default_device
@@ -20,93 +23,36 @@ class SimpleModel(nn.Module):
         return self.linear(x)
 
 
-def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
-    """
-    Core test logic for saving and loading a checkpoint.
-    """
-    # 1. Setup environment
-    save_dir = tmp_path
-    filename = "test_checkpoint.pt"
-    filepath = os.path.join(save_dir, filename)
+@pytest.fixture
+def distributed_env():
+    """Fixture to set up a single-node distributed environment for testing."""
+    if not dist.is_available():
+        pytest.skip("torch.distributed is not available")
 
-    # 2. Create original objects and move to device
-    model_orig = SimpleModel().to(device)
-    optimizer_orig = optim.Adam(model_orig.parameters(), lr=0.001)
-    
-    # Create metadata with git info (mimicking what ReproducibilityManager would provide)
-    git_info = {
-        "commit_hash": get_git_commit_hash(),
-        "branch": "test-branch",
-        "remote_url": "https://github.com/test/repo.git",
-        "was_dirty": False
-    }
-    metadata_orig = {
-        'epoch': 10, 
-        'step': 1234, 
-        'best_val_loss': 0.05,
-        'git_info': git_info
-    }
+    port = random.randint(10000, 65535)
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = str(port)
+    os.environ["RANK"] = "0"
+    os.environ["WORLD_SIZE"] = "1"
 
-    # Perform a training step to give the optimizer state
-    optimizer_orig.zero_grad()
-    dummy_input = torch.randn(4, 10, device=device)
-    loss = model_orig(dummy_input).sum()
-    loss.backward()
-    optimizer_orig.step()
+    backend = "gloo"
+    dist.init_process_group(backend=backend)
+    yield
+    dist.destroy_process_group()
+    del os.environ["MASTER_ADDR"]
+    del os.environ["MASTER_PORT"]
+    del os.environ["RANK"]
+    del os.environ["WORLD_SIZE"]
 
-    # 3. Save the checkpoint
-    save_checkpoint(
-        save_dir=str(save_dir),
-        filename=filename,
-        metadata=metadata_orig,
-        save_rng_state=True,
-        model=model_orig,
-        optimizer=optimizer_orig
-    )
-    assert os.path.exists(filepath), "Checkpoint file was not created"
 
-    # 4. Create new objects to load into
-    model_loaded = SimpleModel().to(device)
-    optimizer_loaded = optim.Adam(model_loaded.parameters(), lr=0.001)
-
-    # Verify state is different before loading
-    assert not torch.equal(
-        next(iter(model_orig.parameters())).data,
-        next(iter(model_loaded.parameters())).data
-    ), "Models were already identical before loading"
-
-    # 5. Load the checkpoint
-    loaded_data = load_checkpoint(
-        filepath=filepath,
-        map_location=str(device),
-        model=model_loaded,
-        optimizer=optimizer_loaded
-    )
-
-    # 6. Assert that the state has been restored correctly
-    assert loaded_data['metadata'] == metadata_orig, "Metadata was not loaded correctly"
-    assert 'rng_states' in loaded_data, "RNG states not found in loaded data"
-    
-    # Verify git info is properly stored in metadata
-    assert 'git_info' in loaded_data['metadata'], "Git info not found in metadata"
-    assert loaded_data['metadata']['git_info']['commit_hash'] == git_info['commit_hash'], "Git commit hash not preserved"
-
-    # Check model state
-    for p_orig, p_loaded in zip(model_orig.parameters(), model_loaded.parameters()):
-        assert torch.equal(p_orig.data, p_loaded.data), "Model parameters do not match after loading"
-
-    # Check optimizer state by comparing its components manually.
-    # A direct dict comparison fails because it contains tensors.
-    sd_orig = optimizer_orig.state_dict()
-    sd_loaded = optimizer_loaded.state_dict()
+def _compare_optimizer_states(sd_orig, sd_loaded, device):
+    """Helper to compare two optimizer state_dicts."""
     assert len(sd_orig['param_groups']) == len(sd_loaded['param_groups']), "Number of param groups differs"
     for pg_orig, pg_loaded in zip(sd_orig['param_groups'], sd_loaded['param_groups']):
-        # We can't compare 'params' directly as they are just IDs
         pg_orig.pop('params', None)
         pg_loaded.pop('params', None)
         assert pg_orig == pg_loaded, "Optimizer param_groups do not match"
 
-    # Compare state tensors (e.g., momentum buffers)
     assert sd_orig['state'].keys() == sd_loaded['state'].keys(), "Optimizer state keys do not match"
     for param_id in sd_orig['state']:
         state_orig = sd_orig['state'][param_id]
@@ -115,9 +61,82 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
             val_orig = state_orig[key]
             val_loaded = state_loaded[key]
             if isinstance(val_orig, torch.Tensor):
-                assert torch.equal(val_orig, val_loaded.to(val_orig.device)), f"Optimizer state tensor '{key}' does not match"
+                assert torch.equal(val_orig.to(device), val_loaded.to(device)), f"Optimizer state tensor '{key}' does not match"
             else:
                 assert val_orig == val_loaded, f"Optimizer state value '{key}' does not match"
+
+
+def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
+    """
+    Core test logic for saving and loading a checkpoint.
+    """
+    save_dir = tmp_path
+    filename = "test_checkpoint.pt"
+    filepath = os.path.join(save_dir, filename)
+
+    model_orig = SimpleModel().to(device)
+    optimizer_orig = optim.Adam(model_orig.parameters(), lr=0.001)
+
+    git_info = {
+        "commit_hash": get_git_commit_hash(),
+        "branch": "test-branch",
+        "remote_url": "https://github.com/test/repo.git",
+        "was_dirty": False,
+    }
+    metadata_orig = {
+        "epoch": 10,
+        "step": 1234,
+        "best_val_loss": 0.05,
+        "git_info": git_info,
+    }
+
+    optimizer_orig.zero_grad()
+    dummy_input = torch.randn(4, 10, device=device)
+    loss = model_orig(dummy_input).sum()
+    loss.backward()
+    optimizer_orig.step()
+
+    save_checkpoint(
+        save_dir=str(save_dir),
+        filename=filename,
+        metadata=metadata_orig,
+        save_rng_state=True,
+        model=model_orig,
+        optimizer=optimizer_orig,
+    )
+    assert os.path.exists(filepath), "Checkpoint file was not created"
+
+    model_loaded = SimpleModel().to(device)
+    optimizer_loaded = optim.Adam(model_loaded.parameters(), lr=0.001)
+
+    assert not torch.equal(
+        next(iter(model_orig.parameters())).data,
+        next(iter(model_loaded.parameters())).data,
+    ), "Models were already identical before loading"
+
+    loaded_data = load_checkpoint(
+        filepath=filepath,
+        map_location=str(device),
+        model=model_loaded,
+        optimizer=optimizer_loaded,
+    )
+
+    assert loaded_data["metadata"] == metadata_orig, "Metadata was not loaded correctly"
+    assert "rng_states" in loaded_data, "RNG states not found in loaded data"
+
+    assert "git_info" in loaded_data["metadata"], "Git info not found in metadata"
+    assert (
+        loaded_data["metadata"]["git_info"]["commit_hash"] == git_info["commit_hash"]
+    ), "Git commit hash not preserved"
+
+    for p_orig, p_loaded in zip(model_orig.parameters(), model_loaded.parameters()):
+        assert torch.equal(
+            p_orig.data, p_loaded.data
+        ), "Model parameters do not match after loading"
+
+    sd_orig = optimizer_orig.state_dict()
+    sd_loaded = optimizer_loaded.state_dict()
+    _compare_optimizer_states(sd_orig, sd_loaded, device)
 
 
 def test_checkpointing_roundtrip(tmp_path):
@@ -126,3 +145,137 @@ def test_checkpointing_roundtrip(tmp_path):
     """
     device = get_default_device()
     _checkpointing_roundtrip_test(device, tmp_path)
+
+
+def _run_compatibility_test(
+    tmp_path,
+    device,
+    create_save_objects,
+    create_load_objects,
+):
+    """
+    Generic test logic for saving one model type and loading into another.
+    It takes functions to create the models/optimizers to avoid initialization issues.
+    """
+    filename = "compat_test.pt"
+    filepath = os.path.join(tmp_path, filename)
+
+    model_to_save, optimizer_to_save = create_save_objects()
+
+    optimizer_to_save.zero_grad()
+    dummy_input = torch.randn(4, 10, device=device)
+    loss = model_to_save(dummy_input).sum()
+    loss.backward()
+    optimizer_to_save.step()
+
+    save_checkpoint(
+        save_dir=str(tmp_path),
+        filename=filename,
+        model=model_to_save,
+        optimizer=optimizer_to_save,
+    )
+
+    model_to_load, optimizer_to_load = create_load_objects()
+
+    load_checkpoint(
+        filepath=filepath,
+        map_location=str(device),
+        model=model_to_load,
+        optimizer=optimizer_to_load,
+    )
+
+    raw_model_saved = model_to_save
+    if hasattr(raw_model_saved, "module"):
+        raw_model_saved = raw_model_saved.module
+    if hasattr(raw_model_saved, "_orig_mod"):
+        raw_model_saved = raw_model_saved._orig_mod
+
+    raw_model_loaded = model_to_load
+    if hasattr(raw_model_loaded, "module"):
+        raw_model_loaded = raw_model_loaded.module
+    if hasattr(raw_model_loaded, "_orig_mod"):
+        raw_model_loaded = raw_model_loaded._orig_mod
+
+    for p_orig, p_loaded in zip(
+        raw_model_saved.parameters(), raw_model_loaded.parameters()
+    ):
+        assert torch.equal(
+            p_orig.data, p_loaded.data
+        ), "Model parameters do not match"
+
+    _compare_optimizer_states(
+        optimizer_to_save.state_dict(), optimizer_to_load.state_dict(), device
+    )
+
+
+# --- DDP Tests ---
+@pytest.mark.skipif(
+    get_default_device().type == "mps", reason="DDP is not supported on MPS backend"
+)
+def test_ddp_save_raw_load_ddp(tmp_path, distributed_env):
+    """Tests saving a raw model and loading into a DDP-wrapped one."""
+    device = get_default_device()
+    def create_raw():
+        model = SimpleModel().to(device)
+        return model, optim.Adam(model.parameters())
+    def create_ddp():
+        model = DDP(SimpleModel().to(device), device_ids=[device.index] if device.type == "cuda" else None)
+        return model, optim.Adam(model.parameters())
+    _run_compatibility_test(tmp_path, device, create_raw, create_ddp)
+
+@pytest.mark.skipif(
+    get_default_device().type == "mps", reason="DDP is not supported on MPS backend"
+)
+def test_ddp_save_ddp_load_raw(tmp_path, distributed_env):
+    """Tests saving a DDP-wrapped model and loading into a raw one."""
+    device = get_default_device()
+    def create_raw():
+        model = SimpleModel().to(device)
+        return model, optim.Adam(model.parameters())
+    def create_ddp():
+        model = DDP(SimpleModel().to(device), device_ids=[device.index] if device.type == "cuda" else None)
+        return model, optim.Adam(model.parameters())
+    _run_compatibility_test(tmp_path, device, create_ddp, create_raw)
+
+
+# --- torch.compile Tests ---
+@pytest.mark.skipif(not hasattr(torch, 'compile'), reason="torch.compile not available")
+def test_compile_save_raw_load_compiled(tmp_path):
+    """Tests saving a raw model and loading into a compiled one."""
+    device = get_default_device()
+    def create_raw():
+        model = SimpleModel().to(device)
+        return model, optim.Adam(model.parameters())
+    def create_compiled():
+        model = torch.compile(SimpleModel().to(device))
+        return model, optim.Adam(model.parameters())
+    _run_compatibility_test(tmp_path, device, create_raw, create_compiled)
+
+@pytest.mark.skipif(not hasattr(torch, 'compile'), reason="torch.compile not available")
+def test_compile_save_compiled_load_raw(tmp_path):
+    """Tests saving a compiled model and loading into a raw one."""
+    device = get_default_device()
+    def create_raw():
+        model = SimpleModel().to(device)
+        return model, optim.Adam(model.parameters())
+    def create_compiled():
+        model = torch.compile(SimpleModel().to(device))
+        return model, optim.Adam(model.parameters())
+    _run_compatibility_test(tmp_path, device, create_compiled, create_raw)
+
+
+# --- DDP + torch.compile Tests ---
+@pytest.mark.skipif(
+    get_default_device().type == "mps", reason="DDP is not supported on MPS backend"
+)
+@pytest.mark.skipif(not hasattr(torch, 'compile'), reason="torch.compile not available")
+def test_ddp_compile_save_wrapped_load_raw(tmp_path, distributed_env):
+    """Tests saving a DDP-compiled model and loading into a raw one."""
+    device = get_default_device()
+    def create_raw():
+        model = SimpleModel().to(device)
+        return model, optim.Adam(model.parameters())
+    def create_wrapped():
+        model = DDP(torch.compile(SimpleModel().to(device)), device_ids=[device.index] if device.type == "cuda" else None)
+        return model, optim.Adam(model.parameters())
+    _run_compatibility_test(tmp_path, device, create_wrapped, create_raw)

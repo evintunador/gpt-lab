@@ -137,20 +137,33 @@ save_checkpoint(
 )
 ```
 
-### 3. Unwrap DDP Models
+### 3. Automatic Handling for DDP and `torch.compile`
 
-When using `DistributedDataParallel`, save the underlying module:
+The checkpointer is designed to work seamlessly with common PyTorch wrappers, removing boilerplate and potential errors from your training scripts.
+
+-   **`torch.nn.parallel.DistributedDataParallel` (DDP)**: You no longer need to manually unwrap the model by accessing `.module`. The checkpointer automatically detects a DDP-wrapped model and saves the underlying model's state dictionary.
+-   **`torch.compile`**: Similarly, if you pass a compiled model, the checkpointer automatically saves the state dictionary of the original, uncompiled model.
+
+This means you can pass your model object directly to `save_checkpoint` and `load_checkpoint`, regardless of whether it's wrapped in DDP, compiled with `torch.compile`, or both.
+
+**Example:**
 
 ```python
-from torch.nn.parallel import DistributedDataParallel as DDP
+# model can be a raw model, a DDP-wrapped model, or a compiled model
+model = DDP(torch.compile(MyModel()), device_ids=[local_rank])
 
-model = DDP(MyModel(), device_ids=[local_rank])
-
-# Save the underlying module, not the DDP wrapper
+# No need to call model.module or access _orig_mod
 save_checkpoint(
     save_dir="./checkpoints",
     filename="checkpoint.pt",
-    model=model.module,  # Not model!
+    model=model, # Pass the wrapped model directly
+    optimizer=optimizer
+)
+
+# To load, you can also pass the wrapped model directly
+load_checkpoint(
+    filepath="./checkpoints/checkpoint.pt",
+    model=model,
     optimizer=optimizer
 )
 ```
