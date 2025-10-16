@@ -105,10 +105,20 @@ mm_op.register_autograd(backward, setup_context=setup_context)
 
 
 class FP8Linear(nn.Linear):
-    def __init__(self, in_features: int, out_features: int,  
-                 fp8: bool, x_s: float = 1.0, w_s: float = 1.0, grad_s: float = 1.0,
-                 device: str = None, dtype: torch.dtype = torch.float32,):
-        super().__init__(in_features, out_features, bias=False, device=device, dtype=dtype)
+    def __init__(
+        self, 
+        in_features: int, 
+        out_features: int,  
+        fp8: bool, 
+        x_s: float = 1.0, 
+        w_s: float = 1.0, 
+        grad_s: float = 1.0,
+    ):
+        super().__init__(
+            in_features, 
+            out_features, 
+            bias=False,
+        )
         self.fp8 = fp8 and is_hopper_available()
         self.x_s = x_s
         self.w_s = w_s
@@ -155,8 +165,8 @@ __competitors__ = {
 }
 
 
-def input_args(dev, in_features, out_features, dtype):
-    return (torch.randn(2048, in_features, device=dev, dtype=torch.float32, requires_grad=True),)
+def input_args(in_features, out_features):
+    return (torch.randn(2048, in_features, requires_grad=True),)
 
 __test_config__ = ModuleTestConfig(
     competitors=__competitors__,
@@ -167,16 +177,14 @@ __test_config__ = ModuleTestConfig(
                 'in_features': in_features, 
                 'out_features': out_features, 
                 'fp8': fp8,
-                'dtype': dtype,
                 },
-            'input_args': lambda dev, in_dim=in_features, out_dim=out_features, dt=dtype: input_args(dev, in_dim, out_dim, dt),
+            'input_args': input_args(in_features, out_features),
             'output_validator': output_validator,
-            'tolerances': {'atol': 1e-1, 'rtol': 1},          # Optional
-            'case_descriptor': f'(in_features,out_features)=({in_features},{out_features})_fp8={fp8}_dtype={dtype}',
+            'tolerances_fn': lambda x: {'atol': 1e-1, 'rtol': 1},          # Optional
+            'case_descriptor': f'(in_features,out_features)=({in_features},{out_features})_fp8={fp8}',
         }
         for in_features, out_features in [(128, 128), (512, 2048), (1832, 4271)]
         for fp8 in ([True, False] if is_hopper_available() else [False])
-        for dtype in [torch.float16, torch.bfloat16, torch.float32]
     ]
 )
 
@@ -186,18 +194,16 @@ __test_config__ = ModuleTestConfig(
 ##################################################
 
 
-def benchmark_input_provider(init_args: dict, device: str) -> tuple:
+def benchmark_input_provider(init_args: dict) -> tuple:
     """Generates a standard input for benchmarking."""
     # input shape: (batch_size, sequence_length, dimension)
-    dtype = init_args.get('dtype', torch.float32)
-    return (torch.randn(1, 1, init_args['in_features'], device=device, dtype=torch.float32),)
+    return (torch.randn(1, 1, init_args['in_features']),)
 
 __benchmark_config__ = BenchmarkConfig(
     module_name='FP8Linear',
     competitors=__competitors__,
     parameter_space={
         'dim': [32, 64, 128, 512, 1024, 2048, 4096],
-        'dtype': [torch.float16, torch.bfloat16, torch.float32],
         'fp8': [True, False] if is_hopper_available() else [False],
     },
     init_arg_builder=lambda params: {

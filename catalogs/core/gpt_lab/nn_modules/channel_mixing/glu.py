@@ -13,9 +13,8 @@ from gpt_lab.nn_modules.activations.relu2 import ReLU2
 from .fp8_linear import FP8Linear, is_hopper_available
 from .mlp import (
     input_args, 
-    tolerances, 
+    tolerances_fn, 
     dims_to_test, 
-    dtypes_to_test, 
     act_to_test,
     output_validator,
     dims_to_bench,
@@ -71,15 +70,15 @@ class GLU(nn.Module):
 # PRECOMPILED IMPLEMENTATION FOR TESTING torch.compile #
 ########################################################
 
-@torch.compile
-def fwd(inp, w_up_gate, w_down, act_fn, dropout):
+@torch.compile(mode='default')
+def pre_compiled_fwd(inp, w_up_gate, w_down, act_fn, dropout):
     up_gate = w_up_gate(inp)
     up, gate = up_gate.chunk(2, dim=-1)
     return dropout(w_down(up * act_fn(gate)))
 
 class PreCompiledGLU(GLU):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return fwd(x, self.Wup_gate, self.Wdown, self.act_fn, self.dropout)
+        return pre_compiled_fwd(x, self.Wup_gate, self.Wdown, self.act_fn, self.dropout)
     
 
 def pre_compiled_run_filter(inputs: Union[torch.Tensor, Tuple[Any]]) -> bool:
@@ -110,13 +109,12 @@ __test_config__ = ModuleTestConfig(
     test_cases=[
         {
             'init_args': {'in_dim': dim, 'activation': act, 'fp8': fp8},
-            'input_args': lambda dev, dim=dim, dt=dt: input_args(device=dev, dim=dim, dtype=dt),
+            'input_args': input_args(dim=dim), 
             'output_validator': output_validator,
-            'tolerances': tolerances(dt), # Optional
-            'case_descriptor': f'dim={dim}_dt={dt}_act={act}_fp8={fp8}',
+            'tolerances_fn': tolerances_fn,                  # Optional
+            'case_descriptor': f'dim={dim}_act={act}_fp8={fp8}',
         }
         for dim in dims_to_test
-        for dt in dtypes_to_test
         for act in act_to_test
         for fp8 in ([True, False] if is_hopper_available() else [False])
     ]
@@ -135,7 +133,7 @@ __benchmark_config__ = BenchmarkConfig(
         'dim': dims_to_bench,
         'hidden_mult': hidden_mult_to_bench,
         'activation': act_to_test,
-        'fp8': ([True, False] if is_hopper_available() else [False])
+        'fp8': ([True, False] if is_hopper_available() else [False]),
     },
     init_arg_builder=lambda params: {
         'in_dim': params['dim'],

@@ -1,4 +1,4 @@
-from typing import List, Dict, Any, Union, Sequence, Callable
+from typing import List, Dict, Any, Union, Sequence, Callable, Optional
 import copy
 import os
 import shutil
@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from gpt_lab.nn_modules.catalog_utils import ModuleTestConfig, get_total_loss
-from gpt_lab.device import get_available_devices
+from gpt_lab.device import get_available_devices, to_device, to_dtype
 from gpt_lab.catalog_utils import discover_dunder_objects_in_package, list_all_files_in_folder_and_subdirs, import_module_from_path
 from gpt_lab.catalog_bootstrap import get_active_context
 
@@ -180,6 +180,47 @@ def _assert_tensors_close_and_generate_heatmaps(
         )
 
 
+ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects_in_package(
+    dunder='__test_config__', 
+    object=ModuleTestConfig,
+    package_name='gpt_lab.nn_modules'
+)
+
+# Fallback discovery by filesystem if package-based discovery yields nothing
+if len(ALL_TEST_CONFIGS) == 0 and not DISCOVERY_ERRORS:
+    print("Package-based nn.Module test discovery failed; falling back to filesystem-based test discovery.")
+    try:
+        ctx = get_active_context()
+        roots = [Path(r) / 'nn_modules' for r in ctx.get('ordered_roots', [])]
+        seen = set()
+        for root in roots:
+            if not root.is_dir():
+                continue
+            for rel_path in list_all_files_in_folder_and_subdirs(str(root)):
+                if not rel_path.endswith('.py') or rel_path.endswith('__init__.py'):
+                    continue
+                abs_path = root / rel_path
+                key = str(abs_path)
+                if key in seen:
+                    continue
+                seen.add(key)
+                try:
+                    module = import_module_from_path(f"nnm_fs_{len(seen)}", abs_path)
+                    obj = getattr(module, '__test_config__', None)
+                    if isinstance(obj, ModuleTestConfig):
+                        ALL_TEST_CONFIGS.append(obj)
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
+
+dtype_dict = {
+    'fp32': torch.float32, 
+    'fp16': torch.float16, 
+    'bf16': torch.bfloat16,
+}
+
 def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: List[str]) -> List[Any]:
     test_suite = []
     
@@ -208,60 +249,32 @@ def build_test_suite(test_configs: List[ModuleTestConfig], available_devices: Li
                 run_filter = competitor_config.run_filter
                 
                 for device in available_devices:
-                    test_id = f"{config.reference_competitor}_vs_{competitor_name}_{test_case['case_descriptor']}_{device}"
-                    test_suite.append(
-                        pytest.param(
-                            ReferenceModuleCls,
-                            CompetitorModuleCls,
-                            test_case,
-                            device,
-                            run_filter,
-                            id=test_id
+
+                    for dtype in ['fp32', 'fp16', 'bf16']:
+                        test_id = (f"{config.reference_competitor}_vs_{competitor_name}"
+                                    f"_{device}_{dtype}"
+                                    f"_{test_case['case_descriptor']}")
+                        test_suite.append(
+                            pytest.param(
+                                ReferenceModuleCls,
+                                CompetitorModuleCls,
+                                test_case,
+                                device,
+                                dtype,
+                                run_filter,
+                                id=test_id
+                            )
                         )
-                    )
     
     return test_suite
 
-
-ALL_TEST_CONFIGS, DISCOVERY_ERRORS = discover_dunder_objects_in_package(
-    dunder='__test_config__', 
-    object=ModuleTestConfig,
-    package_name='gpt_lab.nn_modules'
-)
-
-# Fallback discovery by filesystem if package-based discovery yields nothing
-if len(ALL_TEST_CONFIGS) == 0 and not DISCOVERY_ERRORS:
-    try:
-        ctx = get_active_context()
-        roots = [Path(r) / 'nn_modules' for r in ctx.get('ordered_roots', [])]
-        seen = set()
-        for root in roots:
-            if not root.is_dir():
-                continue
-            for rel_path in list_all_files_in_folder_and_subdirs(str(root)):
-                if not rel_path.endswith('.py') or rel_path.endswith('__init__.py'):
-                    continue
-                abs_path = root / rel_path
-                key = str(abs_path)
-                if key in seen:
-                    continue
-                seen.add(key)
-                try:
-                    module = import_module_from_path(f"nnm_fs_{len(seen)}", abs_path)
-                    obj = getattr(module, '__test_config__', None)
-                    if isinstance(obj, ModuleTestConfig):
-                        ALL_TEST_CONFIGS.append(obj)
-                except Exception:
-                    continue
-    except Exception:
-        pass
 AVAILABLE_DEVICES, _ = get_available_devices()
 TEST_SUITE = build_test_suite(ALL_TEST_CONFIGS, AVAILABLE_DEVICES)
 
 # Add this to make pytest show more info about parameterized tests
 if len(TEST_SUITE) == 0 and not DISCOVERY_ERRORS:
     print("[ERROR] No tests generated!")
-    pytest.skip("No tests generated - check module discovery", allow_module_level=True)
+    pytest.fail("No tests generated - check module discovery", allow_module_level=True)
 
 
 def test_module_discovery_errors():
@@ -277,7 +290,7 @@ def test_module_discovery_errors():
 
 
 @pytest.mark.parametrize(
-    "ReferenceModuleCls, CompetitorModuleCls, test_case, device, run_filter", 
+    "ReferenceModuleCls, CompetitorModuleCls, test_case, device, dtype, run_filter", 
     TEST_SUITE
 )
 def test_bulk_module_correctness(
@@ -285,7 +298,8 @@ def test_bulk_module_correctness(
     CompetitorModuleCls: nn.Module, 
     test_case: Dict[str, Any], 
     device: str,
-    run_filter: Union[Callable[Union[torch.Tensor, Sequence[Any]], bool], "NoneType"],
+    dtype: str,
+    run_filter: Optional[Callable[torch.Tensor | Sequence[Any], bool]],
     request: pytest.FixtureRequest,
 ):
     """
@@ -293,19 +307,25 @@ def test_bulk_module_correctness(
     to a 'reference' implementation (e.g., a kernel vs. pure PyTorch).
     Pytest calls this function repeatedly for each parameter set in TEST_SUITE.
     """
+    dtype = dtype_dict[dtype]
     
     # Handle the dummy test case
     if ReferenceModuleCls is None:
         pytest.fail("No tests were generated. Check the debug output above.")
     
-    # Instantiate and validate the reference module
-    ref_module = ReferenceModuleCls(**test_case['init_args']).to(device)
-    ref_inputs = test_case['input_args'](device)
+    # Instantiate the reference module and its inputs
+    ref_module = ReferenceModuleCls(**test_case['init_args']).to(device).to(dtype)
+    ref_inputs = to_dtype(to_device(test_case['input_args'], device=device), dtype=dtype)
 
     # Check if the competitor module should be run
     if run_filter is not None and not run_filter(ref_inputs):
         pytest.skip(f"Skipping {CompetitorModuleCls.__name__} on {device} due to run_filter()->False.")
         return
+    
+    # For non-leaf tensors, we need to explicitly retain the gradient
+    for t in ref_inputs:
+        if isinstance(t, torch.Tensor) and t.requires_grad:
+            t.retain_grad()
     
     # Run a validator on the reference implementation output to catch baseline bugs
     ref_outputs = ref_module(*ref_inputs)
@@ -314,7 +334,7 @@ def test_bulk_module_correctness(
         test_case['output_validator'](ref_module, ref_inputs, outputs_for_validator)
 
     # Instantiate the competitor module and copy weights
-    competitor_module = CompetitorModuleCls(**test_case['init_args']).to(device)
+    competitor_module = to_dtype(to_device(CompetitorModuleCls(**test_case['init_args']), device), dtype)
     competitor_module.load_state_dict(ref_module.state_dict())
     
     competitor_inputs = [
@@ -323,10 +343,11 @@ def test_bulk_module_correctness(
     ]
     competitor_outputs = competitor_module(*competitor_inputs)
 
-    # Test numerical equivalence
     get_total_loss(ref_outputs).backward()
     get_total_loss(competitor_outputs).backward()
-    tolerances = test_case.get('tolerances', {})
+    
+    tolerances_fn = test_case.get('tolerances_fn', lambda _: {})
+    tolerances = tolerances_fn(ref_inputs)
 
     # Use the test's unique ID for the heatmap folder name
     test_id = request.node.callspec.id

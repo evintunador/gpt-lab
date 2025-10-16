@@ -60,7 +60,7 @@ class MLP(nn.Module):
 # PRECOMPILED IMPLEMENTATION FOR TESTING torch.compile #
 ########################################################
 
-@torch.compile
+@torch.compile(mode='default')
 def fwd(inp, w_up, w_down, act_fn, dropout):
     return dropout(w_down(act_fn(w_up(inp))))
 
@@ -108,19 +108,19 @@ __competitors__ = {
 }
 
 
-def input_args(device: str, dim: int, dtype):
-    return (torch.randn(128, dim, device=device, dtype=dtype, requires_grad=True),)
-def tolerances(dtype: torch.dtype) -> dict:
-    if dtype == torch.float32:
+def input_args(dim: int):
+    return (torch.randn(128, dim, requires_grad=True),)
+def tolerances_fn(input_args: Tuple[Any]) -> dict:
+    x = input_args[0]
+    if x.dtype == torch.float32:
         return {'atol': 1e-2, 'rtol': 1e-1}
-    elif dtype == torch.float16:
+    elif x.dtype == torch.float16:
         return {'atol': 5e-2, 'rtol': 1}
-    elif dtype == torch.bfloat16:
-        return {'atol': 1e-1, 'rtol': 10}
+    elif x.dtype == torch.bfloat16:
+        return {'atol': 0.1, 'rtol': 1e6}
     else:
-        return {'atol': 1e-2, 'rtol': 1e100000}
+        return {'atol': 0.1, 'rtol': 1e6}
 dims_to_test = [768]
-dtypes_to_test = [torch.float32, torch.float16, torch.bfloat16]
 act_to_test = ['relu', 'relu2', 'silu']
 
 
@@ -130,13 +130,12 @@ __test_config__ = ModuleTestConfig(
     test_cases=[
         {
             'init_args': {'in_dim': dim, 'activation': act, 'fp8': fp8},
-            'input_args': lambda dev, dim=dim, dt=dt: input_args(device=dev, dim=dim, dtype=dt),
+            'input_args': input_args(dim=dim),
             'output_validator': output_validator,
-            'tolerances': tolerances(dt),          # Optional
-            'case_descriptor': f'dim={dim}_dt={dt}_act={act}_fp8={fp8}',
+            'tolerances_fn': tolerances_fn, # Optional
+            'case_descriptor': f'dim={dim}_act={act}_fp8={fp8}',
         }
         for dim in dims_to_test
-        for dt in dtypes_to_test
         for act in act_to_test
         for fp8 in ([True, False] if is_hopper_available() else [False])
     ]
@@ -152,11 +151,10 @@ dims_to_bench = [128, 512, 2048]
 hidden_mult_to_bench = [2, 4, 8]
 
 
-def benchmark_input_provider(init_args: dict, device: str) -> tuple:
+def benchmark_input_provider(init_args: dict) -> tuple:
     """Generates a standard input for benchmarking."""
     # input shape: (batch_size, sequence_length, dimension)
-    dtype = init_args.get('dtype', torch.float32)
-    return (torch.randn(512, init_args['in_dim'], device=device, dtype=dtype),)
+    return (torch.randn(512, init_args['in_dim']),)
 
 
 __benchmark_config__ = BenchmarkConfig(

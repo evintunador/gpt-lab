@@ -1,4 +1,4 @@
-from typing import List, Sequence, Union, Callable, Optional
+from typing import List, Optional
 import os
 import sys
 import time
@@ -11,7 +11,7 @@ import torch
 import pandas as pd
 
 from gpt_lab.nn_modules.catalog_utils import BenchmarkConfig, get_total_loss
-from gpt_lab.device import get_available_devices
+from gpt_lab.device import get_available_devices, to_device, to_dtype
 from gpt_lab.catalog_utils import discover_dunder_objects_in_package
 from gpt_lab.catalog_bootstrap import get_artifact_root
 
@@ -132,7 +132,10 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Opti
         param_combinations = list(itertools.product(*param_values))
 
         desc = f"Benchmarking {config.module_name} on {device}"
-        for combo in tqdm(param_combinations, desc=desc, leave=False):
+        benchmark_iterations = itertools.product(config.dtypes_to_benchmark, param_combinations)
+        num_iterations = len(config.dtypes_to_benchmark) * len(param_combinations)
+
+        for dtype, combo in tqdm(benchmark_iterations, total=num_iterations, desc=desc, leave=False):
             params = dict(zip(param_names, combo))
             
             for competitor_name, competitor in config.competitors.items():
@@ -141,8 +144,12 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Opti
 
                 try:
                     init_args = config.init_arg_builder(params)
-                    module = competitor.module_class(**init_args).to(device)
-                    inputs = config.input_provider(init_args, device)
+
+                    module = competitor.module_class(**init_args)
+                    module = to_dtype(to_device(module, device), dtype)
+
+                    inputs = config.input_provider(init_args)
+                    inputs = to_dtype(to_device(inputs, device), dtype)
                     
                     if competitor.run_filter and not competitor.run_filter(inputs):
                         continue
@@ -152,6 +159,7 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Opti
                     # Store results in a tidy format
                     for metric_name, value in perf_metrics.items():
                         result_row = params.copy()
+                        result_row['dtype'] = dtype
                         result_row['class'] = competitor_name
                         result_row['device'] = device
                         result_row['measurement'] = metric_name
@@ -160,7 +168,7 @@ def run_benchmarks(configs: List[BenchmarkConfig], device: str, output_dir: Opti
 
                 except Exception as e:
                     param_str = ', '.join(f'{k}={v.__name__ if isinstance(v, type) else v}' for k, v in params.items())
-                    tqdm.write(f"[WARNING] Skipping {competitor_name} for combo ({param_str}) on {device} due to error: {e}")
+                    tqdm.write(f"[WARNING] Skipping {competitor_name} for combo ({param_str}) on {device} with dtype {dtype} due to error: {e}")
 
         if not all_results:
             tqdm.write(f"No results generated for {config.module_name} on {device}. Skipping CSV generation.")
