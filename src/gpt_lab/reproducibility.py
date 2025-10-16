@@ -3,8 +3,11 @@ import os
 import shutil
 import subprocess
 import datetime
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 class BaseStorageBackend(ABC):
@@ -168,12 +171,17 @@ class ReproducibilityManager:
         """Sets up the experiment environment and captures git state."""
         if self.is_main_process:
             print("\n--- Setting up Reproducible Experiment ---")
+            logger.info("Initializing reproducibility manager")
             
             # Capture git information
             commit_hash = get_git_commit_hash()
             remote_url = get_git_remote_url()
             branch = get_git_branch()
             self.was_dirty = is_git_dirty()
+            
+            logger.debug(f"Git commit: {commit_hash}")
+            logger.debug(f"Git branch: {branch}")
+            logger.debug(f"Git dirty: {self.was_dirty}")
             
             # Create GitHub/GitLab URL if possible
             github_url = None
@@ -208,6 +216,9 @@ class ReproducibilityManager:
             print(f"[Reproducibility] Git branch: {branch}")
             print(f"[Reproducibility] Working directory clean: {not self.was_dirty}")
             
+            logger.info(f"Experiment output directory: {self.output_dir}", extra={"output_dir": self.output_dir})
+            logger.info(f"Git state captured", extra={"commit": commit_hash, "branch": branch, "was_dirty": self.was_dirty})
+            
             # Save git patch if dirty
             if self.was_dirty:
                 patch_content = create_git_patch()
@@ -216,12 +227,14 @@ class ReproducibilityManager:
                     with open(patch_file, 'w') as f:
                         f.write(patch_content)
                     print(f"[Reproducibility] Uncommitted changes saved to: uncommitted_changes.patch")
+                    logger.info("Saved uncommitted changes to patch file")
             
             # Save git info to a JSON file
             import json
             git_info_file = os.path.join(self.output_dir, "git_info.json")
             with open(git_info_file, 'w') as f:
                 json.dump(self.git_info, f, indent=2)
+            logger.debug(f"Saved git info to: {git_info_file}")
             
         return self
 
@@ -230,7 +243,9 @@ class ReproducibilityManager:
         if self.is_main_process and self.storage_backend and self.output_dir:
             if exc_type is not None:
                 print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
+                logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
             print("\n--- Uploading Experiment Artifacts ---")
+            logger.info("Finalizing experiment artifacts")
             
             # The experiment ID is the path relative to the CWD for clean storage paths.
             try:
@@ -244,8 +259,10 @@ class ReproducibilityManager:
                     local_source_dir=self.output_dir,
                     experiment_id=experiment_id
                 )
+                logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
             except Exception as e:
                 print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
+                logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
 
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""

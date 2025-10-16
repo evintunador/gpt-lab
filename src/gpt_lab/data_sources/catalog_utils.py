@@ -4,11 +4,14 @@ from pathlib import Path
 import os
 import multiprocessing as mp
 from functools import partial
+import logging
 import requests
 
 import torch
 import numpy as np
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class Split(Enum):
@@ -55,6 +58,8 @@ class PrecachedDatasetMixin:
         self._max_num_shards = max_num_shards
         self._cache_filename_prefix = cache_filename_prefix
         self._num_workers = num_workers or max(1, (os.cpu_count() or 2) - 2)
+        
+        logger.info(f"Initialized PrecachedDatasetMixin with cache_dir={self._cache_dir}, shard_size={self._shard_size:,}, num_workers={self._num_workers}")
 
         # indexing-related state (populated by setup_cache_index)
         self._files: List[Path] = []
@@ -81,7 +86,12 @@ class PrecachedDatasetMixin:
         return sorted(self._cache_dir.glob(f"{self._cache_filename_prefix}_{split}_*.bin"))
 
     def has_cache(self) -> bool:
-        return bool(self._cache_glob("val") and self._cache_glob("train"))
+        has_val = bool(self._cache_glob("val"))
+        has_train = bool(self._cache_glob("train"))
+        has_both = has_val and has_train
+        if has_both:
+            logger.info("Found existing cache for both train and val splits")
+        return has_both
 
     def build_cache(
         self,
@@ -91,7 +101,10 @@ class PrecachedDatasetMixin:
         token_dtype: np.dtype = np.uint16,
     ) -> None:
         if self.has_cache():
+            logger.info("Cache already exists, skipping build")
             return
+        
+        logger.info(f"Building cache with {self._num_workers} workers, dtype={token_dtype}")
 
         shard_index = 0
         token_count = 0
@@ -181,14 +194,21 @@ class PrecachedDatasetMixin:
         self._split = split_str
         self._seq_len = int(seq_len)
 
+        logger.info(f"Setting up cache index for split={split_str}, seq_len={seq_len}")
+        
         self._files = self._cache_glob(split_str)
         if not self._files:
+            logger.error(f"No cached shards found for split='{split_str}' in {self._cache_dir}")
             raise RuntimeError(f"No cached shards found for split='{split_str}' in {self._cache_dir}")
+        
+        logger.debug(f"Found {len(self._files)} shard files for split={split_str}")
         self._memmaps = [PrecachedDatasetMixin.read_datafile_tokens_memmap(p) for p in self._files]
         self._shard_sizes = np.array([PrecachedDatasetMixin.read_datafile_token_count(p) for p in self._files], dtype=np.int64)
         self._cumsum = np.cumsum(np.concatenate([[0], self._shard_sizes]))
         total_tokens = int(self._shard_sizes.sum())
         self._num_items = total_tokens // self._seq_len
+        
+        logger.info(f"Cache index ready: {total_tokens:,} tokens, {self._num_items:,} sequences of length {seq_len}")
 
     def __len__(self) -> int:
         if self._seq_len is None:
@@ -236,7 +256,7 @@ class PrecachedDatasetMixin:
         header[3] = dtype_size # dtype of tokens after the header
 
         os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
-        print(f"writing {len(toks):,} tokens to {filename}")
+        logger.info(f"writing {len(toks):,} tokens to {filename}")
         with open(filename, "wb") as f:
             f.write(header.tobytes())
             f.write(toks.tobytes())

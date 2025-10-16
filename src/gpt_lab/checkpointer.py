@@ -1,9 +1,12 @@
 import os
 import random
 from typing import Optional, Dict, Any
+import logging
 
 import numpy as np
 import torch
+
+logger = logging.getLogger(__name__)
 
 
 def save_checkpoint(
@@ -30,6 +33,8 @@ def save_checkpoint(
     """
     os.makedirs(save_dir, exist_ok=True)
     filepath = os.path.join(save_dir, filename)
+    
+    logger.info(f"Saving checkpoint to: {filepath}")
 
     state = {
         'metadata': metadata or {},
@@ -46,11 +51,12 @@ def save_checkpoint(
     for key, obj in stateful_objects.items():
         if hasattr(obj, 'state_dict'):
             state[key] = obj.state_dict()
+            logger.debug(f"Added state_dict for '{key}' to checkpoint")
         else:
-            print(f"Warning: object '{key}' has no .state_dict() method and will not be checkpointed.")
+            logger.warning(f"Object '{key}' has no .state_dict() method and will not be checkpointed")
 
     torch.save(state, filepath)
-    print(f"Checkpoint saved to {filepath}")
+    logger.info(f"Checkpoint saved successfully: {filepath}")
     return filepath
 
 
@@ -77,8 +83,10 @@ def load_checkpoint(
         including metadata and RNG states.
     """
     if not os.path.exists(filepath):
+        logger.error(f"Checkpoint file not found: {filepath}")
         raise FileNotFoundError(f"Checkpoint file not found: {filepath}")
 
+    logger.info(f"Loading checkpoint from: {filepath}")
     # Set weights_only=False to allow loading of arbitrary python objects
     # like numpy RNG states, which are not considered "safe" by default.
     checkpoint = torch.load(filepath, map_location=map_location, weights_only=False)
@@ -87,12 +95,12 @@ def load_checkpoint(
     for key, obj in stateful_objects.items():
         if key in checkpoint:
             if hasattr(obj, 'load_state_dict'):
-                print(f"Loading state for '{key}'...")
+                logger.debug(f"Loading state for '{key}'")
                 obj.load_state_dict(checkpoint[key])
             else:
-                print(f"Warning: object '{key}' has no .load_state_dict() method. Skipping.")
+                logger.warning(f"Object '{key}' has no .load_state_dict() method. Skipping")
         else:
-            print(f"Warning: key '{key}' not found in checkpoint. Skipping.")
+            logger.warning(f"Key '{key}' not found in checkpoint. Skipping")
 
     # Return all data that isn't a state_dict for the passed objects
     returned_data = {}
@@ -101,5 +109,7 @@ def load_checkpoint(
         if key not in stateful_keys:
             returned_data[key] = value
     
-    print(f"Loaded checkpoint from {filepath}")
+    logger.info(f"Checkpoint loaded successfully from {filepath}")
+    if 'metadata' in returned_data:
+        logger.debug(f"Checkpoint metadata: {returned_data['metadata']}")
     return returned_data

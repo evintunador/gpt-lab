@@ -2,7 +2,10 @@ import argparse
 import yaml
 import os
 import sys
+import logging
 from typing import Dict, Any
+
+logger = logging.getLogger(__name__)
 
 
 def _str_to_bool(value):
@@ -65,8 +68,12 @@ def get_config(parser: argparse.ArgumentParser) -> Dict[str, Any]:
     
     config_dict = {}
     if args.config and os.path.exists(args.config):
+        logger.info(f"Loading configuration from: {args.config}")
         with open(args.config, 'r') as f:
             config_dict = yaml.safe_load(f) or {}
+        logger.debug(f"Loaded base config with {len(config_dict)} top-level keys")
+    elif args.config:
+        logger.warning(f"Config file specified but not found: {args.config}")
 
     cli_args = {}
     for arg in unknown:
@@ -107,5 +114,9 @@ def get_config(parser: argparse.ArgumentParser) -> Dict[str, Any]:
             d[keys[-1]] = value
 
     final_config_dict = _merge_dicts(config_dict, cli_args)
+    
+    if cli_args:
+        logger.info(f"Applied {len(cli_args)} CLI overrides to configuration")
+        logger.debug(f"CLI overrides: {cli_args}")
     
     return final_config_dict

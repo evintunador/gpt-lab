@@ -260,3 +260,5 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] improve attribute names and standardize all test & bench configs (hint: rename 'output_validator' to 'output_validator_fn' in nn.Modules bulk testing)
 - [ ] write equivalents of `to_device` and `to_dtype` but for `.clone()` and `.detach()`
 - [ ] separate core src/ importables from tools only used by catalog
+- [ ] build system for updating a model's checkpoints as they change over time
+- [ ] make checkpointer torch.compile & ddp aware

@@ -1,10 +1,13 @@
 import os
 from typing import TypeVar, List, Any
+import logging
 
 import torch
 import torch.distributed as dist
 import random
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 T = TypeVar('T')
@@ -47,8 +50,11 @@ class DistributedManager:
         """Initializes the distributed environment."""
         if self.is_available() and self._is_dist_env():
             self._init_distributed()
+        else:
+            logger.info("Running in single-process mode")
         
         self._set_device()
+        logger.info(f"Process initialized - Rank: {self.rank}/{self.world_size}, Device: {self.device}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -70,32 +76,39 @@ class DistributedManager:
             # This is a common setup, might need adjustment based on specific SLURM config
             os.environ["MASTER_ADDR"] = os.environ["SLURM_SRUN_COMM_HOST"]
             os.environ["MASTER_PORT"] = str(int(os.environ["SLURM_SRUN_COMM_PORT"]))
+            logger.info(f"Detected SLURM environment - Rank {self.rank}/{self.world_size}")
         elif "RANK" in os.environ and "WORLD_SIZE" in os.environ:
             # torchrun environment variables
             self.rank = int(os.environ["RANK"])
             self.local_rank = int(os.environ["LOCAL_RANK"])
             self.world_size = int(os.environ["WORLD_SIZE"])
+            logger.info(f"Detected torchrun environment - Rank {self.rank}/{self.world_size}")
         else:
             return  # Not a distributed environment
 
         backend = "nccl" if torch.cuda.is_available() else "gloo"
+        logger.info(f"Initializing process group with backend: {backend}")
         dist.init_process_group(
             backend=backend, 
             rank=self.rank, 
             world_size=self.world_size
         )
         self.is_distributed = True
+        logger.info(f"Process group initialized successfully")
         
     def _set_device(self):
         """Sets the device for the current process."""
         if torch.cuda.is_available():
             self.device = torch.device(f"cuda:{self.local_rank}")
             torch.cuda.set_device(self.device)
+            logger.debug(f"Set CUDA device to {self.device}")
         elif hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
             # Note: MPS does not support distributed training.
             self.device = torch.device("mps")
+            logger.debug("Set device to MPS (Apple Silicon)")
         else:
             self.device = torch.device("cpu")
+            logger.debug("Set device to CPU")
 
     @property
     def is_main_process(self) -> bool:
@@ -163,3 +176,4 @@ class DistributedManager:
         torch.manual_seed(final_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed_all(final_seed)
+        logger.info(f"Set seed to {final_seed} (base: {seed}, rank: {self.rank})")

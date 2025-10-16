@@ -1,8 +1,11 @@
 from typing import List, Tuple, Any, Union
+import logging
 
 import numpy as np
 import torch
 import torch.nn as nn
+
+logger = logging.getLogger(__name__)
 
 
 def get_default_device() -> torch.device:
@@ -11,10 +14,16 @@ def get_default_device() -> torch.device:
     Prioritizes CUDA, then MPS, and falls back to CPU.
     """
     if torch.cuda.is_available():
-        return torch.device(torch.cuda.current_device())
+        device = torch.device(torch.cuda.current_device())
+        logger.info(f"Selected default device: {device} (CUDA available)")
+        return device
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
+        device = torch.device("mps")
+        logger.info(f"Selected default device: {device} (MPS/Apple Silicon)")
+        return device
+    device = torch.device("cpu")
+    logger.info(f"Selected default device: {device} (fallback)")
+    return device
 
 
 def to_device(item: Any, device: Union[str, torch.device], pin_memory: bool = False, non_blocking: bool = False) -> Any:
@@ -69,7 +78,7 @@ def to_dtype(item: Any, dtype: str | torch.dtype) -> Any:
     if isinstance(dtype, str):
         dtype = dtype_str_parse(dtype)
     if isinstance(dtype, str):
-        print(f"[WARNING] Dtype string '{dtype}' could not be parsed; returning item as-is")
+        logger.warning(f"Dtype string '{dtype}' could not be parsed; returning item as-is")
         return item
     if isinstance(item, (list, tuple)):
         return type(item)(to_dtype(x, dtype) for x in item)
@@ -77,7 +86,7 @@ def to_dtype(item: Any, dtype: str | torch.dtype) -> Any:
         return {k: to_dtype(v, dtype) for k, v in item.items()}
     if hasattr(item, "to") and callable(item.to):
         return item.to(dtype)
-    print(f"[WARNING] Item {item} could not be converted to dtype {dtype}")
+    logger.warning(f"Item {item} could not be converted to dtype {dtype}")
     return item
 
 
@@ -92,8 +101,12 @@ def get_available_devices(exclude: List[str] = []) -> Tuple[List[str], List[str]
     # Check for CUDA devices
     if torch.cuda.is_available():
         available_devices.append('cuda')
-        for i in range(torch.cuda.device_count()):
+        device_count = torch.cuda.device_count()
+        logger.debug(f"Found {device_count} CUDA device(s)")
+        for i in range(device_count):
+            device_name = torch.cuda.get_device_name(i)
             available_devices_with_ranks.append(f'cuda:{i}')
+            logger.debug(f"  cuda:{i} - {device_name}")
 
     # Check for MPS devices (Apple Silicon)
     if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available():
@@ -116,5 +129,7 @@ def get_available_devices(exclude: List[str] = []) -> Tuple[List[str], List[str]
     if not available_devices:
         available_devices.append('cpu')
         available_devices_with_ranks.append('cpu')
-
+        logger.debug("No accelerators found, using CPU")
+    
+    logger.info(f"Available devices: {', '.join(available_devices)}")
     return available_devices, available_devices_with_ranks
