@@ -93,23 +93,23 @@ __competitors__ = {
 n_embd_to_test = [256, 768]
 n_head_to_test = [4, 8]
 seq_len_to_test = [64, 256]
-dtypes_to_test = [torch.float32, torch.float16, torch.bfloat16]
 
 
-def input_args(device: str, n_embd: int, seq_len: int, dtype: torch.dtype):
+def input_args(n_embd: int, seq_len: int):
     batch_size = 4
-    return (torch.randn(batch_size, seq_len, n_embd, device=device, dtype=dtype, requires_grad=True),)
+    return (torch.randn(batch_size, seq_len, n_embd, requires_grad=True),)
 
 
-def tolerances(dtype: torch.dtype) -> dict:
-    if dtype == torch.float32:
+def tolerances_fn(input_args: Tuple[Any]) -> dict:
+    x = input_args[0]
+    if x.dtype == torch.float32:
         return {'atol': 1e-4, 'rtol': 1e-3}
-    elif dtype == torch.float16:
+    elif x.dtype == torch.float16:
         return {'atol': 5e-3, 'rtol': 1e-1}
-    elif dtype == torch.bfloat16:
+    elif x.dtype == torch.bfloat16:
         return {'atol': 1e-2, 'rtol': 1e-1}
     else:
-        return {'atol': 1e-4, 'rtol': 1e-3}
+        return {'atol': 1e-4, 'rtol': 1e-1000}
 
 
 __test_config__ = ModuleTestConfig(
@@ -118,15 +118,14 @@ __test_config__ = ModuleTestConfig(
     test_cases=[
         {
             'init_args': {'n_embd': n_embd, 'n_head': n_head, 'dropout': 0.0, 'bias': True},
-            'input_args': lambda dev, n_embd=n_embd, seq_len=seq_len, dt=dt: input_args(device=dev, n_embd=n_embd, seq_len=seq_len, dtype=dt),
+            'input_args': input_args(n_embd, seq_len),
             'output_validator': output_validator,
-            'tolerances': tolerances(dt),
-            'case_descriptor': f'n_embd={n_embd}_n_head={n_head}_seq_len={seq_len}_dtype={dt}',
+            'tolerances_fn': tolerances_fn,
+            'case_descriptor': f'n_embd={n_embd}_n_head={n_head}_seq_len={seq_len}',
         }
         for n_embd in n_embd_to_test
         for n_head in n_head_to_test
         for seq_len in seq_len_to_test
-        for dt in dtypes_to_test
         if n_embd % n_head == 0  # Only test valid head configurations
     ]
 )
@@ -137,13 +136,12 @@ __test_config__ = ModuleTestConfig(
 ##################################################
 
 
-def benchmark_input_provider(init_args: dict, device: str) -> tuple:
+def benchmark_input_provider(init_args: dict) -> tuple:
     """Generates a standard input for benchmarking."""
     n_embd = init_args.get('n_embd', 768)
     seq_len = init_args.get('seq_len', 512)
-    dtype = init_args.get('dtype', torch.float32)
     batch_size = 8
-    return (torch.randn(batch_size, seq_len, n_embd, device=device, dtype=dtype),)
+    return (torch.randn(batch_size, seq_len, n_embd, requires_grad=True),)
 
 
 __benchmark_config__ = BenchmarkConfig(
@@ -153,15 +151,13 @@ __benchmark_config__ = BenchmarkConfig(
         'n_embd': [256, 512, 1024, 2048],
         'n_head': [8, 16],
         'seq_len': [256, 512, 1024, 2048],
-        'dtype': [torch.float16, torch.bfloat16, torch.float32],
     },
     init_arg_builder=lambda params: {
         'n_embd': params['n_embd'],
         'n_head': params['n_head'],
         'dropout': 0.0,
         'bias': True,
-        'seq_len': params['seq_len'],
-        'dtype': params['dtype'],
     },
     input_provider=benchmark_input_provider,
+    dtypes_to_benchmark=(['fp32'] + (['fp16', 'bf16'] if not torch.backends.mps.is_available() else [])),
 )

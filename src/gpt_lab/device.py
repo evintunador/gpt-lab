@@ -1,5 +1,6 @@
 from typing import List, Tuple, Any, Union
 
+import numpy as np
 import torch
 import torch.nn as nn
 
@@ -31,7 +32,6 @@ def to_device(item: Any, device: Union[str, torch.device], pin_memory: bool = Fa
         return type(item)(to_device(x, device, pin_memory, non_blocking) for x in item)
     if isinstance(item, dict):
         return {k: to_device(v, device, pin_memory, non_blocking) for k, v in item.items()}
-    # Check for a 'to()' method to handle tensors, modules, etc.
     if hasattr(item, "to") and callable(item.to):
         # For tensors, we can use pin_memory and non_blocking
         if isinstance(item, torch.Tensor):
@@ -41,6 +41,43 @@ def to_device(item: Any, device: Union[str, torch.device], pin_memory: bool = Fa
         else:
             # For modules and other objects, just use device
             return item.to(device)
+    return item
+
+
+def dtype_str_parse(dtype: str):
+    dtype = dtype.lower()
+    dtype_dict = {
+        'fp32': torch.float32,
+        'fp16': torch.float16,
+        'bf16': torch.bfloat16,
+        'float32': torch.float32,
+        'float16': torch.float16,
+        'bfloat16': torch.bfloat16,
+    }
+    return dtype_dict.get(dtype, dtype)
+
+
+def to_dtype(item: Any, dtype: str | torch.dtype) -> Any:
+    """
+    Recursively moves a complex data structure to the specified data type.
+    Supports lists, tuples, dicts, tensors, and nn.Modules.
+    
+    Args:
+        item: The item to move to device
+        dtype: Target dtype
+    """
+    if isinstance(dtype, str):
+        dtype = dtype_str_parse(dtype)
+    if isinstance(dtype, str):
+        print(f"[WARNING] Dtype string '{dtype}' could not be parsed; returning item as-is")
+        return item
+    if isinstance(item, (list, tuple)):
+        return type(item)(to_dtype(x, dtype) for x in item)
+    if isinstance(item, dict):
+        return {k: to_dtype(v, dtype) for k, v in item.items()}
+    if hasattr(item, "to") and callable(item.to):
+        return item.to(dtype)
+    print(f"[WARNING] Item {item} could not be converted to dtype {dtype}")
     return item
 
 

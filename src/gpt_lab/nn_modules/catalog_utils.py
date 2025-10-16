@@ -1,5 +1,5 @@
 from typing import List, Dict, Optional, Type, Callable, Any, Union, Tuple, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 import torch.nn as nn
@@ -58,7 +58,9 @@ class BenchmarkConfig:
     # This is useful for args that are derived from others (e.g., out_dim=dim)
     init_arg_builder: Callable[[Dict[str, Any]], Dict[str, Any]]
     # A function that provides the input tensors for the module, given the init_args.
-    input_provider: Callable[[Dict[str, Any], str], tuple]
+    input_provider: Callable[[Dict[str, Any]], tuple]
+    # A list of dtypes to run the benchmark on.
+    dtypes_to_benchmark: List[str] = field(default_factory=lambda: ['fp32', 'fp16', 'bf16'])
 
     def __post_init__(self):
         self.module_name = self.module_name.replace('/', '_').replace('\\', '_')

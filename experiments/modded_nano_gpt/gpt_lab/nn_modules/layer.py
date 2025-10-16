@@ -9,7 +9,7 @@ from gpt_lab.nn_modules.catalog_utils import ignore_if_no_cuda
 ignore_if_no_cuda()
 
 from gpt_lab.nn_modules.flex_self_attention import ModdedNanoGPTFlexSelfAttention, BlockMask
-from gpt_lab.nn_modules.channel_mixing.mlp import MLP
+from gpt_lab.nn_modules.channel_mixing.glu import GLU
 
 
 class ModdedNanoGPTBlock(nn.Module):
@@ -19,7 +19,7 @@ class ModdedNanoGPTBlock(nn.Module):
         # Adjusted for smaller models - only skip if we have enough layers
         skip_attn = (layer_idx == 7) and (dim > 512)  # Only skip in larger models
         self.attn = ModdedNanoGPTFlexSelfAttention(dim, num_heads, max_seq_len) if not skip_attn else None
-        self.mlp = MLP(dim, mlp_ratio)
+        self.mlp = GLU(dim, mlp_ratio)
         self.lambdas = nn.Parameter(torch.tensor([1., 0.]))
         self.norm = RMSNorm()
 
