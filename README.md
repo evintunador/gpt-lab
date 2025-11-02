@@ -210,7 +210,7 @@ See [LICENSE](LICENSE) for details.
 # todo
 ## important / urgent
 
-- [ ] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
+- [x] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
 - [ ] design & build a mu-parametrization utility
 - [ ] do first DAGSeq2DAGSeq experiment
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
@@ -220,7 +220,6 @@ See [LICENSE](LICENSE) for details.
 - [ ] fact check various inaccuracies in the documentation
 - [ ] design and build a system for comparing performance between two experiments or/
 and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
-    - [x] initial direct metric comparison
     - [ ] time series
     - [ ] more adaptable to whatever's available in the experiments
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later
@@ -252,9 +251,7 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
 - [ ] make configuration.py not require any input argparser at all so users can rely entirely on config if they want
 - [ ] make the example submodule experiment an actual submodule
-- [x] use the custom logger everywhere
 - [ ] make a way to directly import the custom logger rather than having to use the setup function
-- [x] move device & dtype management out of individual nn.modules and into bulk nn.Module test
 - [ ] edit GLU to use our own custom version of LigerKernel that supports more activation functions
 - [ ] move nn_module backup test discovery inside primary test discovery function & maybe get rid of it entirely
 - [ ] improve attribute names and standardize all test & bench configs (hint: rename 'output_validator' to 'output_validator_fn' in nn.Modules bulk testing)
@@ -262,3 +259,5 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] separate core src/ importables from tools only used by catalog
 - [ ] build system for updating a model's checkpoints as they change over time
 - [ ] make checkpointer torch.compile & ddp aware
+- [x] make logs also human readable
+- [x] remove log requirement that you work inside experiments/

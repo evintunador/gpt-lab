@@ -38,6 +38,19 @@ def test_file_handler_writes_json_with_extra(tmp_path: Path):
     assert data["step"] == 1
 
 
+def test_txt_log_created_for_main_process_only(tmp_path: Path):
+    """Verify that a human-readable log.txt is created only for the main process."""
+    # Test main process
+    log_dir_main = tmp_path / "logs_main"
+    setup_experiment_logging(str(log_dir_main), rank=0, is_main_process=True)
+    assert (log_dir_main / "log.txt").exists()
+
+    # Test worker process
+    log_dir_worker = tmp_path / "logs_worker"
+    setup_experiment_logging(str(log_dir_worker), rank=1, is_main_process=False)
+    assert not (log_dir_worker / "log.txt").exists()
+
+
 # def test_whitelist_filter_works(tmp_path: Path):
 #     """Verify that the Whitelist filter includes and excludes the correct loggers."""
 #     log_dir = tmp_path / "logs"
