@@ -61,19 +61,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_object)
 
 
-class Whitelist(logging.Filter):
-    """
-    A logging filter that allows only records whose names start with
-    one of the specified prefixes. This is used to silence logs from
-    third-party libraries and focus on application-specific logging.
-    """
-
-    def __init__(self, prefixes: List[str]):
-        super().__init__()
-        self.prefixes = tuple(prefixes)
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.name.startswith(self.prefixes)
+# class Whitelist(logging.Filter):
+#     """
+#     A logging filter that allows only records whose names start with
+#     one of the specified prefixes. This is used to silence logs from
+#     third-party libraries and focus on application-specific logging.
+#     """
+#
+#     def __init__(self, prefixes: List[str]):
+#         super().__init__()
+#         self.prefixes = tuple(prefixes)
+#
+#     def filter(self, record: logging.LogRecord) -> bool:
+#         return record.name.startswith(self.prefixes)
 
 
 def get_package_versions() -> Dict[str, Any]:
@@ -128,8 +128,8 @@ def setup_experiment_logging(
 
     This function sets up a unified logging system that:
     1.  Writes all log records from all ranks to a rank-specific JSONL file.
-    2.  If on the main process, also prints human-readable logs to the console.
-    3.  Filters out logs from third-party libraries to keep logs clean.
+    2.  If on the main process, writes human-readable logs to a .txt file.
+    3.  If on the main process, also prints human-readable logs to the console.
 
     Args:
         log_dir: The directory to save log files in.
@@ -144,7 +144,7 @@ def setup_experiment_logging(
     root_logger.handlers.clear()
 
     # Create a filter to only include logs from our project code and the main script
-    project_filter = Whitelist(["gpt_lab", "experiments", "__main__"])
+    # project_filter = Whitelist(["gpt_lab", "experiments", "__main__"])
 
     # Create the log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
@@ -153,16 +153,23 @@ def setup_experiment_logging(
     log_file_path = os.path.join(log_dir, f"log_rank_{rank}.jsonl")
     file_handler = logging.FileHandler(log_file_path, mode="a")
     file_handler.setFormatter(JsonFormatter())
-    file_handler.addFilter(project_filter)
+    # file_handler.addFilter(project_filter)
     root_logger.addHandler(file_handler)
 
-    # Console handler for human-readable output (main process only)
+    # Console and text file handlers for human-readable output (main process only)
     if is_main_process:
-        console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = logging.Formatter(
             "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
+
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
-        console_handler.addFilter(project_filter)
         root_logger.addHandler(console_handler)
+
+        # Text file handler for the main process
+        txt_log_path = os.path.join(log_dir, "log.txt")
+        txt_file_handler = logging.FileHandler(txt_log_path, mode="a")
+        txt_file_handler.setFormatter(console_formatter)
+        root_logger.addHandler(txt_file_handler)
