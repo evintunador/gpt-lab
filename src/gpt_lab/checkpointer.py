@@ -5,16 +5,29 @@ import logging
 
 import numpy as np
 import torch
+from torch._inductor.virtualized import V
 import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
 
+def _contains_key(target_key, nested_dict):
+    return target_key in nested_dict
+
+
+def _normalize_state_dict_keys(state_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Removes the 'module.' and '_orig_mod.' prefix keys from DDP and torch.compile
+    """
+    state_dict_normalized = {k.replace("module.", "").replace("_orig_mod.", ""): v for k, v in state_dict.items()}
+    if state_dict.keys() != state_dict_normalized.keys():
+        logger.debug(f"Prefixes from DDP and/or torch.compile removed from state_dict")
+    return state_dict_normalized
+
+
 def save_checkpoint(
-    save_dir: str,
-    filename: str,
+    filepath: str,
     metadata: Optional[Dict[str, Any]] = None,
-    save_rng_state: bool = True,
     **stateful_objects: Any,
 ) -> str:
     """
@@ -24,42 +37,33 @@ def save_checkpoint(
         save_dir: The directory to save the checkpoint in.
         filename: The name of the checkpoint file.
         metadata: Any non-stateful metadata to save (e.g., epoch, step, metrics).
-                 Should include 'git_info' from ReproducibilityManager for full reproducibility.
-        save_rng_state: If True, saves the state of torch, numpy, and random RNGs.
+                 Should include info from ReproducibilityManager for full reproducibility.
         **stateful_objects: Keyword arguments for stateful objects to save
             (e.g., model=my_model, optimizer=my_optimizer).
 
     Returns:
         The full path to the saved checkpoint file.
     """
-    os.makedirs(save_dir, exist_ok=True)
-    filepath = os.path.join(save_dir, filename)
-    
     logger.info(f"Saving checkpoint to: {filepath}")
 
-    state = {
-        'metadata': metadata or {},
-    }
+    for key in ['git_info', 'rng_state']:
+        if not _contains_key('git_info', metadata):
+            logger.warning(
+                f"Key '{key}' not found in metadata dictionary. "
+                f"Future provenance tracking and reproducibility efforts may not be possible without it if the checkpoint file is moved."
+            )
 
-    if save_rng_state:
-        state['rng_states'] = {
-            'torch': torch.get_rng_state(),
-            'numpy': np.random.get_state(),
-            'random': random.getstate(),
-        }
+    save_dir = os.path.normpath(filepath).split(os.sep)[0]
+    os.makedirs(save_dir, exist_ok=True)
 
+    state = {'metadata': metadata}
     for key, obj in stateful_objects.items():
         if hasattr(obj, 'state_dict'):
-            state_dict_obj = obj
-            if isinstance(state_dict_obj, nn.parallel.DistributedDataParallel):
-                logger.debug(f"Unwrapping '{key}' (DDP model) before saving state_dict.")
-                state_dict_obj = state_dict_obj.module
-            if hasattr(state_dict_obj, '_orig_mod'):
-                logger.debug(f"Unwrapping '{key}' (compiled model) before saving state_dict.")
-                state_dict_obj = state_dict_obj._orig_mod
-
-            state[key] = state_dict_obj.state_dict()
-            logger.debug(f"Added state_dict for '{key}' to checkpoint")
+            logger.debug(f"Adding state_dict for '{key}' to checkpoint...")
+            state_dict = obj.state_dict()
+            state_dict = _normalize_state_dict_keys(state_dict)
+            state[key] = state_dict
+            logger.debug(f"Successfully added state_dict for '{key}' to checkpoint")
         else:
             logger.warning(f"Object '{key}' has no .state_dict() method and will not be checkpointed")
 
@@ -68,22 +72,39 @@ def save_checkpoint(
     return filepath
 
 
-def _normalize_state_dict_keys(state_dict: Dict[str, Any], model: nn.Module) -> Dict[str, Any]:
-    """
-    Normalizes state_dict keys to handle inconsistencies from DDP.
+def _value_match_criteria(ckpt_val, trgt_val):
+    if type(ckpt_val) != type(trgt_val):
+        return False
 
-    - If loading into a DDP model, it adds the 'module.' prefix to keys if absent.
-    - If loading into a non-DDP model, it removes the 'module.' prefix if present.
+def _adjust_ckpt_to_target(ckpt_sd: Dict[str, Any], trgt_sd: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalizes state_dict keys to handle inconsistencies from DDP & torch.compile
+    when loading a checkpoint's state dictionary.
 
     Args:
-        state_dict: The state dictionary loaded from a checkpoint.
-        model: The model instance to load the state into.
+        ckpt_sd: The state dictionary loaded from a checkpoint.
+        trgt_sd: The state dictionary loaded from the target object
 
     Returns:
         The adjusted state dictionary.
     """
-    has_module_prefix = any(k.startswith("module.") for k in state_dict.keys())
-    is_ddp_model = isinstance(model, nn.parallel.DistributedDataParallel)
+    if ckpt_sd == trgt_sd:
+        return ckpt_sd
+    
+    intersect = {
+        ckpt_key: ckpt_sd[ckpt_key] 
+        for ckpt_key, trgt_key in zip(ckpt_sd, trgt_sd)
+        if (ckpt_key in trgt_sd.keys() 
+            and trgt_key in ckpt_sd.keys()
+            and _value_match_criteria(ckpt_sd[ckpt_key], trgt_sd[trgt_key]))
+    }
+    only_in_ckpt = ckpt_sd - intersect
+    only_in_trgt = trgt_sd - intersect
+
+    ckpt_has_ddp = any(k.find('module.') > -1 for k in ckpt_state_dict.keys())
+    target_has_ddp = any(k.find('module.') > -1 for k in target_state_dict.keys())
+    ckpt_has_torchcomp = any(k.find('_orig_mod.') > -1 for k in ckpt_state_dict.keys())
+    target_has_torchcomp = any(k.find('_orig_mod.') > -1 for k in target_state_dict.keys())
 
     if is_ddp_model and not has_module_prefix:
         logger.info("Adding 'module.' prefix to state_dict keys for DDP model compatibility.")
@@ -107,6 +128,9 @@ def load_checkpoint(
     that occur when saving/loading models wrapped with `torch.nn.parallel.DistributedDataParallel`
     or optimized with `torch.compile`.
 
+    WARNING: This function assumes checkpoint data is safe in order to load non-weight informatino.
+    Do not use it to load checkpoints from unknown sources that may contain unsafe data.
+
     Args:
         filepath: The path to the checkpoint file.
         map_location: The device to map the loaded tensors to ('cpu', 'cuda', etc.).
@@ -118,8 +142,7 @@ def load_checkpoint(
         loaded via their load_state_dict() method if available.
 
     Returns:
-        A dictionary containing all non-state-dict data from the checkpoint,
-        including metadata and RNG states.
+        A dictionary containing all non-state-dict metadata from the checkpoint, if any.
     """
     if not os.path.exists(filepath):
         logger.error(f"Checkpoint file not found: {filepath}")
@@ -133,23 +156,18 @@ def load_checkpoint(
     for key, obj in stateful_objects.items():
         if key in checkpoint:
             if hasattr(obj, "load_state_dict"):
-                state_to_load = checkpoint[key]
+                ckpt_state_dict = checkpoint[key]
+                ckpt_state_dict = _adjust_ckpt_to_target(ckpt_state_dict, obj.state_dict())
 
-                target_obj = obj
-                if isinstance(target_obj, nn.Module):
-                    if isinstance(target_obj, nn.parallel.DistributedDataParallel):
-                        target_obj = target_obj.module
-                    if hasattr(target_obj, '_orig_mod'):
-                        target_obj = target_obj._orig_mod
                 try:
                     logger.debug(f"Loading state for '{key}'")
-                    target_obj.load_state_dict(state_to_load)
+                    obj.load_state_dict(ckpt_state_dict)
                 except RuntimeError as e:
                     logger.error(
                         f"Failed to load state_dict for '{key}'. This can happen if the "
-                        f"architecture does not match the checkpoint. Error: {e}"
+                        f"architecture does not match the checkpoint."
                     )
-                    logger.warning(f"Skipping state loading for '{key}'.")
+                    raise e
             else:
                 logger.warning(f"Object '{key}' has no .load_state_dict() method. Skipping")
         else:
