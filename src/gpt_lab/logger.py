@@ -128,8 +128,8 @@ def setup_experiment_logging(
 
     This function sets up a unified logging system that:
     1.  Writes all log records from all ranks to a rank-specific JSONL file.
-    2.  If on the main process, also prints human-readable logs to the console.
-    3.  Filters out logs from third-party libraries to keep logs clean.
+    2.  If on the main process, writes human-readable logs to a .txt file.
+    3.  If on the main process, also prints human-readable logs to the console.
 
     Args:
         log_dir: The directory to save log files in.
@@ -156,13 +156,20 @@ def setup_experiment_logging(
     # file_handler.addFilter(project_filter)
     root_logger.addHandler(file_handler)
 
-    # Console handler for human-readable output (main process only)
+    # Console and text file handlers for human-readable output (main process only)
     if is_main_process:
-        console_handler = logging.StreamHandler(sys.stdout)
         console_formatter = logging.Formatter(
             "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
+
+        # Console handler
+        console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(console_formatter)
-        # console_handler.addFilter(project_filter)
         root_logger.addHandler(console_handler)
+
+        # Text file handler for the main process
+        txt_log_path = os.path.join(log_dir, "log.txt")
+        txt_file_handler = logging.FileHandler(txt_log_path, mode="a")
+        txt_file_handler.setFormatter(console_formatter)
+        root_logger.addHandler(txt_file_handler)
