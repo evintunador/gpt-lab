@@ -61,19 +61,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_object)
 
 
-class Whitelist(logging.Filter):
-    """
-    A logging filter that allows only records whose names start with
-    one of the specified prefixes. This is used to silence logs from
-    third-party libraries and focus on application-specific logging.
-    """
-
-    def __init__(self, prefixes: List[str]):
-        super().__init__()
-        self.prefixes = tuple(prefixes)
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        return record.name.startswith(self.prefixes)
+# class Whitelist(logging.Filter):
+#     """
+#     A logging filter that allows only records whose names start with
+#     one of the specified prefixes. This is used to silence logs from
+#     third-party libraries and focus on application-specific logging.
+#     """
+#
+#     def __init__(self, prefixes: List[str]):
+#         super().__init__()
+#         self.prefixes = tuple(prefixes)
+#
+#     def filter(self, record: logging.LogRecord) -> bool:
+#         return record.name.startswith(self.prefixes)
 
 
 def get_package_versions() -> Dict[str, Any]:
@@ -144,7 +144,7 @@ def setup_experiment_logging(
     root_logger.handlers.clear()
 
     # Create a filter to only include logs from our project code and the main script
-    project_filter = Whitelist(["gpt_lab", "experiments", "__main__"])
+    # project_filter = Whitelist(["gpt_lab", "experiments", "__main__"])
 
     # Create the log directory if it doesn't exist
     os.makedirs(log_dir, exist_ok=True)
@@ -153,7 +153,7 @@ def setup_experiment_logging(
     log_file_path = os.path.join(log_dir, f"log_rank_{rank}.jsonl")
     file_handler = logging.FileHandler(log_file_path, mode="a")
     file_handler.setFormatter(JsonFormatter())
-    file_handler.addFilter(project_filter)
+    # file_handler.addFilter(project_filter)
     root_logger.addHandler(file_handler)
 
     # Console handler for human-readable output (main process only)
@@ -164,5 +164,5 @@ def setup_experiment_logging(
             datefmt="%Y-%m-%d %H:%M:%S",
         )
         console_handler.setFormatter(console_formatter)
-        console_handler.addFilter(project_filter)
+        # console_handler.addFilter(project_filter)
         root_logger.addHandler(console_handler)

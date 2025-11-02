@@ -38,27 +38,27 @@ def test_file_handler_writes_json_with_extra(tmp_path: Path):
     assert data["step"] == 1
 
 
-def test_whitelist_filter_works(tmp_path: Path):
-    """Verify that the Whitelist filter includes and excludes the correct loggers."""
-    log_dir = tmp_path / "logs"
-    setup_experiment_logging(str(log_dir), rank=0, is_main_process=False)
+# def test_whitelist_filter_works(tmp_path: Path):
+#     """Verify that the Whitelist filter includes and excludes the correct loggers."""
+#     log_dir = tmp_path / "logs"
+#     setup_experiment_logging(str(log_dir), rank=0, is_main_process=False)
 
-    # These should be logged
-    logging.getLogger("gpt_lab.utils").info("message 1")
-    logging.getLogger("experiments.run").info("message 2")
-    logging.getLogger("__main__").info("message 3")
+#     # These should be logged
+#     logging.getLogger("gpt_lab.utils").info("message 1")
+#     logging.getLogger("experiments.run").info("message 2")
+#     logging.getLogger("__main__").info("message 3")
 
-    # This should be filtered out
-    logging.getLogger("third_party.library").warning("message 4")
+#     # This should be filtered out
+#     logging.getLogger("third_party.library").warning("message 4")
 
-    log_file = log_dir / "log_rank_0.jsonl"
-    with open(log_file, "r") as f:
-        lines = f.readlines()
+#     log_file = log_dir / "log_rank_0.jsonl"
+#     with open(log_file, "r") as f:
+#         lines = f.readlines()
     
-    assert len(lines) == 3
-    assert "message 1" in lines[0]
-    assert "message 2" in lines[1]
-    assert "message 3" in lines[2]
+#     assert len(lines) == 3
+#     assert "message 1" in lines[0]
+#     assert "message 2" in lines[1]
+#     assert "message 3" in lines[2]
 
 
 def test_console_handler_main_process_only(tmp_path: Path, capsys):
