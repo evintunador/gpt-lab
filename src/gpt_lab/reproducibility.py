@@ -22,7 +22,7 @@ class BaseStorageBackend(ABC):
     """
 
     @abstractmethod
-    def upload(self, local_source_dir: str, experiment_id: str):
+    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
         """Uploads artifacts from a local directory to a destination."""
         pass
 
@@ -40,7 +40,7 @@ class LocalFileSystemBackend(BaseStorageBackend):
         os.makedirs(self.root_dir, exist_ok=True)
         print(f"[Storage] LocalFileSystemBackend initialized at: {self.root_dir}")
 
-    def upload(self, local_source_dir: str, experiment_id: str):
+    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
         destination = os.path.join(self.root_dir, experiment_id)
         
         if os.path.abspath(local_source_dir) == os.path.abspath(destination):
@@ -49,7 +49,10 @@ class LocalFileSystemBackend(BaseStorageBackend):
             
         if os.path.exists(destination):
             shutil.rmtree(destination)
-        shutil.copytree(local_source_dir, destination)
+        
+        # Use shutil's built-in ignore_patterns utility
+        ignore = shutil.ignore_patterns(*ignore_patterns) if ignore_patterns else None
+        shutil.copytree(local_source_dir, destination, ignore=ignore)
         print(f"[Storage] Artifacts for '{experiment_id}' saved to {destination}")
 
     def download(self, experiment_id: str, local_destination_dir: str):
