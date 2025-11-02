@@ -252,7 +252,7 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
 - [ ] make configuration.py not require any input argparser at all so users can rely entirely on config if they want
 - [ ] make the example submodule experiment an actual submodule
-- [ ] use the custom logger everywhere
+- [x] use the custom logger everywhere
 - [ ] make a way to directly import the custom logger rather than having to use the setup function
 - [x] move device & dtype management out of individual nn.modules and into bulk nn.Module test
 - [ ] edit GLU to use our own custom version of LigerKernel that supports more activation functions

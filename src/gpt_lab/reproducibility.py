@@ -6,6 +6,11 @@ import datetime
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
+import random
+
+import torch 
+import numpy as np
+
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +60,14 @@ class LocalFileSystemBackend(BaseStorageBackend):
             shutil.rmtree(local_destination_dir)
         shutil.copytree(source, local_destination_dir)
         print(f"[Storage] Artifacts for '{experiment_id}' downloaded to {local_destination_dir}")
+
+
+def get_rng_state():
+    return {
+        'torch': torch.get_rng_state(),
+        'numpy': np.random.get_state(),
+        'random': random.getstate(),
+    }
 
 
 def get_git_commit_hash() -> Optional[str]:
@@ -173,12 +186,10 @@ class ReproducibilityManager:
             print("\n--- Setting up Reproducible Experiment ---")
             logger.info("Initializing reproducibility manager")
             
-            # Capture git information
             commit_hash = get_git_commit_hash()
             remote_url = get_git_remote_url()
             branch = get_git_branch()
             self.was_dirty = is_git_dirty()
-            
             logger.debug(f"Git commit: {commit_hash}")
             logger.debug(f"Git branch: {branch}")
             logger.debug(f"Git dirty: {self.was_dirty}")
@@ -195,14 +206,6 @@ class ReproducibilityManager:
                         repo_path = remote_url.split("github.com/")[-1].replace(".git", "")
                         github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
             
-            self.git_info = {
-                "commit_hash": commit_hash,
-                "branch": branch,
-                "remote_url": remote_url,
-                "github_url": github_url,
-                "was_dirty": self.was_dirty,
-            }
-            
             # Create unique output directory
             timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             commit_short = commit_hash[:7] if commit_hash else "unknown"
@@ -211,30 +214,32 @@ class ReproducibilityManager:
             self.output_dir = os.path.join(self.output_root_dir, dir_name)
             os.makedirs(self.output_dir, exist_ok=True)
             
-            print(f"[Reproducibility] Experiment output directory: {self.output_dir}")
-            print(f"[Reproducibility] Git commit: {commit_hash}")
-            print(f"[Reproducibility] Git branch: {branch}")
-            print(f"[Reproducibility] Working directory clean: {not self.was_dirty}")
-            
+            print(f"Experiment output directory: {self.output_dir}")
             logger.info(f"Experiment output directory: {self.output_dir}", extra={"output_dir": self.output_dir})
-            logger.info(f"Git state captured", extra={"commit": commit_hash, "branch": branch, "was_dirty": self.was_dirty})
+            
+            self.git_info = {
+                "commit_hash": commit_hash,
+                "branch": branch,
+                "remote_url": remote_url,
+                "github_url": github_url,
+                "was_dirty": self.was_dirty,
+            }
             
             # Save git patch if dirty
             if self.was_dirty:
                 patch_content = create_git_patch()
                 if patch_content:
                     patch_file = os.path.join(self.output_dir, "uncommitted_changes.patch")
+                    self.git_info['patch_file'] = patch_file
                     with open(patch_file, 'w') as f:
                         f.write(patch_content)
-                    print(f"[Reproducibility] Uncommitted changes saved to: uncommitted_changes.patch")
-                    logger.info("Saved uncommitted changes to patch file")
+                    
+            logger.info(f"Git state captured", extra={"git_info": self.git_info})
             
-            # Save git info to a JSON file
-            import json
             git_info_file = os.path.join(self.output_dir, "git_info.json")
             with open(git_info_file, 'w') as f:
                 json.dump(self.git_info, f, indent=2)
-            logger.debug(f"Saved git info to: {git_info_file}")
+            logger.info(f"Saved git info to: {git_info_file}")
             
         return self
 
@@ -244,7 +249,7 @@ class ReproducibilityManager:
             if exc_type is not None:
                 print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
                 logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
-            print("\n--- Uploading Experiment Artifacts ---")
+                
             logger.info("Finalizing experiment artifacts")
             
             # The experiment ID is the path relative to the CWD for clean storage paths.
