@@ -263,3 +263,4 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [x] add support for external storage backup daemon to account for stalled experiments
 - [ ] move reproducibility's storage backup backend ABC & daemon ABC over to the catalog system
 - [ ] add non-grid indivdiual-command ability to the multi-run configs
+- [ ] move tests from src/gpt_lab/tests/ to tests/
