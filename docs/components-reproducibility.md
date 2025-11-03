@@ -46,11 +46,13 @@ On **entry** (`__enter__`):
 4. Saves `git_info.json` with metadata
 5. If dirty, creates `uncommitted_changes.patch` file
 6. Calls `on_run_start` on the provided `daemon_hook` if provided.
+7. Registers signal handlers for `SIGINT` (Ctrl+C) and `SIGTERM` to enable graceful shutdown.
 
 On **exit** (`__exit__`):
 1. Calls `on_run_end` on the provided `daemon_hook` if provided.
 2. Uploads artifacts to secondary/backup storage backend (saving to local designated folder was already being done live during the experiment)
-3. Works even if experiment exits with error
+3. Works even if experiment exits with an error or is interrupted
+4. Restores original signal handlers to avoid side effects.
 
 **Created Directory Structure:**
 ```

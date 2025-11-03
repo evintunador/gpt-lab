@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 import shutil
 import pytest
+import signal
+import sys
 
 from gpt_lab.reproducibility import (
     ReproducibilityManager, 
@@ -215,6 +217,37 @@ def test_daemon_hook_survives_exception(git_repo: Path, tmp_path: Path):
 
         # Watch file should be gone after exit, even with the exception
         assert not list(watch_dir.glob("*.json"))
+    finally:
+        os.chdir(original_cwd)
+
+
+@pytest.mark.parametrize("sig", [signal.SIGINT, signal.SIGTERM])
+def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
+    """Verify that artifacts are saved on SIGINT or SIGTERM."""
+    # This test might be flaky on some systems if signal handling is slow.
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        mock_storage = MockStorageBackend(source_artifacts_dir=tmp_path / "remote_storage")
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+
+        with pytest.raises(SystemExit) as e:
+            with ReproducibilityManager(
+                output_dir=str(runs_dir),
+                storage_backend=mock_storage
+            ) as manager:
+                (Path(manager.output_dir) / "results.txt").write_text("partial success")
+                os.kill(os.getpid(), sig)
+                # The process should exit via the signal handler, so this is a failure.
+                pytest.fail("Code continued execution after signal-induced exit.")
+
+        assert e.value.code == 1
+        assert len(mock_storage.upload_calls) == 1
+        
+        uploaded_dir, experiment_id = mock_storage.upload_calls[0]
+        assert "test-exp" in experiment_id
+        remote_file = tmp_path / "remote_storage" / experiment_id / "results.txt"
+        assert remote_file.read_text() == "partial success"
     finally:
         os.chdir(original_cwd)
 

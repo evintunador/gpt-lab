@@ -5,6 +5,8 @@ import subprocess
 import datetime
 import logging
 import uuid
+import signal
+import sys
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import random
@@ -226,6 +228,9 @@ class ReproducibilityManager:
         self.is_main_process = is_main_process
         self.storage_backend = storage_backend
         self.daemon_hook = daemon_hook
+        self._is_shutting_down = False
+        self.original_sigint_handler = None
+        self.original_sigterm_handler = None
 
         if self.storage_backend is None and self.is_main_process:
             self.storage_backend = LocalFileSystemBackend(root_dir=os.getcwd())
@@ -234,6 +239,22 @@ class ReproducibilityManager:
         self.output_dir: Optional[str] = None
         self.git_info: Dict[str, Any] = {}
         self.was_dirty: bool = False
+
+    def _signal_handler(self, signum, frame):
+        """Custom signal handler for graceful shutdown."""
+        if self._is_shutting_down:
+            return  # Avoid re-entrant calls
+        self._is_shutting_down = True
+
+        signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
+        logger.info(f"\n--- Interrupted by {signal_name}. Saving artifacts before exiting. ---")
+        logger.warning(f"Received {signal_name}, attempting graceful shutdown.")
+
+        # Perform cleanup and upload
+        self._cleanup_and_upload(exc_type=signal_name)
+
+        # Exit after saving
+        sys.exit(1)
 
     def __enter__(self):
         """Sets up the experiment environment and captures git state."""
@@ -304,39 +325,65 @@ class ReproducibilityManager:
                     "start_time_utc": datetime.datetime.utcnow().isoformat(),
                 }
                 self.daemon_hook.on_run_start(run_info)
+
+            # Register signal handlers for graceful shutdown
+            logger.debug("Registering signal handlers for graceful shutdown.")
+            self.original_sigint_handler = signal.signal(signal.SIGINT, self._signal_handler)
+            self.original_sigterm_handler = signal.signal(signal.SIGTERM, self._signal_handler)
             
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleans up and optionally uploads artifacts."""
-        if self.is_main_process:
-            # Call daemon hook on end, regardless of outcome
-            if self.daemon_hook:
-                self.daemon_hook.on_run_end()
+    def _cleanup_and_upload(self, exc_type=None, exc_val=None):
+        """Handles daemon hook cleanup and artifact uploading."""
+        if not self.is_main_process:
+            return
 
-            if self.storage_backend and self.output_dir:
-                if exc_type is not None:
+        # Call daemon hook on end, regardless of outcome
+        if self.daemon_hook:
+            self.daemon_hook.on_run_end()
+
+        if self.storage_backend and self.output_dir:
+            if exc_type is not None:
+                if exc_type in ("SIGINT", "SIGTERM"):
+                    # The message is printed in the handler
+                    logger.error(f"Experiment interrupted by {exc_type}. Partial artifacts saved.")
+                else:
                     print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
                     logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
-                
-                logger.info("Finalizing experiment artifacts")
-                
-                # The experiment ID is the path relative to the CWD for clean storage paths.
-                try:
-                    experiment_id = os.path.relpath(self.output_dir, os.getcwd())
-                except ValueError:
-                    # Fallback for cases like different drives on Windows
-                    experiment_id = self.output_dir
 
-                try:
-                    self.storage_backend.upload(
-                        local_source_dir=self.output_dir,
-                        experiment_id=experiment_id
-                    )
-                    logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
-                except Exception as e:
-                    print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
-                    logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
+            logger.info("Finalizing experiment artifacts")
+
+            # The experiment ID is the path relative to the CWD for clean storage paths.
+            try:
+                experiment_id = os.path.relpath(self.output_dir, os.getcwd())
+            except ValueError:
+                # Fallback for cases like different drives on Windows
+                experiment_id = self.output_dir
+
+            try:
+                self.storage_backend.upload(
+                    local_source_dir=self.output_dir,
+                    experiment_id=experiment_id
+                )
+                logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
+            except Exception as e:
+                print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
+                logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Cleans up and optionally uploads artifacts."""
+        if self._is_shutting_down:
+            return  # Shutdown is already being handled by the signal handler
+
+        # Perform cleanup and upload for normal exit or exception
+        self._cleanup_and_upload(exc_type, exc_val)
+
+        # Restore original signal handlers
+        if self.is_main_process:
+            if self.original_sigint_handler:
+                signal.signal(signal.SIGINT, self.original_sigint_handler)
+            if self.original_sigterm_handler:
+                signal.signal(signal.SIGTERM, self.original_sigterm_handler)
 
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
