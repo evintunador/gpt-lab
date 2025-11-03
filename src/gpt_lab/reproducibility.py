@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import datetime
 import logging
+import uuid
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import random
@@ -60,6 +61,58 @@ class LocalFileSystemBackend(BaseStorageBackend):
             shutil.rmtree(local_destination_dir)
         shutil.copytree(source, local_destination_dir)
         print(f"[Storage] Artifacts for '{experiment_id}' downloaded to {local_destination_dir}")
+
+
+class BaseDaemonHook(ABC):
+    """
+    Abstract Base Class for a daemon hook.
+    This defines the interface for external processes to monitor experiment runs.
+    """
+
+    @abstractmethod
+    def on_run_start(self, run_info: Dict[str, Any]):
+        """Called when the experiment run starts."""
+        pass
+
+    @abstractmethod
+    def on_run_end(self):
+        """Called when the experiment run ends (successfully or not)."""
+        pass
+
+
+class FileDaemonHook(BaseDaemonHook):
+    """
+    A daemon hook that creates a watch file on run start and deletes it on run end.
+    An external daemon can monitor the watch directory for these files.
+    """
+
+    def __init__(self, watch_dir: str = ".watch_runs"):
+        self.watch_dir = os.path.abspath(watch_dir)
+        os.makedirs(self.watch_dir, exist_ok=True)
+        self.watch_file_path: Optional[str] = None
+        logger.info(f"[DaemonHook] FileDaemonHook initialized. Watching directory: {self.watch_dir}")
+
+    def on_run_start(self, run_info: Dict[str, Any]):
+        """Creates a unique JSON file with run information."""
+        unique_id = uuid.uuid4()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"{timestamp}_{run_info.get('pid', 'unknown_pid')}_{unique_id}.json"
+        self.watch_file_path = os.path.join(self.watch_dir, filename)
+        
+        with open(self.watch_file_path, 'w') as f:
+            json.dump(run_info, f, indent=2)
+        
+        logger.info(f"Daemon hook: Created watch file at {self.watch_file_path}")
+
+    def on_run_end(self):
+        """Deletes the watch file to signal a clean exit."""
+        if self.watch_file_path and os.path.exists(self.watch_file_path):
+            try:
+                os.remove(self.watch_file_path)
+                logger.info(f"Daemon hook: Removed watch file {self.watch_file_path}")
+            except OSError as e:
+                logger.error(f"Daemon hook: Error removing watch file {self.watch_file_path}: {e}")
+        self.watch_file_path = None
 
 
 def get_rng_state():
@@ -167,10 +220,12 @@ class ReproducibilityManager:
         output_dir: str,
         storage_backend: Optional[BaseStorageBackend] = None,
         is_main_process: bool = True,
+        daemon_hook: Optional[BaseDaemonHook] = None,
     ):
         self.output_root_dir = os.path.abspath(output_dir)
         self.is_main_process = is_main_process
         self.storage_backend = storage_backend
+        self.daemon_hook = daemon_hook
 
         if self.storage_backend is None and self.is_main_process:
             self.storage_backend = LocalFileSystemBackend(root_dir=os.getcwd())
@@ -241,33 +296,47 @@ class ReproducibilityManager:
                 json.dump(self.git_info, f, indent=2)
             logger.info(f"Saved git info to: {git_info_file}")
             
+            # Call daemon hook on start
+            if self.daemon_hook:
+                run_info = {
+                    "pid": os.getpid(),
+                    "output_dir": self.output_dir,
+                    "start_time_utc": datetime.datetime.utcnow().isoformat(),
+                }
+                self.daemon_hook.on_run_start(run_info)
+            
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Cleans up and optionally uploads artifacts."""
-        if self.is_main_process and self.storage_backend and self.output_dir:
-            if exc_type is not None:
-                print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
-                logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
-                
-            logger.info("Finalizing experiment artifacts")
-            
-            # The experiment ID is the path relative to the CWD for clean storage paths.
-            try:
-                experiment_id = os.path.relpath(self.output_dir, os.getcwd())
-            except ValueError:
-                # Fallback for cases like different drives on Windows
-                experiment_id = self.output_dir
+        if self.is_main_process:
+            # Call daemon hook on end, regardless of outcome
+            if self.daemon_hook:
+                self.daemon_hook.on_run_end()
 
-            try:
-                self.storage_backend.upload(
-                    local_source_dir=self.output_dir,
-                    experiment_id=experiment_id
-                )
-                logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
-            except Exception as e:
-                print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
-                logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
+            if self.storage_backend and self.output_dir:
+                if exc_type is not None:
+                    print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
+                    logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
+                
+                logger.info("Finalizing experiment artifacts")
+                
+                # The experiment ID is the path relative to the CWD for clean storage paths.
+                try:
+                    experiment_id = os.path.relpath(self.output_dir, os.getcwd())
+                except ValueError:
+                    # Fallback for cases like different drives on Windows
+                    experiment_id = self.output_dir
+
+                try:
+                    self.storage_backend.upload(
+                        local_source_dir=self.output_dir,
+                        experiment_id=experiment_id
+                    )
+                    logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
+                except Exception as e:
+                    print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
+                    logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
 
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""

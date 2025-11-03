@@ -5,7 +5,13 @@ from pathlib import Path
 import shutil
 import pytest
 
-from gpt_lab.reproducibility import ReproducibilityManager, BaseStorageBackend, restore_experiment_state, LocalFileSystemBackend
+from gpt_lab.reproducibility import (
+    ReproducibilityManager, 
+    BaseStorageBackend, 
+    restore_experiment_state, 
+    LocalFileSystemBackend, 
+    FileDaemonHook
+)
 
 
 # --- Test Fixtures and Helpers ---
@@ -152,6 +158,63 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         uploaded_dir, experiment_id = mock_storage.upload_calls[0]
         assert "test-exp" in experiment_id
         assert (tmp_path / "remote_storage" / experiment_id / "results.txt").read_text() == "success"
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_daemon_hook_lifecycle(git_repo: Path, tmp_path: Path):
+    """Verify the FileDaemonHook creates and deletes its watch file."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        watch_dir = tmp_path / "watch"
+        hook = FileDaemonHook(watch_dir=str(watch_dir))
+        
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        
+        with ReproducibilityManager(
+            output_dir=str(runs_dir),
+            daemon_hook=hook
+        ) as manager:
+            # 1. Check file creation on __enter__
+            watch_files = list(watch_dir.glob("*.json"))
+            assert len(watch_files) == 1
+            watch_file = watch_files[0]
+            
+            with open(watch_file, 'r') as f:
+                run_info = json.load(f)
+            
+            assert run_info["pid"] == os.getpid()
+            assert Path(run_info["output_dir"]) == Path(manager.output_dir)
+
+        # 2. Check file deletion on __exit__
+        assert not list(watch_dir.glob("*.json"))
+
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_daemon_hook_survives_exception(git_repo: Path, tmp_path: Path):
+    """Verify the watch file is removed even if the experiment fails."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        watch_dir = tmp_path / "watch_failure"
+        hook = FileDaemonHook(watch_dir=str(watch_dir))
+        
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        
+        with pytest.raises(ValueError, match="Experiment failed"):
+            with ReproducibilityManager(
+                output_dir=str(runs_dir),
+                daemon_hook=hook
+            ):
+                # Watch file should exist here
+                assert len(list(watch_dir.glob("*.json"))) == 1
+                raise ValueError("Experiment failed")
+
+        # Watch file should be gone after exit, even with the exception
+        assert not list(watch_dir.glob("*.json"))
     finally:
         os.chdir(original_cwd)
 

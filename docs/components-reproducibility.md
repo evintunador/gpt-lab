@@ -35,6 +35,7 @@ with ReproducibilityManager(
 - `output_dir`: Root directory for experiment outputs
 - `storage_backend`: Secondary/backup storage backend for artifacts (default: `LocalFileSystemBackend` is equivalent to not having a secondary/backup storage location)
 - `is_main_process`: Whether this is the main process (for distributed training)
+- `daemon_hook`: An optional hook for external monitoring of the run's liveness.
 
 **Behavior:**
 
@@ -44,10 +45,12 @@ On **entry** (`__enter__`):
 3. Creates timestamped output directory: `{timestamp}_{commit_short}/`
 4. Saves `git_info.json` with metadata
 5. If dirty, creates `uncommitted_changes.patch` file
+6. Calls `on_run_start` on the provided `daemon_hook` if provided.
 
 On **exit** (`__exit__`):
-1. Uploads artifacts to secondary/backup storage backend (saving to local designated folder was already being done live during the experiment)
-2. Works even if experiment exits with error
+1. Calls `on_run_end` on the provided `daemon_hook` if provided.
+2. Uploads artifacts to secondary/backup storage backend (saving to local designated folder was already being done live during the experiment)
+3. Works even if experiment exits with error
 
 **Created Directory Structure:**
 ```
