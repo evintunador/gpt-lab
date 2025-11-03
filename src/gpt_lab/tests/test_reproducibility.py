@@ -321,3 +321,29 @@ def test_restore_state_safety_check(git_repo: Path, capsys):
         assert "Error: Your git working directory is not clean" in captured.out
     finally:
         os.chdir(original_cwd)
+
+
+def test_local_backend_idempotency(tmp_path: Path):
+    """Verify that re-uploading to the same destination works without error."""
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    (source_dir / "test.txt").write_text("data")
+    
+    storage_root = tmp_path / "storage"
+    backend = LocalFileSystemBackend(root_dir=str(storage_root))
+    
+    experiment_id = "idempotent-test"
+    
+    # First upload
+    backend.upload(str(source_dir), experiment_id)
+    assert (storage_root / experiment_id / "test.txt").exists()
+    
+    # Second upload to the same destination should not raise an error
+    try:
+        (source_dir / "test.txt").write_text("updated data")
+        backend.upload(str(source_dir), experiment_id)
+    except Exception as e:
+        pytest.fail(f"Second upload failed with an exception: {e}")
+        
+    # Verify content is updated
+    assert (storage_root / experiment_id / "test.txt").read_text() == "updated data"
