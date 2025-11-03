@@ -112,10 +112,6 @@ class S3StorageBackend(BaseStorageBackend):
         pass
 ```
 
-### `restore_experiment_state()`
-
-WIP
-
 ## Helper Functions
 
 ### Git State Capture
@@ -146,7 +142,7 @@ patch = create_git_patch()          # Full git diff as string
 ```python
 import logging
 from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import setup_experiment_logging, get_system_info
+from gpt_lab.logger import setup_experiment_logging
 
 with ReproducibilityManager(output_dir="./runs") as repro:
     # Setup logging
@@ -154,10 +150,6 @@ with ReproducibilityManager(output_dir="./runs") as repro:
     setup_experiment_logging(log_dir, rank=0, is_main_process=True)
     
     logger = logging.getLogger(__name__)
-    
-    # Log system info with git info
-    system_info = get_system_info(git_info=repro.git_info)
-    logger.info("Experiment started", extra=system_info)
     
     # Log experiment directory
     logger.info(f"Output directory: {repro.output_dir}")
@@ -257,45 +249,6 @@ with ReproducibilityManager(
     # Artifacts automatically uploaded to S3 on exit
 ```
 
-### Accessing Git Info in Experiments
-
-```python
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.checkpointer import save_checkpoint
-
-with ReproducibilityManager(output_dir="./runs") as repro:
-    model = MyModel()
-    optimizer = torch.optim.AdamW(model.parameters())
-    
-    for epoch in range(num_epochs):
-        train_epoch(model, optimizer)
-        
-        # Include git info in checkpoint metadata
-        save_checkpoint(
-            save_dir=os.path.join(repro.output_dir, "checkpoints"),
-            filename=f"epoch_{epoch:03d}.pt",
-            metadata={
-                "epoch": epoch,
-                "git_info": repro.git_info  # Critical for tracking!
-            },
-            model=model,
-            optimizer=optimizer
-        )
-```
-
-## CLI Usage
-
-The `reproducibility.py` module can be used as a CLI script:
-
-```bash
-# Restore experiment from local storage
-python -m gpt_lab.reproducibility \
-    experiments/my_exp/runs/2025-10-12_14-30-45_a1b2c3d \
-    --backend local \
-    --storage_root ./experiment_artifacts \
-    --restore_path ./restored
-```
-
 ## Best Practices
 
 ### 1. Always Use ReproducibilityManager
@@ -334,21 +287,6 @@ save_checkpoint(
 )
 ```
 
-### 4. Test Restoration Periodically
-
-Regularly verify you can restore old experiments:
-
-```bash
-# Restore an old experiment
-python -m gpt_lab.reproducibility experiments/my_exp/runs/2025-10-12_14-30-45_a1b2c3d
-
-# Verify files are correct
-ls -la
-
-# Return to current branch
-git checkout main
-```
-
 ## Testing
 
 Comprehensive tests are in `src/gpt_lab/tests/test_reproducibility.py`:
@@ -365,25 +303,3 @@ pytest src/gpt_lab/tests/test_reproducibility.py -v
 - Distributed training awareness
 - Full restoration roundtrip
 - Safety checks for dirty state during restoration
-
-## Contributing
-
-To contribute to the reproducibility component:
-
-1. **Adding Features**: Extend functionality in `src/gpt_lab/reproducibility.py`
-   - Add new storage backends (S3, GCS, Azure Blob, etc.)
-   - Add git submodule support
-   - Add experiment metadata extraction utilities
-   - Add experiment comparison tools
-
-2. **Adding Tests**: Add test cases to `src/gpt_lab/tests/test_reproducibility.py`
-   - Test new storage backends with mock services
-   - Test edge cases (detached HEAD, merge conflicts, etc.)
-   - Test cross-platform compatibility
-   - Test large file handling
-
-3. **Guidelines**:
-   - Always test with real git operations
-   - Handle git errors gracefully
-   - Maintain backward compatibility with existing artifacts
-   - Document storage backend requirements
