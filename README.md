@@ -248,7 +248,7 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
-- [ ] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
+- [x] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
 - [ ] make configuration.py not require any input argparser at all so users can rely entirely on config if they want
 - [ ] make the example submodule experiment an actual submodule
 - [ ] make a way to directly import the custom logger rather than having to use the setup function
@@ -261,3 +261,4 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] make checkpointer torch.compile & ddp aware
 - [x] make logs also human readable
 - [x] remove log requirement that you work inside experiments/
+- [x] add support for external storage backup daemon to account for stalled experiments

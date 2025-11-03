@@ -4,6 +4,9 @@ import shutil
 import subprocess
 import datetime
 import logging
+import uuid
+import signal
+import sys
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import random
@@ -22,7 +25,7 @@ class BaseStorageBackend(ABC):
     """
 
     @abstractmethod
-    def upload(self, local_source_dir: str, experiment_id: str):
+    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
         """Uploads artifacts from a local directory to a destination."""
         pass
 
@@ -40,16 +43,16 @@ class LocalFileSystemBackend(BaseStorageBackend):
         os.makedirs(self.root_dir, exist_ok=True)
         print(f"[Storage] LocalFileSystemBackend initialized at: {self.root_dir}")
 
-    def upload(self, local_source_dir: str, experiment_id: str):
+    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
         destination = os.path.join(self.root_dir, experiment_id)
         
         if os.path.abspath(local_source_dir) == os.path.abspath(destination):
             print(f"[Storage] Artifacts are already in their final destination: {destination}")
             return
             
-        if os.path.exists(destination):
-            shutil.rmtree(destination)
-        shutil.copytree(local_source_dir, destination)
+        # Use shutil's built-in ignore_patterns utility
+        ignore = shutil.ignore_patterns(*ignore_patterns) if ignore_patterns else None
+        shutil.copytree(local_source_dir, destination, ignore=ignore, dirs_exist_ok=True)
         print(f"[Storage] Artifacts for '{experiment_id}' saved to {destination}")
 
     def download(self, experiment_id: str, local_destination_dir: str):
@@ -60,6 +63,58 @@ class LocalFileSystemBackend(BaseStorageBackend):
             shutil.rmtree(local_destination_dir)
         shutil.copytree(source, local_destination_dir)
         print(f"[Storage] Artifacts for '{experiment_id}' downloaded to {local_destination_dir}")
+
+
+class BaseDaemonHook(ABC):
+    """
+    Abstract Base Class for a daemon hook.
+    This defines the interface for external processes to monitor experiment runs.
+    """
+
+    @abstractmethod
+    def on_run_start(self, run_info: Dict[str, Any]):
+        """Called when the experiment run starts."""
+        pass
+
+    @abstractmethod
+    def on_run_end(self):
+        """Called when the experiment run ends (successfully or not)."""
+        pass
+
+
+class FileDaemonHook(BaseDaemonHook):
+    """
+    A daemon hook that creates a watch file on run start and deletes it on run end.
+    An external daemon can monitor the watch directory for these files.
+    """
+
+    def __init__(self, watch_dir: str = ".watch_runs"):
+        self.watch_dir = os.path.abspath(watch_dir)
+        os.makedirs(self.watch_dir, exist_ok=True)
+        self.watch_file_path: Optional[str] = None
+        logger.info(f"[DaemonHook] FileDaemonHook initialized. Watching directory: {self.watch_dir}")
+
+    def on_run_start(self, run_info: Dict[str, Any]):
+        """Creates a unique JSON file with run information."""
+        unique_id = uuid.uuid4()
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"{timestamp}_{run_info.get('pid', 'unknown_pid')}_{unique_id}.json"
+        self.watch_file_path = os.path.join(self.watch_dir, filename)
+        
+        with open(self.watch_file_path, 'w') as f:
+            json.dump(run_info, f, indent=2)
+        
+        logger.info(f"Daemon hook: Created watch file at {self.watch_file_path}")
+
+    def on_run_end(self):
+        """Deletes the watch file to signal a clean exit."""
+        if self.watch_file_path and os.path.exists(self.watch_file_path):
+            try:
+                os.remove(self.watch_file_path)
+                logger.info(f"Daemon hook: Removed watch file {self.watch_file_path}")
+            except OSError as e:
+                logger.error(f"Daemon hook: Error removing watch file {self.watch_file_path}: {e}")
+        self.watch_file_path = None
 
 
 def get_rng_state():
@@ -167,10 +222,15 @@ class ReproducibilityManager:
         output_dir: str,
         storage_backend: Optional[BaseStorageBackend] = None,
         is_main_process: bool = True,
+        daemon_hook: Optional[BaseDaemonHook] = None,
     ):
         self.output_root_dir = os.path.abspath(output_dir)
         self.is_main_process = is_main_process
         self.storage_backend = storage_backend
+        self.daemon_hook = daemon_hook
+        self._is_shutting_down = False
+        self.original_sigint_handler = None
+        self.original_sigterm_handler = None
 
         if self.storage_backend is None and self.is_main_process:
             self.storage_backend = LocalFileSystemBackend(root_dir=os.getcwd())
@@ -179,6 +239,22 @@ class ReproducibilityManager:
         self.output_dir: Optional[str] = None
         self.git_info: Dict[str, Any] = {}
         self.was_dirty: bool = False
+
+    def _signal_handler(self, signum, frame):
+        """Custom signal handler for graceful shutdown."""
+        if self._is_shutting_down:
+            return  # Avoid re-entrant calls
+        self._is_shutting_down = True
+
+        signal_name = "SIGINT" if signum == signal.SIGINT else "SIGTERM"
+        logger.info(f"\n--- Interrupted by {signal_name}. Saving artifacts before exiting. ---")
+        logger.warning(f"Received {signal_name}, attempting graceful shutdown.")
+
+        # Perform cleanup and upload
+        self._cleanup_and_upload(exc_type=signal_name)
+
+        # Exit after saving
+        sys.exit(1)
 
     def __enter__(self):
         """Sets up the experiment environment and captures git state."""
@@ -241,17 +317,42 @@ class ReproducibilityManager:
                 json.dump(self.git_info, f, indent=2)
             logger.info(f"Saved git info to: {git_info_file}")
             
+            # Call daemon hook on start
+            if self.daemon_hook:
+                run_info = {
+                    "pid": os.getpid(),
+                    "output_dir": self.output_dir,
+                    "start_time_utc": datetime.datetime.utcnow().isoformat(),
+                }
+                self.daemon_hook.on_run_start(run_info)
+
+            # Register signal handlers for graceful shutdown
+            logger.debug("Registering signal handlers for graceful shutdown.")
+            self.original_sigint_handler = signal.signal(signal.SIGINT, self._signal_handler)
+            self.original_sigterm_handler = signal.signal(signal.SIGTERM, self._signal_handler)
+            
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Cleans up and optionally uploads artifacts."""
-        if self.is_main_process and self.storage_backend and self.output_dir:
+    def _cleanup_and_upload(self, exc_type=None, exc_val=None):
+        """Handles daemon hook cleanup and artifact uploading."""
+        if not self.is_main_process:
+            return
+
+        # Call daemon hook on end, regardless of outcome
+        if self.daemon_hook:
+            self.daemon_hook.on_run_end()
+
+        if self.storage_backend and self.output_dir:
             if exc_type is not None:
-                print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
-                logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
-                
+                if exc_type in ("SIGINT", "SIGTERM"):
+                    # The message is printed in the handler
+                    logger.error(f"Experiment interrupted by {exc_type}. Partial artifacts saved.")
+                else:
+                    print(f"\n--- Experiment exited with an error. Attempting to save partial artifacts. ---")
+                    logger.error(f"Experiment exited with error: {exc_type.__name__}: {exc_val}")
+
             logger.info("Finalizing experiment artifacts")
-            
+
             # The experiment ID is the path relative to the CWD for clean storage paths.
             try:
                 experiment_id = os.path.relpath(self.output_dir, os.getcwd())
@@ -268,6 +369,21 @@ class ReproducibilityManager:
             except Exception as e:
                 print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
                 logger.error(f"Failed to upload artifacts: {e}", exc_info=True)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Cleans up and optionally uploads artifacts."""
+        if self._is_shutting_down:
+            return  # Shutdown is already being handled by the signal handler
+
+        # Perform cleanup and upload for normal exit or exception
+        self._cleanup_and_upload(exc_type, exc_val)
+
+        # Restore original signal handlers
+        if self.is_main_process:
+            if self.original_sigint_handler:
+                signal.signal(signal.SIGINT, self.original_sigint_handler)
+            if self.original_sigterm_handler:
+                signal.signal(signal.SIGTERM, self.original_sigterm_handler)
 
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
@@ -348,69 +464,3 @@ def restore_experiment_state(
     except Exception as e:
         print(f"\n\033[91m❌ An unexpected error occurred: {e}\033[0m")
         exit(1)
-
-if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Restore the state of a previous experiment."
-    )
-    
-    # --- General Arguments ---
-    parser.add_argument(
-        "experiment_id",
-        type=str,
-        help="The unique ID of the experiment to restore (e.g., 'my-exp/2025-09-20_14-30-00_a1b2c3d')."
-    )
-    parser.add_argument(
-        "--backend",
-        type=str,
-        default="local",
-        choices=["local"], # Add future backends like 's3' here
-        help="The storage backend to use."
-    )
-    parser.add_argument(
-        "--restore_path",
-        type=str,
-        default="restored_experiments",
-        help="The local directory where experiment artifacts will be downloaded."
-    )
-
-    # --- Backend-Specific Arguments ---
-
-    # Local File System Backend
-    local_group = parser.add_argument_group("Local Backend Arguments")
-    local_group.add_argument(
-        "--storage_root",
-        type=str,
-        default="experiment_artifacts",
-        help="The root directory of the local file system storage backend."
-    )
-
-    # Example for a future S3 Backend
-    # s3_group = parser.add_argument_group("S3 Backend Arguments")
-    # s3_group.add_argument("--s3-bucket", type=str, help="Name of the S3 bucket.")
-    # s3_group.add_argument("--s3-prefix", type=str, default="", help="Optional prefix within the S3 bucket.")
-
-
-    args = parser.parse_args()
-
-    # --- Initialize Storage Backend ---
-    storage: BaseStorageBackend
-    if args.backend == "local":
-        storage = LocalFileSystemBackend(root_dir=args.storage_root)
-    # elif args.backend == 's3':
-    #     if not args.s3_bucket:
-    #         parser.error("--s3-bucket is required when using the 's3' backend.")
-    #     # Assume S3Backend reads credentials from environment variables
-    #     storage = S3Backend(bucket_name=args.s3_bucket, prefix=args.s3_prefix)
-    else:
-        # This will be unreachable until more choices are added
-        raise ValueError(f"Unknown backend: {args.backend}")
-
-
-    restore_experiment_state(
-        experiment_id=args.experiment_id,
-        storage_backend=storage,
-        restore_path=args.restore_path
-    )
