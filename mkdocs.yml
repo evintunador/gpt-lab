@@ -18,6 +18,7 @@ nav:
     - Pytest All Experiments: cli-pytest-all-experiments.md
     - Run Multiple Experiments: cli-run-multi.md
     - Scaffold New Experiment: cli-scaffold-experiment.md
+    - Restore Experiment: cli-restore-experiment.md
     - Misc:
       - Print Active Paths: cli-print-active-paths.md
       - Validate Repo Layout: cli-validate-layout.md

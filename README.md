@@ -210,7 +210,6 @@ See [LICENSE](LICENSE) for details.
 # todo
 ## important / urgent
 
-- [x] reorganize repo to separate out "repo tools" from "repo common catalogs" to "experiment specific catalogs" using something like namespace packages, but more flexible
 - [ ] design & build a mu-parametrization utility
 - [ ] do first DAGSeq2DAGSeq experiment
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
@@ -220,6 +219,7 @@ See [LICENSE](LICENSE) for details.
 - [ ] fact check various inaccuracies in the documentation
 - [ ] design and build a system for comparing performance between two experiments or/
 and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
+    - [x] minimal proof of concept
     - [ ] time series
     - [ ] more adaptable to whatever's available in the experiments
 - [ ] design & build hyperparameter search utility with an interface such that we can change out search algorithms later
@@ -227,7 +227,6 @@ and i guess different config settings within an experiment both directly and as 
 - [ ] add slurm capabilities to DistributedManager
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
 - [ ] abstract out evaluation utilities. rn we've got `src/benchmarks/` which seems able to run benchmark datasets but i'd also like general evaluation metrics like perplexity to get recorded. maybe a benchmark is a specific type of evaluation that takes in an external dataset? does regular validation count as a type of evaluation? idk how this works
-- [ ] tool for forking repo with specific experiment as the only one to carry over into fork--or i guess a tool to run after you've forked? not sure how the system will work. maybe just a simple tool that, after a fork, you give it the directories inside `experiments/` that you actually care about, and it deletes all catalog items that are not used by those experiments? or, optionally, also deletes all harness component files that weren't utilized. or, even more optionally, also deletes any functions and classes within the remaining files that weren't used? not sure exactly how i'd properly parse that dependency graph but i assume it's doable.
 - [ ] build a tool to allow the experiment to dynamically increase or decrease the number of nodes it's taking up by periodically checking for outside requests. it'd have to effectively re-adjust gradient accumulation settings in order to make the experiment numerically equivalent to when it had more/fewer nodes. i guess it wouldn't have to be aware of VRAM utilization since we'd keep the micro batch size the same and only change number of nodes and number of gradient accumulation steps? i don't think this would have to be aware of the gradient accumulation atomic feature; you'd just need to tell it which argument is the right one. is kinda ugly that people are roughly restricted to powers of 2 at that point. also this would have to overwrite whatever "waiting in line" system submitit has going on in order to restart a given experiment but smaller and let it skip forward in line. also ugly af thinking about resuming from the most recent checkpoint ew. not sure how feasible this is but i feel like it's necessary eventually
 
 ### not important / urgent
@@ -262,3 +261,5 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [x] make logs also human readable
 - [x] remove log requirement that you work inside experiments/
 - [x] add support for external storage backup daemon to account for stalled experiments
+- [ ] move reproducibility's storage backup backend ABC & daemon ABC over to the catalog system
+- [ ] add non-grid indivdiual-command ability to the multi-run configs
