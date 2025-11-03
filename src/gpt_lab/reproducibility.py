@@ -47,12 +47,9 @@ class LocalFileSystemBackend(BaseStorageBackend):
             print(f"[Storage] Artifacts are already in their final destination: {destination}")
             return
             
-        if os.path.exists(destination):
-            shutil.rmtree(destination)
-        
         # Use shutil's built-in ignore_patterns utility
         ignore = shutil.ignore_patterns(*ignore_patterns) if ignore_patterns else None
-        shutil.copytree(local_source_dir, destination, ignore=ignore)
+        shutil.copytree(local_source_dir, destination, ignore=ignore, dirs_exist_ok=True)
         print(f"[Storage] Artifacts for '{experiment_id}' saved to {destination}")
 
     def download(self, experiment_id: str, local_destination_dir: str):
