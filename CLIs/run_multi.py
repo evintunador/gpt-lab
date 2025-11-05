@@ -26,6 +26,70 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def validate_config(config: dict) -> list[str]:
+    """Validates the configuration has required fields.
+    
+    Args:
+        config: Configuration dictionary to validate
+        
+    Returns:
+        List of missing required field names (empty if valid)
+    """
+    required_fields = ['command', 'parameters']
+    missing_fields = [field for field in required_fields if field not in config]
+    return missing_fields
+
+
+def format_summary(summary: dict) -> str:
+    """Formats the multi-run summary into a string.
+    
+    Args:
+        summary: Summary dictionary from run_multi
+        
+    Returns:
+        Formatted summary string
+    """
+    lines = [
+        "=" * 60,
+        f"Multi-run '{summary['name']}' completed",
+        f"Total runs: {summary['total_runs']}",
+        f"Successful: {summary['successful']}",
+        f"Failed: {summary['failed']}",
+        "=" * 60,
+    ]
+    return "\n" + "\n".join(lines)
+
+
+def execute_multi_run(config: dict) -> int:
+    """Executes the multi-run with the given configuration.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        Exit code (0 for success, 1 for failure)
+    """
+    # Validate required fields
+    missing_fields = validate_config(config)
+    if missing_fields:
+        logger.error(f"Configuration is missing required fields: {missing_fields}")
+        return 1
+    
+    # Execute the multi-run
+    try:
+        summary = run_multi(config)
+        
+        # Print summary
+        print(format_summary(summary))
+        
+        # Return error code if any runs failed
+        return 1 if summary['failed'] > 0 else 0
+    
+    except Exception as e:
+        logger.error(f"Multi-run failed with error: {e}", exc_info=True)
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run multiple experiments with different parameter configurations.",
@@ -50,32 +114,8 @@ using dot notation (e.g., --execution.mode sequential).
     # and handle merging YAML config with CLI overrides
     config = get_config(parser)
     
-    # Validate required fields
-    required_fields = ['command', 'parameters']
-    missing_fields = [field for field in required_fields if field not in config]
-    if missing_fields:
-        logger.error(f"Configuration is missing required fields: {missing_fields}")
-        sys.exit(1)
-    
-    # Execute the multi-run
-    try:
-        summary = run_multi(config)
-        
-        # Print summary
-        print("\n" + "="*60)
-        print(f"Multi-run '{summary['name']}' completed")
-        print(f"Total runs: {summary['total_runs']}")
-        print(f"Successful: {summary['successful']}")
-        print(f"Failed: {summary['failed']}")
-        print("="*60)
-        
-        # Exit with error code if any runs failed
-        if summary['failed'] > 0:
-            sys.exit(1)
-    
-    except Exception as e:
-        logger.error(f"Multi-run failed with error: {e}", exc_info=True)
-        sys.exit(1)
+    exit_code = execute_multi_run(config)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,50 @@ from gpt_lab.reproducibility import (
 )
 
 
+def create_storage_backend(backend: str, storage_root: str) -> BaseStorageBackend:
+    """Creates a storage backend based on the specified type.
+    
+    Args:
+        backend: Type of backend to create ('local', 's3', etc.)
+        storage_root: Root directory for the storage backend
+        
+    Returns:
+        Initialized storage backend instance
+        
+    Raises:
+        ValueError: If backend type is unknown
+    """
+    if backend == "local":
+        return LocalFileSystemBackend(root_dir=storage_root)
+    # elif backend == 's3':
+    #     # Assume S3Backend reads credentials from environment variables
+    #     return S3Backend(bucket_name=storage_root, prefix=prefix)
+    else:
+        raise ValueError(f"Unknown backend: {backend}")
+
+
+def restore_experiment(
+    experiment_id: str,
+    backend: str = "local",
+    restore_path: str = "restored_experiments",
+    storage_root: str = "experiment_artifacts",
+):
+    """Restores an experiment from a storage backend.
+    
+    Args:
+        experiment_id: The unique ID of the experiment to restore
+        backend: Type of storage backend to use
+        restore_path: Local directory where artifacts will be downloaded
+        storage_root: Root directory of the storage backend
+    """
+    storage = create_storage_backend(backend, storage_root)
+    restore_experiment_state(
+        experiment_id=experiment_id,
+        storage_backend=storage,
+        restore_path=restore_path
+    )
+
+
 def main():
     """Main function to run the CLI tool."""
     parser = argparse.ArgumentParser(description="Restore the state of a previous experiment.")
@@ -51,21 +95,11 @@ def main():
 
     args = parser.parse_args()
 
-    # --- Initialize Storage Backend ---
-    storage: BaseStorageBackend
-    if args.backend == "local":
-        storage = LocalFileSystemBackend(root_dir=args.storage_root)
-    # elif args.backend == 's3':
-    #     if not args.s3_bucket:
-    #         parser.error("--s3-bucket is required when using the 's3' backend.")
-    #     # Assume S3Backend reads credentials from environment variables
-    #     storage = S3Backend(bucket_name=args.s3_bucket, prefix=args.s3_prefix)
-    else:
-        # This will be unreachable until more choices are added
-        raise ValueError(f"Unknown backend: {args.backend}")
-
-    restore_experiment_state(
-        experiment_id=args.experiment_id, storage_backend=storage, restore_path=args.restore_path
+    restore_experiment(
+        experiment_id=args.experiment_id,
+        backend=args.backend,
+        restore_path=args.restore_path,
+        storage_root=args.storage_root,
     )
 
 
