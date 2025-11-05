@@ -32,8 +32,7 @@ def run_training(
     if save_every_steps is not None and output_dir is not None:
         raw_model = model.module if hasattr(model, 'module') else model
         checkpointer.save_checkpoint(
-            save_dir=os.path.join(output_dir, "checkpoints"),
-            filename=f"step_-1.pt",
+            filepath=os.path.join(output_dir, "checkpoints", f"step_-1.pt"),
             # include ALL metadata that would be required to resume training from this epoch
             metadata={"step": -1, "config": kwargs.get("config", {})},
             # include ALL objects with a state_dict as kwargs
@@ -57,8 +56,7 @@ def run_training(
             and step_count % save_every_steps == 0):
                 raw_model = model.module if hasattr(model, 'module') else model
                 checkpointer.save_checkpoint(
-                    save_dir=os.path.join(output_dir, "checkpoints"),
-                    filename=f"step_{step_count}.pt",
+                    filepath=os.path.join(output_dir, "checkpoints", f"step_{step_count}.pt"),
                     # include ALL metadata that would be required to resume training from this epoch
                     metadata={"step": step_count, "config": kwargs.get("config", {})},
                     # include ALL objects with a state_dict as kwargs
@@ -72,8 +70,7 @@ def run_training(
         and step_count % save_every_steps != 0):
         raw_model = model.module if hasattr(model, 'module') else model
         checkpointer.save_checkpoint(
-            save_dir=os.path.join(output_dir, "checkpoints"),
-            filename=f"step_{step_count}.pt",
+            filepath=os.path.join(output_dir, "checkpoints", f"step_{step_count}.pt"),
             # include ALL metadata that would be required to resume training from this epoch
             metadata={"step": step_count, "config": kwargs.get("config", {})},
             # include ALL objects with a state_dict as kwargs

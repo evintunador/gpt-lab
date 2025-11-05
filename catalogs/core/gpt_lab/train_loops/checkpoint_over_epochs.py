@@ -33,8 +33,7 @@ def run_training(
     if save_every_epochs is not None and output_dir is not None:
         raw_model = model.module if hasattr(model, 'module') else model
         checkpointer.save_checkpoint(
-            save_dir=os.path.join(output_dir, "checkpoints"),
-            filename=f"epoch_-1.pt",
+            filepath=os.path.join(output_dir, "checkpoints", f"epoch_-1.pt"),
             # include ALL metadata that would be required to resume training from this epoch
             metadata={"epoch": -1, "config": kwargs.get("config", {})}, 
             # include ALL objects with a state_dict as kwargs
@@ -57,8 +56,7 @@ def run_training(
                 or epoch == num_epochs - 1)):
             raw_model = model.module if hasattr(model, 'module') else model
             checkpointer.save_checkpoint(
-                save_dir=os.path.join(output_dir, "checkpoints"),
-                filename=f"epoch_{epoch}.pt",
+                filepath=os.path.join(output_dir, "checkpoints", f"epoch_{epoch}.pt"),
                 # include ALL metadata that would be required to resume training from this epoch
                 metadata={"epoch": epoch, "config": kwargs.get("config", {})}, 
                 # include ALL objects with a state_dict as kwargs

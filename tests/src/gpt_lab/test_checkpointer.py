@@ -97,10 +97,8 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
     optimizer_orig.step()
 
     save_checkpoint(
-        save_dir=str(save_dir),
-        filename=filename,
+        filepath=filepath,
         metadata=metadata_orig,
-        save_rng_state=True,
         model=model_orig,
         optimizer=optimizer_orig,
     )
@@ -114,19 +112,17 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
         next(iter(model_loaded.parameters())).data,
     ), "Models were already identical before loading"
 
-    loaded_data = load_checkpoint(
+    loaded_metadata = load_checkpoint(
         filepath=filepath,
-        map_location=str(device),
         model=model_loaded,
         optimizer=optimizer_loaded,
     )
 
-    assert loaded_data["metadata"] == metadata_orig, "Metadata was not loaded correctly"
-    assert "rng_states" in loaded_data, "RNG states not found in loaded data"
+    assert loaded_metadata == metadata_orig, "Metadata was not loaded correctly"
 
-    assert "git_info" in loaded_data["metadata"], "Git info not found in metadata"
+    assert "git_info" in loaded_metadata, "Git info not found in metadata"
     assert (
-        loaded_data["metadata"]["git_info"]["commit_hash"] == git_info["commit_hash"]
+        loaded_metadata["git_info"]["commit_hash"] == git_info["commit_hash"]
     ), "Git commit hash not preserved"
 
     for p_orig, p_loaded in zip(model_orig.parameters(), model_loaded.parameters()):
@@ -169,17 +165,16 @@ def _run_compatibility_test(
     optimizer_to_save.step()
 
     save_checkpoint(
-        save_dir=str(tmp_path),
-        filename=filename,
+        filepath=filepath,
         model=model_to_save,
         optimizer=optimizer_to_save,
+        metadata={},
     )
 
     model_to_load, optimizer_to_load = create_load_objects()
 
     load_checkpoint(
         filepath=filepath,
-        map_location=str(device),
         model=model_to_load,
         optimizer=optimizer_to_load,
     )

@@ -61,8 +61,7 @@ def run_training(
                     result['best_val_loss'] = best_val_loss
                     raw_model = model.module if hasattr(model, 'module') else model
                     checkpointer.save_checkpoint(
-                        save_dir=os.path.join(output_dir, "checkpoints"),
-                        filename="best_model.pt",
+                        filepath=os.path.join(output_dir, "checkpoints", "best_model.pt"),
                         # include ALL metadata that would be required to resume training from this epoch
                         metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
                         # include ALL objects with a state_dict as kwargs
@@ -83,8 +82,7 @@ def run_training(
             result['best_val_loss'] = best_val_loss
             raw_model = model.module if hasattr(model, 'module') else model
             checkpointer.save_checkpoint(
-                save_dir=os.path.join(output_dir, "checkpoints"),
-                filename="best_model.pt",
+                filepath=os.path.join(output_dir, "checkpoints", "best_model.pt"),
                 # include ALL metadata that would be required to resume training from this epoch
                 metadata={"val_loss": best_val_loss, "step": step_count, "config": kwargs.get("config", {})},
                 # include ALL objects with a state_dict as kwargs
