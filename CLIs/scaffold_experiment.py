@@ -1,4 +1,5 @@
 import argparse
+import subprocess
 from pathlib import Path
 
 
@@ -7,13 +8,9 @@ include_packs: []
 """
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Scaffold a new experiment with gpt_lab layout")
-    parser.add_argument("name", help="Experiment name (folder under experiments/)")
-    args = parser.parse_args()
-
-    repo = Path(__file__).resolve().parents[1]
-    exp_dir = repo / "experiments" / args.name
+def scaffold_experiment(repo_root: Path, name: str):
+    """Scaffolds a new experiment."""
+    exp_dir = repo_root / "experiments" / name
     gl_dir = exp_dir / "gpt_lab"
     artifacts_dir = gl_dir / "artifacts"
 
@@ -27,11 +24,33 @@ def main():
 
     main_path = exp_dir / "main.py"
     if not main_path.exists():
-        main_path.write_text("""if __name__ == '__main__':
+        main_path.write_text(
+            f"""if __name__ == '__main__':
     print('Hello from experiment: {name}')
-""".format(name=args.name))
+"""
+        )
+
+    if not (exp_dir / ".git").exists():
+        print("Initializing git repository...")
+        subprocess.run(["git", "init"], cwd=exp_dir, check=True, capture_output=True)
+        subprocess.run(["git", "add", "."], cwd=exp_dir, check=True, capture_output=True)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit from scaffold"],
+            cwd=exp_dir,
+            check=True,
+            capture_output=True,
+        )
 
     print(f"Scaffolded experiment at {exp_dir}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Scaffold a new experiment with gpt_lab layout")
+    parser.add_argument("name", help="Experiment name (folder under experiments/)")
+    args = parser.parse_args()
+
+    repo = Path(__file__).resolve().parents[1]
+    scaffold_experiment(repo, args.name)
 
 
 if __name__ == "__main__":
