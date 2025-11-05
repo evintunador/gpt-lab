@@ -12,7 +12,7 @@ def main():
     parser.add_argument("name", help="Experiment name (folder under experiments/)")
     args = parser.parse_args()
 
-    repo = Path(__file__).resolve().parents[2]
+    repo = Path(__file__).resolve().parents[1]
     exp_dir = repo / "experiments" / args.name
     gl_dir = exp_dir / "gpt_lab"
     artifacts_dir = gl_dir / "artifacts"
