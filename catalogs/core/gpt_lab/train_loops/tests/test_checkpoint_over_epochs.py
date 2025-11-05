@@ -52,8 +52,15 @@ def test_checkpointing_over_epochs(device, tmp_path, monkeypatch):
     assert mock_save_checkpoint.call_count == 5
     
     expected_epochs = [-1, 0, 3, 6, 9]
-    called_epochs = {c.kwargs['metadata']['epoch'] for c in mock_save_checkpoint.call_args_list}
-    assert called_epochs == set(expected_epochs)
+    expected_calls = [
+        call(
+            filepath=str(output_dir / "checkpoints" / f"epoch_{epoch}.pt"),
+            metadata={"epoch": epoch, "config": {}},
+            model=model,
+            optimizer=optimizer
+        ) for epoch in expected_epochs
+    ]
+    mock_save_checkpoint.assert_has_calls(expected_calls, any_order=True)
 
 # Registry for discovery
 __specific_tests__ = [

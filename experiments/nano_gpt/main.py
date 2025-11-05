@@ -96,13 +96,12 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
     start_step = 0
     if cfg['training']['resume_from_checkpoint']:
         dist.print_on_main(f"Resuming from checkpoint: {cfg['training']['resume_from_checkpoint']}")
-        resume_data = load_checkpoint(
-            cfg['training']['resume_from_checkpoint'],
-            map_location=dist.device,
+        resume_metadata = load_checkpoint(
+            filepath=cfg['training']['resume_from_checkpoint'],
             model=model,
             optimizer=optimizer
         )
-        start_step = resume_data.get('metadata', {}).get('step', -1) + 1
+        start_step = resume_metadata.get('step', -1) + 1
         dist.print_on_main(f"Resuming training from step {start_step}")
     """
 

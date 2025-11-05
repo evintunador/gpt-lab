@@ -56,36 +56,31 @@ def test_checkpointing_over_steps(device, tmp_path, monkeypatch):
     
     expected_calls = [
         call(
-            save_dir=str(output_dir / "checkpoints"),
-            filename="step_-1.pt",
+            filepath=str(output_dir / "checkpoints" / "step_-1.pt"),
             metadata={"step": -1, "config": {}},
             model=model,
             optimizer=optimizer,
         ),
         call(
-            save_dir=str(output_dir / "checkpoints"),
-            filename="step_3.pt",
+            filepath=str(output_dir / "checkpoints" / "step_3.pt"),
             metadata={"step": 3, "config": {}},
             model=model,
             optimizer=optimizer,
         ),
         call(
-            save_dir=str(output_dir / "checkpoints"),
-            filename="step_6.pt",
+            filepath=str(output_dir / "checkpoints" / "step_6.pt"),
             metadata={"step": 6, "config": {}},
             model=model,
             optimizer=optimizer,
         ),
         call(
-            save_dir=str(output_dir / "checkpoints"),
-            filename="step_9.pt",
+            filepath=str(output_dir / "checkpoints" / "step_9.pt"),
             metadata={"step": 9, "config": {}},
             model=model,
             optimizer=optimizer,
         ),
         call(
-            save_dir=str(output_dir / "checkpoints"),
-            filename="step_10.pt",
+            filepath=str(output_dir / "checkpoints" / "step_10.pt"),
             metadata={"step": 10, "config": {}},
             model=model,
             optimizer=optimizer,

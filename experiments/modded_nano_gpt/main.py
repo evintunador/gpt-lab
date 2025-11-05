@@ -191,9 +191,9 @@ def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityMana
 
             if rep.output_dir:
                 raw_model = model.module if dist.is_distributed else model
-                checkpoint_path = save_checkpoint(
-                    save_dir=os.path.join(rep.output_dir, "checkpoints"),
-                    filename=f"step_{step}.pt",
+                checkpoint_path = os.path.join(rep.output_dir, "checkpoints", f"step_{step}.pt")
+                save_checkpoint(
+                    filepath=checkpoint_path,
                     metadata={"step": step, "val_loss": val_loss, "config": cfg},
                     model=raw_model,
                     optimizer=optimizer,

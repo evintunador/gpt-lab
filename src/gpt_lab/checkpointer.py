@@ -1,27 +1,53 @@
 import os
-import random
 from typing import Optional, Dict, Any
 import logging
 
-import numpy as np
 import torch
-from torch._inductor.virtualized import V
-import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
 
-def _contains_key(target_key, nested_dict):
-    return target_key in nested_dict
+def _normalize_state_dict_key(
+    key: str, 
+    substrings: tuple = ("module.", "_orig_mod.")
+) -> str:
+    """
+    Removes all occurrences of any of the given substrings from the key, wherever they appear.
+
+    Args:
+        key: The state_dict key to normalize.
+        substrings: Tuple of substring strings to remove from anywhere in the key.
+
+    Returns:
+        The normalized key.
+    """
+    for substring in substrings:
+        key = key.replace(substring, "")
+    return key
 
 
-def _normalize_state_dict_keys(state_dict: Dict[str, Any]) -> Dict[str, Any]:
+def _normalize_state_dict_keys(
+    state_dict: Dict[str, Any],
+    substrings: tuple = ("module.", "_orig_mod.")
+) -> Dict[str, Any]:
     """
-    Removes the 'module.' and '_orig_mod.' prefix keys from DDP and torch.compile
+    Removes the specified prefix substrings from all keys in the dict, e.g. 'module.' and '_orig_mod.' for DDP and torch.compile.
+
+    Args:
+        state_dict: The original state_dict.
+        substrings: Tuple of substrings to remove from anywhere in the key.
+
+    Returns:
+        The normalized state_dict.
     """
-    state_dict_normalized = {k.replace("module.", "").replace("_orig_mod.", ""): v for k, v in state_dict.items()}
-    if state_dict.keys() != state_dict_normalized.keys():
-        logger.debug(f"Prefixes from DDP and/or torch.compile removed from state_dict")
+    state_dict_normalized = {_normalize_state_dict_key(k, substrings=substrings): v for k, v in state_dict.items()}
+    if list(state_dict.keys()) != list(state_dict_normalized.keys()):
+        count_not_equal = sum(
+            1 for k1, k2 in zip(state_dict.keys(), state_dict_normalized.keys()) if k1 != k2
+        )
+        logger.debug(
+            f"Prefixes {substrings} removed from state_dict for {count_not_equal} keys."
+        )
     return state_dict_normalized
 
 
@@ -34,8 +60,7 @@ def save_checkpoint(
     Saves a flexible and reproducible training checkpoint.
 
     Args:
-        save_dir: The directory to save the checkpoint in.
-        filename: The name of the checkpoint file.
+        filepath: The directory & name of the checkpoint file.
         metadata: Any non-stateful metadata to save (e.g., epoch, step, metrics).
                  Should include info from ReproducibilityManager for full reproducibility.
         **stateful_objects: Keyword arguments for stateful objects to save
@@ -46,22 +71,26 @@ def save_checkpoint(
     """
     logger.info(f"Saving checkpoint to: {filepath}")
 
-    for key in ['git_info', 'rng_state']:
-        if not _contains_key('git_info', metadata):
-            logger.warning(
-                f"Key '{key}' not found in metadata dictionary. "
-                f"Future provenance tracking and reproducibility efforts may not be possible without it if the checkpoint file is moved."
-            )
+    if metadata is not None:
+        for key in ['git_info', 'rng_state']:
+            if key not in metadata.keys():
+                logger.warning(
+                    f"Key '{key}' not found in metadata dictionary. "
+                    f"Future provenance tracking and reproducibility efforts may not be possible without it if the checkpoint file is moved."
+                )
 
-    save_dir = os.path.normpath(filepath).split(os.sep)[0]
-    os.makedirs(save_dir, exist_ok=True)
+    save_dir = os.path.dirname(filepath)
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
 
-    state = {'metadata': metadata}
+    state = {'metadata': metadata or {}}
     for key, obj in stateful_objects.items():
         if hasattr(obj, 'state_dict'):
-            logger.debug(f"Adding state_dict for '{key}' to checkpoint...")
+            logger.debug(f"Fetching state_dict of '{key}'.")
             state_dict = obj.state_dict()
+            logger.debug(f"Normalizing state_dict of '{key}'.")
             state_dict = _normalize_state_dict_keys(state_dict)
+            logger.debug(f"Adding state_dict for '{key}' to checkpoint...")
             state[key] = state_dict
             logger.debug(f"Successfully added state_dict for '{key}' to checkpoint")
         else:
@@ -71,10 +100,6 @@ def save_checkpoint(
     logger.info(f"Checkpoint saved successfully: {filepath}")
     return filepath
 
-
-def _value_match_criteria(ckpt_val, trgt_val):
-    if type(ckpt_val) != type(trgt_val):
-        return False
 
 def _adjust_ckpt_to_target(ckpt_sd: Dict[str, Any], trgt_sd: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -88,37 +113,56 @@ def _adjust_ckpt_to_target(ckpt_sd: Dict[str, Any], trgt_sd: Dict[str, Any]) -> 
     Returns:
         The adjusted state dictionary.
     """
-    if ckpt_sd == trgt_sd:
-        return ckpt_sd
+    ckpt_sd_normed = _normalize_state_dict_keys(ckpt_sd)
     
-    intersect = {
-        ckpt_key: ckpt_sd[ckpt_key] 
-        for ckpt_key, trgt_key in zip(ckpt_sd, trgt_sd)
-        if (ckpt_key in trgt_sd.keys() 
-            and trgt_key in ckpt_sd.keys()
-            and _value_match_criteria(ckpt_sd[ckpt_key], trgt_sd[trgt_key]))
-    }
-    only_in_ckpt = ckpt_sd - intersect
-    only_in_trgt = trgt_sd - intersect
+    final_state_dict = trgt_sd.copy()
+    matched_ckpt_keys = set()
+    for trgt_key in trgt_sd.keys():
+        normed_trgt_key = _normalize_state_dict_key(trgt_key)
+        if normed_trgt_key in ckpt_sd_normed:
+            ckpt_val = ckpt_sd_normed[normed_trgt_key]
+            trgt_val = trgt_sd[trgt_key]
 
-    ckpt_has_ddp = any(k.find('module.') > -1 for k in ckpt_state_dict.keys())
-    target_has_ddp = any(k.find('module.') > -1 for k in target_state_dict.keys())
-    ckpt_has_torchcomp = any(k.find('_orig_mod.') > -1 for k in ckpt_state_dict.keys())
-    target_has_torchcomp = any(k.find('_orig_mod.') > -1 for k in target_state_dict.keys())
+            if isinstance(ckpt_val, torch.Tensor) and isinstance(trgt_val, torch.Tensor):
+                ckpt_val = ckpt_val.to(device=trgt_val.device, dtype=trgt_val.dtype)
 
-    if is_ddp_model and not has_module_prefix:
-        logger.info("Adding 'module.' prefix to state_dict keys for DDP model compatibility.")
-        return {"module." + k: v for k, v in state_dict.items()}
-    elif not is_ddp_model and has_module_prefix:
-        logger.info("Removing 'module.' prefix from state_dict keys for non-DDP model compatibility.")
-        return {k[len("module.") :] : v for k, v in state_dict.items()}
+            ckpt_dtype = getattr(ckpt_val, 'dtype', type(ckpt_val))
+            trgt_dtype = getattr(trgt_val, 'dtype', type(trgt_val))
+            ckpt_shape = getattr(ckpt_val, 'shape', None)
+            trgt_shape = getattr(trgt_val, 'shape', None)
 
-    return state_dict
+            if (ckpt_dtype is not None and trgt_dtype is not None and ckpt_dtype != trgt_dtype) or \
+               (ckpt_shape is not None and trgt_shape is not None and ckpt_shape != trgt_shape):
+                logger.warning(
+                    f"Type/shape mismatch for key '{trgt_key}': "
+                    f"checkpoint (dtype={ckpt_dtype}, shape={ckpt_shape}) vs "
+                    f"target (dtype={trgt_dtype}, shape={trgt_shape})"
+                )
+
+            final_state_dict[trgt_key] = ckpt_val
+            matched_ckpt_keys.add(normed_trgt_key)
+        else:
+            target_val = trgt_sd[trgt_key]
+            logger.warning(
+                f"Could not find checkpoint value for target key: '{trgt_key}' "
+                f"(dtype={getattr(target_val, 'dtype', type(target_val))}, "
+                f"shape={getattr(target_val, 'shape', 'N/A')})"
+            )
+
+    unused_ckpt_keys = set(ckpt_sd_normed.keys()) - matched_ckpt_keys
+    for unused_key in unused_ckpt_keys:
+        ckpt_val = ckpt_sd_normed[unused_key]
+        logger.warning(
+            f"Checkpoint contains unused value for key: '{unused_key}' "
+            f"(dtype={getattr(ckpt_val, 'dtype', type(ckpt_val))}, "
+            f"shape={getattr(ckpt_val, 'shape', 'N/A')})"
+        )
+
+    return final_state_dict
 
 
 def load_checkpoint(
     filepath: str,
-    map_location: str = "cpu",
     **stateful_objects: Any,
 ) -> Dict[str, Any]:
     """
@@ -133,7 +177,6 @@ def load_checkpoint(
 
     Args:
         filepath: The path to the checkpoint file.
-        map_location: The device to map the loaded tensors to ('cpu', 'cuda', etc.).
         **stateful_objects: Keyword arguments for objects to load state into
             (e.g., model=my_model, optimizer=my_optimizer).
 
@@ -149,37 +192,44 @@ def load_checkpoint(
         raise FileNotFoundError(f"Checkpoint file not found: {filepath}")
 
     logger.info(f"Loading checkpoint from: {filepath}")
-    # Set weights_only=False to allow loading of arbitrary python objects
-    # like numpy RNG states, which are not considered "safe" by default.
-    checkpoint = torch.load(filepath, map_location=map_location, weights_only=False)
+    logger.warning(
+        "Setting weights_only=False allows loading of arbitrary Python objects from the checkpoint, "
+        "including potentially unsafe objects (e.g., numpy RNG states). Only load checkpoints from trusted sources."
+    )
+    checkpoint = torch.load(filepath, weights_only=False)
 
     for key, obj in stateful_objects.items():
-        if key in checkpoint:
-            if hasattr(obj, "load_state_dict"):
-                ckpt_state_dict = checkpoint[key]
-                ckpt_state_dict = _adjust_ckpt_to_target(ckpt_state_dict, obj.state_dict())
+        if key not in checkpoint:
+            logger.warning(f"Object '{key}' not found in checkpoint. Skipping")
+            continue
+        if not hasattr(obj, "load_state_dict"):
+            logger.warning(f"Object '{key}' has no .load_state_dict() method. Skipping")
+            continue
 
-                try:
-                    logger.debug(f"Loading state for '{key}'")
-                    obj.load_state_dict(ckpt_state_dict)
-                except RuntimeError as e:
-                    logger.error(
-                        f"Failed to load state_dict for '{key}'. This can happen if the "
-                        f"architecture does not match the checkpoint."
-                    )
-                    raise e
-            else:
-                logger.warning(f"Object '{key}' has no .load_state_dict() method. Skipping")
-        else:
-            logger.warning(f"Key '{key}' not found in checkpoint. Skipping")
+        ckpt_obj_sd = checkpoint[key]
+        ckpt_obj_sd = _adjust_ckpt_to_target(ckpt_obj_sd, obj.state_dict())
 
-    returned_data = {}
+        try:
+            logger.debug(f"Loading state for '{key}'")
+            obj.load_state_dict(ckpt_obj_sd)
+        except RuntimeError as e:
+            logger.error(
+                f"Failed to load state_dict for '{key}'. This can happen if the "
+                f"architecture does not match the checkpoint."
+            )
+            raise e
+
+    metadata = checkpoint.get('metadata', {})
+    if metadata:
+        logger.info(f"Checkpoint metadata found.", extra=metadata)
+    else:
+        logger.info("No checkpoint metadata found.")
+
     stateful_keys = set(stateful_objects.keys())
     for key, value in checkpoint.items():
-        if key not in stateful_keys:
-            returned_data[key] = value
+        if key not in stateful_keys and key != 'metadata':
+            logger.info(f"Found extra checkpoint data under key '{key}'. Adding to metadata dictionary.")
+            metadata[key] = value
     
     logger.info(f"Checkpoint loaded successfully from {filepath}")
-    if 'metadata' in returned_data:
-        logger.debug(f"Checkpoint metadata: {returned_data['metadata']}")
-    return returned_data
+    return metadata
