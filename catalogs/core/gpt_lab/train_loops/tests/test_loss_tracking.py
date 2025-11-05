@@ -9,7 +9,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from gpt_lab.train_loops.loss_tracking import run_training
-from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
+from gpt_lab.train_loops.compiler_validation import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("run_training_fn,device", [(run_training, device) for device in AVAILABLE_DEVICES])

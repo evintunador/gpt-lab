@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from unittest.mock import patch, call, MagicMock
 from importlib import reload
 
-from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
+from gpt_lab.train_loops.compiler_validation import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)

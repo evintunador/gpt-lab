@@ -101,18 +101,28 @@ gpt-lab/
 │           ├── optimizers/
 │           └── train_loops/
 │
-└── src/gpt_lab/              # Main package source (not a root)
-    ├── checkpointer.py       # Importable utilities
-    ├── logger.py
-    └── train_loops/
-        ├── smart_api.py      # Smart train implementation
-        └── tests/            # Tests discover items from roots
+├── src/gpt_lab/              # Main package source (not a root)
+│   ├── checkpointer.py       # Importable utilities
+│   ├── logger.py
+│   └── train_loops/
+│       ├── smart_api.py      # Smart train implementation
+│       └── compiler_validation.py # Validation functions for LLM compiler
+│
+└── tests/                    # Test discovery and execution
+    ├── src/gpt_lab/          # Mirrors src structure
+    │   ├── train_loops/
+    │   │   ├── test_train_loops_catalog.py
+    │   │   └── test_smart_api.py
+    │   ├── nn_modules/
+    │   └── optimizers/
+    └── CLIs/                 # CLI tests
 ```
 
 ### Key Distinction
 
-- **Roots** (`experiments/`, `catalogs/packs/`, `catalogs/core/`): Contain catalog items
+- **Roots** (`experiments/`, `catalogs/packs/`, `catalogs/core/`): Contain catalog items and optionally co-located tests
 - **Main package** (`src/gpt_lab/`): Contains core infrastructure and utilities
+- **Tests** (`tests/`): Contains test runners that discover items from roots
 
 ## Design Benefits
 
@@ -165,10 +175,15 @@ See [Configuration](config.md) for details.
 
 ## Testing
 
-Tests discover catalog items across all active roots, ensuring:
+Tests discover catalog items across all active roots using a two-layer approach:
+- **Central test runners** in `tests/` discover and run tests across all items
+- **Co-located feature tests** live next to catalog items for specific validation
+
+This ensures:
 - Your experiment's items work
 - They're compatible with included packs
 - Core components remain functional
+- Feature-specific behavior is validated
 
 See [Testing](testing.md) for details.
 

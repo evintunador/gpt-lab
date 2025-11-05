@@ -160,7 +160,7 @@ smart_train(
 Smart train is tested across various feature combinations:
 
 ```bash
-pytest src/gpt_lab/train_loops/tests/test_smart_api.py -v
+pytest tests/src/gpt_lab/train_loops/test_smart_api.py -v
 ```
 
 ## Best Practices

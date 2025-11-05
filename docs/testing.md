@@ -4,7 +4,7 @@ GPT-Lab uses **discovery-based testing** where tests automatically find catalog 
 
 ## Overview
 
-Tests are located in `src/gpt_lab/**/tests/` and discover catalog items from active roots. What gets tested depends on which experiments and packs are activated.
+Tests are located in `tests/src/gpt_lab/` and can also be co-located with catalog items. They discover catalog items from active roots. What gets tested depends on which experiments and packs are activated.
 
 **Key insight**: The same test code runs against different sets of catalog items based on activation configuration.
 
@@ -14,13 +14,14 @@ Tests are located in `src/gpt_lab/**/tests/` and discover catalog items from act
 
 ```toml
 [tool.pytest.ini_options]
-testpaths = ["src/gpt_lab"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
+testpaths = ["tests", "experiments"]
+pythonpath = ["."]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
 ```
 
-Tests are collected from `src/gpt_lab/` but discover catalog items from active roots.
+Tests are collected from `tests/` and `experiments/` but discover catalog items from active roots. Tests can also be co-located with catalog items.
 
 ## What Runs By Default
 
@@ -75,7 +76,7 @@ class MyAttention(nn.Module):
 
 **Run tests**:
 ```bash
-pytest src/gpt_lab/nn_modules/tests/ -v
+pytest tests/src/gpt_lab/nn_modules/ -v
 ```
 
 ### optimizers
@@ -91,29 +92,106 @@ pytest src/gpt_lab/nn_modules/tests/ -v
 
 **Run tests**:
 ```bash
-pytest src/gpt_lab/optimizers/tests/ -v
+pytest tests/src/gpt_lab/optimizers/ -v
 ```
 
 ### train_loops
 
 **Discovery**:
 - Finds `run_training` functions in `gpt_lab.train_loops`
+- Discovers specific tests co-located with atomic features across active roots
 - Tests atomic features individually and in combination
+
+**Test Locations**:
+- Main test runner: `tests/src/gpt_lab/train_loops/`
+- Feature-specific tests: Co-located with features (e.g., `catalogs/core/gpt_lab/train_loops/test_grad_accum.py`)
+- Alternative: `catalogs/*/gpt_lab/train_loops/tests/test_*.py`
 
 **Tests**:
 - Feature composition
 - Parameter passing
 - Return value validation
 - Integration with smart_train
+- Base loop compliance (ensures features are backward compatible)
+- Universal learning tests (ensures all loops can learn)
 
 **Run tests**:
 ```bash
-pytest src/gpt_lab/train_loops/tests/ -v
+pytest tests/src/gpt_lab/train_loops/ -v
 ```
 
 ### benchmarks, data_sources, models
 
 Tests are catalog-specific and test functionality appropriate to each type.
+
+## Co-located Testing
+
+GPT-Lab supports **co-located tests** where atomic feature tests live next to their implementations:
+
+### Supported Locations
+
+**Option 1: Direct Co-location**
+
+```text
+catalogs/core/gpt_lab/train_loops/
+├── grad_accum.py
+├── test_grad_accum.py          # Co-located test
+├── mixed_precision.py
+└── test_mixed_precision.py     # Co-located test
+```
+
+**Option 2: Tests Subdirectory**
+
+```text
+catalogs/core/gpt_lab/train_loops/
+├── grad_accum.py
+├── mixed_precision.py
+└── tests/
+    ├── test_grad_accum.py      # Tests subdirectory
+    └── test_mixed_precision.py
+```
+
+**Option 3: Central Tests (Traditional)**
+
+```text
+tests/src/gpt_lab/train_loops/
+├── test_train_loops_catalog.py  # Main test runner
+└── test_smart_api.py            # Smart train tests
+```
+
+### Discovery Mechanism
+
+The test discovery system searches for atomic feature tests across all active roots:
+
+1. For each active root (experiment, pack, core)
+2. Look in `train_loops/` for `test_*.py` files
+3. Look in `train_loops/tests/` for `test_*.py` files
+4. Extract feature name from test filename (e.g., `test_grad_accum.py` → `grad_accum`)
+5. Load test functions from `__specific_tests__` list in each test file
+
+### Writing Co-located Tests
+
+```python
+# catalogs/core/gpt_lab/train_loops/test_my_feature.py
+
+def test_my_feature_behavior(run_training_fn, device):
+    """Test specific behavior of my_feature."""
+    # Test implementation
+    pass
+
+def test_my_feature_integration(run_training_fn, device):
+    """Test integration with other components."""
+    # Test implementation
+    pass
+
+# Export tests for discovery
+__specific_tests__ = [
+    test_my_feature_behavior,
+    test_my_feature_integration,
+]
+```
+
+The main test runner automatically discovers and runs these tests on any compiled loops that use the `my_feature` atomic feature.
 
 ## Common Testing Scenarios
 
@@ -225,7 +303,7 @@ pytest --pdb
 pytest -l
 
 # Run specific test
-pytest src/gpt_lab/nn_modules/tests/test_catalog.py::test_forward_pass -v
+pytest tests/src/gpt_lab/nn_modules/test_nn_modules_catalog.py::test_forward_pass -v
 ```
 
 ## CI/CD Integration
@@ -292,7 +370,7 @@ jobs:
 
 ## Writing Tests for Catalog Items
 
-### nn_modules
+### Writing Tests for nn_modules
 
 Add `__test_config__` to your module:
 
@@ -323,7 +401,7 @@ class MyModule(nn.Module):
         return output
 ```
 
-### optimizers
+### Writing Tests for optimizers
 
 Simply subclass `torch.optim.Optimizer`:
 
@@ -340,9 +418,9 @@ class MyOptimizer(torch.optim.Optimizer):
 
 Tests will automatically discover and verify it reduces loss.
 
-### train_loops
+### Writing Tests for train_loops
 
-Follow the standard signature:
+**Atomic Features**: Follow the standard signature:
 
 ```python
 def run_training(model, optimizer, train_loader, my_param=None, **kwargs):
@@ -350,6 +428,30 @@ def run_training(model, optimizer, train_loader, my_param=None, **kwargs):
     # Implementation
     return {"model": model, "my_metric": value}
 ```
+
+**Feature-specific Tests**: Create co-located tests with `__specific_tests__`:
+
+```python
+# catalogs/core/gpt_lab/train_loops/test_my_feature.py
+
+def test_my_feature_correctness(run_training_fn, device):
+    """Test that my_feature works correctly with its parameters."""
+    # Test implementation
+    pass
+
+def test_my_feature_compatibility(run_training_fn, device):
+    """Test compatibility with base_loop behavior."""
+    # Test implementation  
+    pass
+
+# Export for automatic discovery
+__specific_tests__ = [
+    test_my_feature_correctness,
+    test_my_feature_compatibility,
+]
+```
+
+These tests are automatically run on compiled loops that use your feature.
 
 ## Troubleshooting
 
@@ -362,7 +464,7 @@ def run_training(model, optimizer, train_loader, my_param=None, **kwargs):
 1. **Wrong directory**:
    ```bash
    # From subdirectory, specify testpath
-   pytest src/gpt_lab/
+   pytest tests/
    ```
 
 2. **No activation**:

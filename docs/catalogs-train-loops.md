@@ -130,7 +130,18 @@ smart_train(
 Train loop features are tested automatically:
 
 ```bash
-pytest src/gpt_lab/train_loops/tests/ -v
+pytest tests/src/gpt_lab/train_loops/ -v
+```
+
+Features can also have co-located tests that automatically run on compiled loops:
+
+```python
+# catalogs/core/gpt_lab/train_loops/test_my_feature.py
+def test_my_feature(run_training_fn, device):
+    # Test implementation
+    pass
+
+__specific_tests__ = [test_my_feature]
 ```
 
 ## Contributing
@@ -140,4 +151,4 @@ See `catalogs/core/gpt_lab/train_loops/` for examples of atomic features. Each f
 - Accept feature-specific kwargs
 - Return a dictionary with results
 - Be composable with other features
-- Meet the criteria laid out in all catalog tests located in `src/gpt_lab/train_loops/tests/test_train_loops_catalog.py`
+- Meet the criteria laid out in all catalog tests located in `tests/src/gpt_lab/train_loops/test_train_loops_catalog.py`

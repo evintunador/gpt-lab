@@ -8,7 +8,7 @@ from importlib import reload
 
 import gpt_lab.checkpointer as checkpointer
 
-from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
+from gpt_lab.train_loops.compiler_validation import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 @pytest.mark.parametrize("device", AVAILABLE_DEVICES)
