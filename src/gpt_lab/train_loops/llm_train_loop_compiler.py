@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Dict, Any, List, Callable
 
-from gpt_lab.train_loops.tests.test_train_loops_catalog import (
+from gpt_lab.train_loops.compiler_validation import (
     universal_learning_test, discover_specific_tests, base_loop_compliance_test, dataset_type_compatibility_test
 )
 from gpt_lab.llm_code_compiler import LLMClient, create_llm

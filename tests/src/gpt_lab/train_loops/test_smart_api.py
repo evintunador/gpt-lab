@@ -12,7 +12,7 @@ import pytest
 from unittest.mock import MagicMock
 from importlib import reload
 
-from gpt_lab.train_loops.tests.test_utils import SimpleTestTrainingModel, AVAILABLE_DEVICES
+from gpt_lab.train_loops.compiler_validation import SimpleTestTrainingModel, AVAILABLE_DEVICES
 
 
 # Helper function to create test data

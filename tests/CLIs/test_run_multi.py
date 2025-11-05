@@ -70,10 +70,10 @@ def test_format_summary_structure():
     formatted = format_summary(summary)
     lines = [line for line in formatted.split("\n") if line]
     
-    # Should have 6 lines (empty start, separator, name, total, successful, failed, separator)
+    # Should have 6 lines (empty, separator, name, total, successful, failed, separator)
     assert len(lines) == 6
     
-    # Check order (accounting for leading newline)
+    # Check order
     assert "test" in lines[1]
     assert "Total runs:" in lines[2]
     assert "Successful:" in lines[3]
