@@ -243,12 +243,10 @@ and i guess different config settings within an experiment both directly and as 
     - just "lab"?
 - [ ] design and build a wrapper around other general experiment utilities that need to be called at initialization to make the repo easier to use? do we even have enough stuff for that to be worth it?
 - [ ] setup a "this atomic feature is a superset of atomic feature x" system that saves some context length for the LLM which should hopefully help both performance and costs
-- [ ] abstract out some of what's in `src/gpt_lab/train_loops/` into `src/gpt_lab/
-llm_code_compiler/` and find other use cases for our llm compiler system
+- [ ] abstract out some of what's in `src/gpt_lab/train_loops/` into `src/gpt_lab/llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] go around the repo looking for shared utilities across different catalog types that can be abstracted out
 - [ ] revisit older project components that may have not been designed optimally (I'm particularly thinking of `src/gpt_lab/nn_modules/`)
 - [ ] reduce duplicate dependencies (eg. we have both plotly & matplotlib)
-- [x] move reproducibility.py's inbuilt CLI tool into CLIs/; same for all other CLIs inside src/
 - [ ] make configuration.py not require any input argparser at all so users can rely entirely on config if they want
 - [ ] make the example submodule experiment an actual submodule
 - [ ] make a way to directly import the custom logger rather than having to use the setup function
@@ -256,12 +254,7 @@ llm_code_compiler/` and find other use cases for our llm compiler system
 - [ ] move nn_module backup test discovery inside primary test discovery function & maybe get rid of it entirely
 - [ ] improve attribute names and standardize all test & bench configs (hint: rename 'output_validator' to 'output_validator_fn' in nn.Modules bulk testing)
 - [ ] write equivalents of `to_device` and `to_dtype` but for `.clone()` and `.detach()`
-- [ ] separate core src/ importables from tools only used by catalog
 - [ ] build system for updating a model's checkpoints as they change over time
-- [ ] make checkpointer torch.compile & ddp aware
-- [x] make logs also human readable
-- [x] remove log requirement that you work inside experiments/
-- [x] add support for external storage backup daemon to account for stalled experiments
+- [x] make checkpointer torch.compile & ddp aware
 - [ ] move reproducibility's storage backup backend ABC & daemon ABC over to the catalog system
 - [ ] add non-grid indivdiual-command ability to the multi-run configs
-- [x] move tests from src/gpt_lab/tests/ to tests/
