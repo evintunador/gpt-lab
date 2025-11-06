@@ -159,8 +159,7 @@ def setup_experiment_logging(
     # Console and text file handlers for human-readable output (main process only)
     if is_main_process:
         console_formatter = logging.Formatter(
-            "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+            "[%(name)s] %(message)s"
         )
 
         # Console handler
