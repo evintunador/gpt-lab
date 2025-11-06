@@ -1,0 +1,3 @@
+[submodule "experiments/dagseq2dagseq"]
+	path = experiments/dagseq2dagseq
+	url = git@github.com:evintunador/dagseq2dagseq.git
