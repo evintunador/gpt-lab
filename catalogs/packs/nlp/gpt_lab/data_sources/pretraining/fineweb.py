@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import Dataset, IterableDataset
 from datasets import load_dataset
 
-from gpt_lab.data_sources.catalog_utils import Split, PrecachedDatasetMixin
+from gpt_lab.data_sources.catalog_utils import BinaryShardIO, SequentialPretokenizedDatasetMixin, Split
 
 
 """
@@ -153,7 +153,7 @@ def create_fineweb_dataset(
     return FineWebDataset(data_file_url=data_file_url, **common_args)
 
 
-class PrecachedFineWebDataset(PrecachedDatasetMixin, Dataset):
+class PrecachedFineWebDataset(SequentialPretokenizedDatasetMixin, Dataset):
     def __init__(
         self,
         save_dir: Union[str, Path],
@@ -171,7 +171,7 @@ class PrecachedFineWebDataset(PrecachedDatasetMixin, Dataset):
     ):
         cache_filename_prefix = "finewebedu" if edu else "fineweb"
 
-        PrecachedDatasetMixin.__init__(
+        SequentialPretokenizedDatasetMixin.__init__(
             self,
             save_dir=save_dir,
             shard_size=shard_size,
@@ -180,7 +180,7 @@ class PrecachedFineWebDataset(PrecachedDatasetMixin, Dataset):
             num_workers=num_workers,
         )
 
-        token_dtype = PrecachedDatasetMixin.pick_token_dtype(vocab_size)
+        token_dtype = BinaryShardIO.pick_token_dtype(vocab_size)
 
         if not self.has_cache():
             raw = FineWebStreamingDataset(

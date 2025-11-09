@@ -36,7 +36,79 @@ def download_file(url: str, fname: str, chunk_size=1024):
             bar.update(size)
 
 
-class PrecachedDatasetMixin:
+class BinaryShardIO:
+    @staticmethod
+    def pick_token_dtype(vocab_size: int) -> np.dtype:
+        """Selects the smallest uint dtype that can hold the vocabulary."""
+        if vocab_size < 2**8:
+            return np.uint8
+        elif vocab_size < 2**16:
+            return np.uint16
+        elif vocab_size < 2**32:
+            return np.uint32
+        else:
+            return np.uint64
+
+    @staticmethod
+    def write_datafile(filename, toks: np.ndarray):
+        """
+        Saves token data as a .bin file, for reading in C.
+        - First comes a header with 256 int32s
+        - The tokens follow
+        """
+        assert len(toks) < 2**31, "token count too large"  # ~2.1B tokens
+        dtype_size = toks.dtype.itemsize
+        header = np.zeros(256, dtype=np.int32)
+        header[0] = 11041999  # magic number for file format identification/validation
+        header[1] = 1  # version
+        header[2] = len(toks)  # number of tokens after the header
+        header[3] = dtype_size  # dtype of tokens after the header
+
+        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
+        logger.info(f"writing {len(toks):,} tokens to {filename}")
+        with open(filename, "wb") as f:
+            f.write(header.tobytes())
+            f.write(toks.tobytes())
+
+    @staticmethod
+    def read_datafile_tokens_memmap(path: Union[str, Path], dtype: Optional[np.dtype] = None) -> np.memmap:
+        """Memory-map the token payload after the 256*4 byte header as uint16."""
+        path = os.fspath(path)
+        header_bytes = 256 * 4
+        nbytes = BinaryShardIO.read_datafile_token_dtype(path)
+        if dtype is None:
+            if nbytes == 1:
+                dtype = np.uint8
+            elif nbytes == 2:
+                dtype = np.uint16
+            elif nbytes == 4:
+                dtype = np.uint32
+            elif nbytes == 8:
+                dtype = np.uint64
+            else:
+                raise ValueError(f"Unsupported token dtype size in header: {nbytes}")
+        else:
+            assert (
+                np.dtype(dtype).itemsize == nbytes
+            ), f"Intended dataset read size {dtype} does not match data storage type {nbytes} bytes"
+        return np.memmap(path, mode="r", dtype=dtype, offset=header_bytes)
+
+    @staticmethod
+    def read_datafile_token_count(path: Union[str, Path]) -> int:
+        """Read header[2] which stores token count."""
+        with open(path, "rb") as f:
+            header = np.frombuffer(f.read(256 * 4), dtype=np.int32)
+        return int(header[2])
+
+    @staticmethod
+    def read_datafile_token_dtype(path: Union[str, Path]) -> int:
+        """Read header[3] which stores token dtype"""
+        with open(path, "rb") as f:
+            header = np.frombuffer(f.read(256 * 4), dtype=np.int32)
+        return int(header[3])
+
+
+class SequentialPretokenizedDatasetMixin:
     """
     Utility for building and reading token cache shards:
     - Shards are .bin files with 256*int32 header + tokens of uint{8,16,32,64}
@@ -71,16 +143,16 @@ class PrecachedDatasetMixin:
         self._split: Optional[str] = None
 
     @staticmethod
-    def pick_token_dtype(vocab_size: int) -> np.dtype:
-        """Selects the smallest uint dtype that can hold the vocabulary."""
-        if vocab_size < 2**8:
-            return np.uint8
-        elif vocab_size < 2**16:
-            return np.uint16
-        elif vocab_size < 2**32:
-            return np.uint32
-        else:
-            return np.uint64
+    def _tokenize_worker(
+        doc: str,
+        encode: Callable[[str], List[int]] = None,
+        doc_separator: Optional[int] = None,
+        dtype: np.dtype = np.uint16
+    ) -> np.ndarray:
+        toks = encode(doc)
+        if doc_separator:
+            toks.append(doc_separator)
+        return np.asarray(toks, dtype=dtype)
 
     def _cache_glob(self, split: str) -> List[Path]:
         return sorted(self._cache_dir.glob(f"{self._cache_filename_prefix}_{split}_*.bin"))
@@ -103,7 +175,7 @@ class PrecachedDatasetMixin:
         if self.has_cache():
             logger.info("Cache already exists, skipping build")
             return
-        
+
         logger.info(f"Building cache with {self._num_workers} workers, dtype={token_dtype}")
 
         shard_index = 0
@@ -112,7 +184,7 @@ class PrecachedDatasetMixin:
         pbar = None
 
         use_workers = self._num_workers > 1
-        worker = PrecachedDatasetMixin._tokenize_worker
+        worker = SequentialPretokenizedDatasetMixin._tokenize_worker
 
         if use_workers:
             with mp.Pool(self._num_workers) as pool:
@@ -123,7 +195,7 @@ class PrecachedDatasetMixin:
                 )
                 for tokens in imap_iter:
                     if token_count + len(tokens) < self._shard_size:
-                        all_tokens_np[token_count:token_count + len(tokens)] = tokens
+                        all_tokens_np[token_count : token_count + len(tokens)] = tokens
                         token_count += len(tokens)
                         if pbar is None:
                             pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
@@ -135,8 +207,8 @@ class PrecachedDatasetMixin:
                         if pbar is None:
                             pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
                         pbar.update(remainder)
-                        all_tokens_np[token_count:token_count + remainder] = tokens[:remainder]
-                        PrecachedDatasetMixin.write_datafile(str(filename), all_tokens_np)
+                        all_tokens_np[token_count : token_count + remainder] = tokens[:remainder]
+                        BinaryShardIO.write_datafile(str(filename), all_tokens_np)
                         shard_index += 1
 
                         if self._max_num_shards is not None and shard_index >= self._max_num_shards + 1:
@@ -148,13 +220,9 @@ class PrecachedDatasetMixin:
                         token_count = leftover
         else:
             for doc in doc_iter:
-                tokens = worker(
-                    doc,
-                    encode=tokenizer_encode_fn,
-                    doc_separator=doc_separator
-                )
+                tokens = worker(doc, encode=tokenizer_encode_fn, doc_separator=doc_separator)
                 if token_count + len(tokens) < self._shard_size:
-                    all_tokens_np[token_count:token_count + len(tokens)] = tokens
+                    all_tokens_np[token_count : token_count + len(tokens)] = tokens
                     token_count += len(tokens)
                     if pbar is None:
                         pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
@@ -166,8 +234,8 @@ class PrecachedDatasetMixin:
                     if pbar is None:
                         pbar = tqdm(total=self._shard_size, unit="tokens", desc=f"Shard {shard_index}")
                     pbar.update(remainder)
-                    all_tokens_np[token_count:token_count + remainder] = tokens[:remainder]
-                    PrecachedDatasetMixin.write_datafile(str(filename), all_tokens_np)
+                    all_tokens_np[token_count : token_count + remainder] = tokens[:remainder]
+                    BinaryShardIO.write_datafile(str(filename), all_tokens_np)
                     shard_index += 1
 
                     if self._max_num_shards is not None and shard_index >= self._max_num_shards + 1:
@@ -181,11 +249,11 @@ class PrecachedDatasetMixin:
         if token_count != 0 and (self._max_num_shards is None or shard_index < self._max_num_shards + 1):
             split = "val" if shard_index == 0 else "train"
             filename = self._cache_dir / f"{self._cache_filename_prefix}_{split}_{shard_index:06d}.bin"
-            PrecachedDatasetMixin.write_datafile(str(filename), all_tokens_np[:token_count])
+            BinaryShardIO.write_datafile(str(filename), all_tokens_np[:token_count])
 
     def _split_to_str(self, split: Union[str, "Enum"]) -> str:
         return split.value if hasattr(split, "value") else str(split)
-    
+
     def setup_cache_index(self, split: Union[str, "Enum"], seq_len: int) -> None:
         """
         Open memmaps and prepare sharded indexing for the given split and seq_len
@@ -195,19 +263,21 @@ class PrecachedDatasetMixin:
         self._seq_len = int(seq_len)
 
         logger.info(f"Setting up cache index for split={split_str}, seq_len={seq_len}")
-        
+
         self._files = self._cache_glob(split_str)
         if not self._files:
             logger.error(f"No cached shards found for split='{split_str}' in {self._cache_dir}")
             raise RuntimeError(f"No cached shards found for split='{split_str}' in {self._cache_dir}")
-        
+
         logger.debug(f"Found {len(self._files)} shard files for split={split_str}")
-        self._memmaps = [PrecachedDatasetMixin.read_datafile_tokens_memmap(p) for p in self._files]
-        self._shard_sizes = np.array([PrecachedDatasetMixin.read_datafile_token_count(p) for p in self._files], dtype=np.int64)
+        self._memmaps = [BinaryShardIO.read_datafile_tokens_memmap(p) for p in self._files]
+        self._shard_sizes = np.array(
+            [BinaryShardIO.read_datafile_token_count(p) for p in self._files], dtype=np.int64
+        )
         self._cumsum = np.cumsum(np.concatenate([[0], self._shard_sizes]))
         total_tokens = int(self._shard_sizes.sum())
         self._num_items = total_tokens // self._seq_len
-        
+
         logger.info(f"Cache index ready: {total_tokens:,} tokens, {self._num_items:,} sequences of length {seq_len}")
 
     def __len__(self) -> int:
@@ -235,76 +305,7 @@ class PrecachedDatasetMixin:
             need = end - cur
             take = min(shard_available, need)
             mm = self._memmaps[k]
-            out[write_pos:write_pos + take] = mm[shard_offset:shard_offset + take]
+            out[write_pos : write_pos + take] = mm[shard_offset : shard_offset + take]
             write_pos += take
             cur += take
         return torch.from_numpy(out)
-
-    @staticmethod
-    def write_datafile(filename, toks: np.ndarray):
-        """ 
-        Saves token data as a .bin file, for reading in C.
-        - First comes a header with 256 int32s
-        - The tokens follow
-        """
-        assert len(toks) < 2**31, "token count too large"  # ~2.1B tokens
-        dtype_size = toks.dtype.itemsize
-        header = np.zeros(256, dtype=np.int32)
-        header[0] = 11041999   # magic number for file format identification/validation
-        header[1] = 1          # version
-        header[2] = len(toks)  # number of tokens after the header
-        header[3] = dtype_size # dtype of tokens after the header
-
-        os.makedirs(os.path.dirname(os.path.abspath(filename)), exist_ok=True)
-        logger.info(f"writing {len(toks):,} tokens to {filename}")
-        with open(filename, "wb") as f:
-            f.write(header.tobytes())
-            f.write(toks.tobytes())
-
-    @staticmethod
-    def read_datafile_tokens_memmap(path: Union[str, Path], dtype: Optional[np.dtype] = None) -> np.memmap:
-        """Memory-map the token payload after the 256*4 byte header as uint16."""
-        path = os.fspath(path)
-        header_bytes = 256 * 4
-        nbytes = PrecachedDatasetMixin.read_datafile_token_dtype(path)
-        if dtype is None:
-            if nbytes == 1:
-                dtype = np.uint8
-            elif nbytes == 2:
-                dtype = np.uint16
-            elif nbytes == 4:
-                dtype = np.uint32
-            elif nbytes == 8:
-                dtype = np.uint64
-            else:
-                raise ValueError(f"Unsupported token dtype size in header: {nbytes}")
-        else:
-            assert dtype.itemsize == nbytes, \
-                f"Intended dataset read size {dtype} does not match data storage type {nbytes} bytes"
-        return np.memmap(path, mode="r", dtype=dtype, offset=header_bytes)
-
-    @staticmethod
-    def read_datafile_token_count(path: Union[str, Path]) -> int:
-        """Read header[2] which stores token count."""
-        with open(path, "rb") as f:
-            header = np.frombuffer(f.read(256 * 4), dtype=np.int32)
-        return int(header[2])
-
-    @staticmethod
-    def read_datafile_token_dtype(path: Union[str, Path]) -> int:
-        """Read header[3] which stores token dtype"""
-        with open(path, "rb") as f:
-            header = np.frombuffer(f.read(256 * 4), dtype=np.int32)
-        return int(header[3])
-
-    @staticmethod
-    def _tokenize_worker(
-        doc: str,
-        encode: Callable[[str], List[int]] = None,
-        doc_separator: Optional[int] = None,
-        dtype: np.dtype = np.uint16
-    ) -> np.ndarray:
-        toks = encode(doc)
-        if doc_separator:
-            toks.append(doc_separator)
-        return np.asarray(toks, dtype=dtype)
