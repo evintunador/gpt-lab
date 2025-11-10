@@ -266,3 +266,5 @@ and i guess different config settings within an experiment both directly and as 
 - [ ] add git submodule awareness to ReproducibilityManager
 - [ ] move a couple reproducibility-related method from logger.py to reproducibility.py
 - [ ] draw a clearer conceptual distinction between logs (unstructured output) and metrics (structured output)
+- [ ] make the tests inside an experiment that don't interact with gpt-lab not need to use `from experiments.<experiment_name>...`
+- [ ] make the tests inside an experiment not get picked up as part of other experiments when running `CLIs/pytest_all_experiments.py`
