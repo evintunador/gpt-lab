@@ -258,3 +258,11 @@ and i guess different config settings within an experiment both directly and as 
 - [x] make checkpointer torch.compile & ddp aware
 - [ ] move reproducibility's storage backup backend ABC & daemon ABC over to the catalog system
 - [ ] add non-grid indivdiual-command ability to the multi-run configs
+- [x] SoC the IO operations form the sequential doc packing logic in src/gpt_lab/catalog_utils.py
+    - [x] tests
+- [ ] develop pre-tokenizing/caching as its own catalog system
+    - [ ] geenralize the IO class to different dtypes
+    - [ ] do something more intelligent than the 11041999 doc prefix signature
+- [ ] add git submodule awareness to ReproducibilityManager
+- [ ] move a couple reproducibility-related method from logger.py to reproducibility.py
+- [ ] draw a clearer conceptual distinction between logs (unstructured output) and metrics (structured output)
