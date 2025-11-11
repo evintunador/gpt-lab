@@ -2,10 +2,6 @@ import json
 import logging
 import os
 import sys
-import subprocess
-from typing import Dict, Any, Optional, List
-
-import torch
 
 
 class JsonFormatter(logging.Formatter):

@@ -1,120 +1,21 @@
 import json
 import os
-import shutil
 import subprocess
 import datetime
 import logging
-import uuid
 import signal
 import sys
-from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 import random
 
 import torch 
 import numpy as np
 
+from .daemon_hooks.base import BaseDaemonHook
+from .storage_backends.base import BaseStorageBackend
+
 
 logger = logging.getLogger(__name__)
-
-
-class BaseStorageBackend(ABC):
-    """
-    Abstract Base Class for an artifact storage backend.
-    This defines the interface that all storage backends must implement.
-    """
-
-    @abstractmethod
-    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
-        """Uploads artifacts from a local directory to a destination."""
-        pass
-
-    @abstractmethod
-    def download(self, experiment_id: str, local_destination_dir: str):
-        """Downloads artifacts from a destination to a local directory."""
-        pass
-
-
-class LocalFileSystemBackend(BaseStorageBackend):
-    """A default backend that saves artifacts to another local directory."""
-
-    def __init__(self, root_dir: str = "experiments"):
-        self.root_dir = os.path.abspath(root_dir)
-        os.makedirs(self.root_dir, exist_ok=True)
-        print(f"[Storage] LocalFileSystemBackend initialized at: {self.root_dir}")
-
-    def upload(self, local_source_dir: str, experiment_id: str, ignore_patterns: Optional[list[str]] = None):
-        destination = os.path.join(self.root_dir, experiment_id)
-        
-        if os.path.abspath(local_source_dir) == os.path.abspath(destination):
-            print(f"[Storage] Artifacts are already in their final destination: {destination}")
-            return
-            
-        # Use shutil's built-in ignore_patterns utility
-        ignore = shutil.ignore_patterns(*ignore_patterns) if ignore_patterns else None
-        shutil.copytree(local_source_dir, destination, ignore=ignore, dirs_exist_ok=True)
-        print(f"[Storage] Artifacts for '{experiment_id}' saved to {destination}")
-
-    def download(self, experiment_id: str, local_destination_dir: str):
-        source = os.path.join(self.root_dir, experiment_id)
-        if not os.path.exists(source):
-            raise FileNotFoundError(f"No artifacts found for experiment '{experiment_id}' at {source}")
-        if os.path.exists(local_destination_dir):
-            shutil.rmtree(local_destination_dir)
-        shutil.copytree(source, local_destination_dir)
-        print(f"[Storage] Artifacts for '{experiment_id}' downloaded to {local_destination_dir}")
-
-
-class BaseDaemonHook(ABC):
-    """
-    Abstract Base Class for a daemon hook.
-    This defines the interface for external processes to monitor experiment runs.
-    """
-
-    @abstractmethod
-    def on_run_start(self, run_info: Dict[str, Any]):
-        """Called when the experiment run starts."""
-        pass
-
-    @abstractmethod
-    def on_run_end(self):
-        """Called when the experiment run ends (successfully or not)."""
-        pass
-
-
-class FileDaemonHook(BaseDaemonHook):
-    """
-    A daemon hook that creates a watch file on run start and deletes it on run end.
-    An external daemon can monitor the watch directory for these files.
-    """
-
-    def __init__(self, watch_dir: str = ".watch_runs"):
-        self.watch_dir = os.path.abspath(watch_dir)
-        os.makedirs(self.watch_dir, exist_ok=True)
-        self.watch_file_path: Optional[str] = None
-        logger.info(f"[DaemonHook] FileDaemonHook initialized. Watching directory: {self.watch_dir}")
-
-    def on_run_start(self, run_info: Dict[str, Any]):
-        """Creates a unique JSON file with run information."""
-        unique_id = uuid.uuid4()
-        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        filename = f"{timestamp}_{run_info.get('pid', 'unknown_pid')}_{unique_id}.json"
-        self.watch_file_path = os.path.join(self.watch_dir, filename)
-        
-        with open(self.watch_file_path, 'w') as f:
-            json.dump(run_info, f, indent=2)
-        
-        logger.info(f"Daemon hook: Created watch file at {self.watch_file_path}")
-
-    def on_run_end(self):
-        """Deletes the watch file to signal a clean exit."""
-        if self.watch_file_path and os.path.exists(self.watch_file_path):
-            try:
-                os.remove(self.watch_file_path)
-                logger.info(f"Daemon hook: Removed watch file {self.watch_file_path}")
-            except OSError as e:
-                logger.error(f"Daemon hook: Error removing watch file {self.watch_file_path}: {e}")
-        self.watch_file_path = None
 
 
 def get_rng_state():
@@ -264,8 +165,8 @@ class ReproducibilityManager:
     def __init__(
         self,
         output_dir: str,
-        storage_backend: Optional[BaseStorageBackend] = None,
         is_main_process: bool = True,
+        storage_backend: Optional[BaseStorageBackend] = None,
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
         self.output_root_dir = os.path.abspath(output_dir)
@@ -277,7 +178,8 @@ class ReproducibilityManager:
         self.original_sigterm_handler = None
 
         if self.storage_backend is None and self.is_main_process:
-            self.storage_backend = LocalFileSystemBackend(root_dir=os.getcwd())
+            logger.warning(f"No backup storage backend initialized."
+                f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted.")
 
         # These will be set in __enter__
         self.output_dir: Optional[str] = None
