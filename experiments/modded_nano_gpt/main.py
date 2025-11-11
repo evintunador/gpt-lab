@@ -13,8 +13,8 @@ import tiktoken
 from gpt_lab.configuration import get_config
 from gpt_lab.device import to_device
 from gpt_lab.distributed import DistributedManager
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import setup_experiment_logging, get_system_info
+from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
+from gpt_lab.logger import setup_experiment_logging
 from gpt_lab.checkpointer import save_checkpoint, load_checkpoint
 from gpt_lab.data_sources.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split

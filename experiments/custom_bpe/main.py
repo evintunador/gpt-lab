@@ -16,8 +16,8 @@ import torch.distributed as dist
 from gpt_lab.data_sources.pretraining import create_fineweb_dataset
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.configuration import get_config
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import setup_experiment_logging, get_system_info
+from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
+from gpt_lab.logger import setup_experiment_logging
 
 logger = logging.getLogger(__name__)
 

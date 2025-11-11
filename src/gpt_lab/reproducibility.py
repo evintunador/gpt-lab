@@ -211,6 +211,50 @@ def create_git_patch() -> Optional[str]:
         return None
 
 
+def get_package_versions() -> Dict[str, Any]:
+    """Retrieves versions of installed packages."""
+    try:
+        result = subprocess.check_output(
+            [sys.executable, "-m", "pip", "freeze"], text=True
+        )
+        return {
+            line.split("==")[0]: line.split("==")[1]
+            for line in result.strip().split("\n")
+            if "==" in line
+        }
+    except Exception as e:
+        return {"error": f"Could not run 'pip freeze': {e}"}
+
+
+def get_system_info(git_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """
+    Collects system information, package versions, and optional git information.
+
+    Args:
+        git_info: Optional git information dictionary from ReproducibilityManager.
+
+    Returns:
+        A dictionary containing system details.
+    """
+    info = {
+        "python_version": sys.version,
+        "torch_version": torch.__version__,
+        "cuda_available": torch.cuda.is_available(),
+        "device_count": (
+            torch.cuda.device_count() if torch.cuda.is_available() else 0
+        ),
+        "devices": [
+            torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+        ]
+        if torch.cuda.is_available()
+        else [],
+        "package_versions": get_package_versions(),
+    }
+    if git_info:
+        info["git_info"] = git_info
+    return info
+
+
 class ReproducibilityManager:
     """
     Manages the reproducibility of an experiment.
