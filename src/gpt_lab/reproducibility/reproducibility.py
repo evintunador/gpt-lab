@@ -165,26 +165,80 @@ class ReproducibilityManager:
     def __init__(
         self,
         output_dir: str,
-        is_main_process: bool = True,
+        is_main_process: bool,
         storage_backend: Optional[BaseStorageBackend] = None,
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
-        self.output_root_dir = os.path.abspath(output_dir)
         self.is_main_process = is_main_process
-        self.storage_backend = storage_backend
+
+        self.output_dir = os.path.abspath(output_dir)
+        if self.is_main_process:
+            os.makedirs(self.output_dir, exist_ok=True)
+            logger.info(f"Experiment output directory set: {self.output_dir}", extra={"output_dir": self.output_dir})
+
+        self._get_git_info()
+        if self.is_main_process:
+            git_info_file = os.path.join(self.output_dir, "git_info.json")
+            with open(git_info_file, 'w') as f:
+                json.dump(self.git_info, f, indent=2)
+            logger.info(f"Saved git info to: {git_info_file}")
+            if self.git_info['git_is_dirty'] and self.git_info['patch_content'] is not None:
+                with open(self.git_info['patch_file'], 'w') as f:
+                    f.write(self.git_info['patch_content'])
+                logger.info(f"Saved git patch file to: {self.git_info['patch_file']}")
+        
+        self.pid = os.getpid()
         self.daemon_hook = daemon_hook
+
         self._is_shutting_down = False
         self.original_sigint_handler = None
         self.original_sigterm_handler = None
 
+        self.storage_backend = storage_backend
         if self.storage_backend is None and self.is_main_process:
             logger.warning(f"No backup storage backend initialized."
                 f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted.")
 
-        # These will be set in __enter__
-        self.output_dir: Optional[str] = None
-        self.git_info: Dict[str, Any] = {}
-        self.was_dirty: bool = False
+    def _get_git_info(self):
+        commit_hash = get_git_commit_hash()
+        remote_url = get_git_remote_url()
+        branch = get_git_branch()
+        git_is_dirty = is_git_dirty()
+        logger.debug(f"Git commit: {commit_hash}")
+        logger.debug(f"Git branch: {branch}")
+        logger.debug(f"Git dirty: {git_is_dirty}")
+
+        # Create GitHub/GitLab URL if possible
+        github_url = None
+        if commit_hash and remote_url:
+            if "github.com" in remote_url:
+                # Convert SSH URL to HTTPS if needed
+                if remote_url.startswith("git@github.com:"):
+                    repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
+                    github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
+                elif "github.com" in remote_url:
+                    repo_path = remote_url.split("github.com/")[-1].replace(".git", "")
+                    github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
+
+        self.git_info = {
+            "commit_hash": commit_hash,
+            "branch": branch,
+            "remote_url": remote_url,
+            "github_url": github_url,
+            "git_is_dirty": git_is_dirty,
+        }
+
+        # Save git patch if dirty
+        if git_is_dirty:
+            patch_content = create_git_patch()
+            self.git_info['patch_content'] = patch_content
+            if patch_content:
+                patch_file = os.path.join(self.output_dir, "uncommitted_changes.patch")
+                self.git_info['patch_file'] = patch_file
+
+        # Log all git info except potentially large "patch_content"
+        log_git_info = {k: v for k, v in self.git_info.items() if k != "patch_content"}
+        logger.info(f"Git state captured", extra={"git_info": log_git_info})
 
     def _signal_handler(self, signum, frame):
         """Custom signal handler for graceful shutdown."""
@@ -205,74 +259,16 @@ class ReproducibilityManager:
     def __enter__(self):
         """Sets up the experiment environment and captures git state."""
         if self.is_main_process:
-            print("\n--- Setting up Reproducible Experiment ---")
-            logger.info("Initializing reproducibility manager")
+            logger.info("Entering reproducibility manager")
             
-            commit_hash = get_git_commit_hash()
-            remote_url = get_git_remote_url()
-            branch = get_git_branch()
-            self.was_dirty = is_git_dirty()
-            logger.debug(f"Git commit: {commit_hash}")
-            logger.debug(f"Git branch: {branch}")
-            logger.debug(f"Git dirty: {self.was_dirty}")
-            
-            # Create GitHub/GitLab URL if possible
-            github_url = None
-            if commit_hash and remote_url:
-                if "github.com" in remote_url:
-                    # Convert SSH URL to HTTPS if needed
-                    if remote_url.startswith("git@github.com:"):
-                        repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
-                        github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
-                    elif "github.com" in remote_url:
-                        repo_path = remote_url.split("github.com/")[-1].replace(".git", "")
-                        github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
-            
-            # Create unique output directory
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            commit_short = commit_hash[:7] if commit_hash else "unknown"
-            dir_name = f"{timestamp}_{commit_short}"
-            
-            self.output_dir = os.path.join(self.output_root_dir, dir_name)
-            os.makedirs(self.output_dir, exist_ok=True)
-            
-            print(f"Experiment output directory: {self.output_dir}")
-            logger.info(f"Experiment output directory: {self.output_dir}", extra={"output_dir": self.output_dir})
-            
-            self.git_info = {
-                "commit_hash": commit_hash,
-                "branch": branch,
-                "remote_url": remote_url,
-                "github_url": github_url,
-                "was_dirty": self.was_dirty,
-            }
-            
-            # Save git patch if dirty
-            if self.was_dirty:
-                patch_content = create_git_patch()
-                if patch_content:
-                    patch_file = os.path.join(self.output_dir, "uncommitted_changes.patch")
-                    self.git_info['patch_file'] = patch_file
-                    with open(patch_file, 'w') as f:
-                        f.write(patch_content)
-                    
-            logger.info(f"Git state captured", extra={"git_info": self.git_info})
-            
-            git_info_file = os.path.join(self.output_dir, "git_info.json")
-            with open(git_info_file, 'w') as f:
-                json.dump(self.git_info, f, indent=2)
-            logger.info(f"Saved git info to: {git_info_file}")
-            
-            # Call daemon hook on start
             if self.daemon_hook:
                 run_info = {
-                    "pid": os.getpid(),
+                    "pid": self.pid,
                     "output_dir": self.output_dir,
                     "start_time_utc": datetime.datetime.utcnow().isoformat(),
                 }
-                self.daemon_hook.on_run_start(run_info)
+                self.daemon_hook.on_run_start(run_info)                
 
-            # Register signal handlers for graceful shutdown
             logger.debug("Registering signal handlers for graceful shutdown.")
             self.original_sigint_handler = signal.signal(signal.SIGINT, self._signal_handler)
             self.original_sigterm_handler = signal.signal(signal.SIGTERM, self._signal_handler)
@@ -334,79 +330,3 @@ class ReproducibilityManager:
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
         return self.git_info.copy()
-
-
-def restore_experiment_state(
-    experiment_id: str,
-    storage_backend: BaseStorageBackend,
-    restore_path: str = "restored_experiments",
-):
-    """
-    Restores the code and artifacts of a past experiment.
-
-    This function performs the following steps:
-    1. Checks if the current git repository is clean.
-    2. Downloads the artifacts for the given experiment_id.
-    3. Checks out the specific commit the experiment was run on.
-    4. Applies the uncommitted changes from the .patch file.
-
-    Args:
-        experiment_id: The unique ID of the experiment to restore
-                       (e.g., 'my-exp/2025-09-20_14-30-00_a1b2c3d').
-        storage_backend: The storage backend where the artifacts are stored.
-        restore_path: A local directory to download the artifacts to.
-    """
-    # 1. Safety Check: Ensure no local work will be lost.
-    if is_git_dirty():
-        print("\n\033[91mError: Your git working directory is not clean.\033[0m")
-        print("Please commit or stash your changes before restoring an experiment.")
-        exit(1)
-
-    print(f"--- Restoring experiment: {experiment_id} ---")
-    
-    original_branch = get_git_branch() or 'HEAD' # Fallback to HEAD if branch can't be determined
-
-    try:
-        # 2. Download the artifacts (logs, patch file, git_info.json, etc.)
-        local_artifact_dir = os.path.join(restore_path, experiment_id)
-        storage_backend.download(experiment_id, local_artifact_dir)
-        print(f"Artifacts downloaded to: {local_artifact_dir}")
-
-        # 3. Read the git_info.json file
-        git_info_path = os.path.join(local_artifact_dir, "git_info.json")
-        with open(git_info_path, 'r') as f:
-            git_info = json.load(f)
-
-        commit_hash = git_info.get("commit_hash")
-        if not commit_hash:
-            raise ValueError("Could not find commit_hash in git_info.json")
-
-        # 4. Checkout the exact commit
-        print(f"Checking out commit: {commit_hash}")
-        subprocess.run(["git", "checkout", commit_hash], check=True, capture_output=True, text=True)
-
-        # 5. Apply the patch file if it exists
-        patch_file = os.path.join(local_artifact_dir, "uncommitted_changes.patch")
-        if os.path.exists(patch_file):
-            print("Applying uncommitted changes from patch file...")
-            # Use --reject to handle potential conflicts gracefully
-            subprocess.run(["git", "apply", "--reject", patch_file], check=True, capture_output=True, text=True)
-
-        print("\n\033[92m✅ Success! Your repository is now in the exact state of the experiment.\033[0m")
-        print("Logs and checkpoints are available at:", local_artifact_dir)
-
-    except (subprocess.CalledProcessError, ValueError, FileNotFoundError) as e:
-        print(f"\n\033[91m❌ Error during restoration: {e}\033[0m")
-        print("Attempting to restore original repository state...")
-        try:
-            subprocess.run(["git", "checkout", original_branch], check=True, capture_output=True, text=True)
-            print(f"\033[92m✅ Successfully restored your original branch ('{original_branch}').\033[0m")
-            print("Please check your repository for any lingering changes or .rej files from a failed patch.")
-        except subprocess.CalledProcessError as cleanup_error:
-            print(f"\n\033[91m❌ Automatic cleanup failed: {cleanup_error.stderr}\033[0m")
-            print(f"Your repository may be in a detached HEAD state. To manually restore, please run:")
-            print(f"  git reset --hard && git checkout {original_branch}")
-        exit(1)
-    except Exception as e:
-        print(f"\n\033[91m❌ An unexpected error occurred: {e}\033[0m")
-        exit(1)

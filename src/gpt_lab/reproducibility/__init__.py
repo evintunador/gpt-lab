@@ -1,6 +1,5 @@
 from .reproducibility import (
     ReproducibilityManager,
-    restore_experiment_state,
     get_rng_state,
     get_git_commit_hash,
     get_git_remote_url,
@@ -15,7 +14,6 @@ from .daemon_hooks.base import BaseDaemonHook
 
 __all__ = [
     "ReproducibilityManager",
-    "restore_experiment_state",
     "get_rng_state",
     "get_git_commit_hash",
     "get_git_remote_url",

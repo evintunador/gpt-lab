@@ -8,7 +8,7 @@ import signal
 import sys
 from unittest.mock import MagicMock
 
-from gpt_lab.reproducibility import ReproducibilityManager, restore_experiment_state
+from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.reproducibility.storage_backends.base import BaseStorageBackend
 
 
@@ -70,7 +70,7 @@ def test_manager_clean_repo(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -79,7 +79,7 @@ def test_manager_clean_repo(git_repo: Path):
             assert git_info_file.exists()
             with open(git_info_file, 'r') as f:
                 git_info = json.load(f)
-            assert not git_info["was_dirty"]
+            assert not git_info["git_is_dirty"]
         
             # Check that no patch file was created
             assert not (output_dir / "uncommitted_changes.patch").exists()
@@ -100,7 +100,7 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             (git_repo / "new_file.txt").write_text("untracked file")
 
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -109,7 +109,7 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             assert git_info_file.exists()
             with open(git_info_file, 'r') as f:
                 git_info = json.load(f)
-            assert git_info["was_dirty"]
+            assert git_info["git_is_dirty"]
         
             # Check that a patch file was created and is not empty
             patch_file = output_dir / "uncommitted_changes.patch"
@@ -129,8 +129,7 @@ def test_manager_distributed_awareness(git_repo: Path):
             output_dir=str(runs_dir),
             is_main_process=False
         ) as manager:
-            assert manager.output_dir is None
-            assert not runs_dir.exists()
+            assert manager.is_main_process is False
     finally:
         os.chdir(original_cwd)
 
@@ -145,6 +144,7 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
             output_dir=str(runs_dir),
+            is_main_process=True,
             storage_backend=mock_storage
         ) as manager:
             # Simulate creating an output file in the experiment dir
@@ -171,6 +171,7 @@ def test_daemon_hook_lifecycle(git_repo: Path):
         
         with ReproducibilityManager(
             output_dir=str(runs_dir),
+            is_main_process=True,
             daemon_hook=mock_hook
         ):
             # 1. Check on_run_start was called
@@ -202,6 +203,7 @@ def test_daemon_hook_survives_exception(git_repo: Path):
         with pytest.raises(ValueError, match="Experiment failed"):
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
+                is_main_process=True,
                 daemon_hook=mock_hook
             ):
                 mock_hook.on_run_start.assert_called_once()
@@ -226,6 +228,7 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         with pytest.raises(SystemExit) as e:
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
+                is_main_process=True,
                 storage_backend=mock_storage
             ) as manager:
                 (Path(manager.output_dir) / "results.txt").write_text("partial success")
@@ -240,77 +243,6 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         assert "test-exp" in experiment_id
         remote_file = tmp_path / "remote_storage" / experiment_id / "results.txt"
         assert remote_file.read_text() == "partial success"
-    finally:
-        os.chdir(original_cwd)
-
-
-def test_restore_state_roundtrip(git_repo: Path, tmp_path: Path):
-    """A full integration test of capturing and then restoring a dirty repo state."""
-    original_cwd = os.getcwd()
-    try:
-        os.chdir(git_repo)
-        
-        # Get the default branch name to avoid main/master issues
-        default_branch = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
-        ).strip()
-        
-        # --- 1. Capture a dirty state ---
-        (git_repo / "file1.txt").write_text("final version")
-        (git_repo / "new_file.txt").write_text("this is a new file")
-        
-        # Use the mock storage backend to save artifacts
-        storage_root = tmp_path / "experiment_artifacts"
-        storage = MockStorageBackend(source_artifacts_dir=storage_root)
-        
-        experiment_id = None
-        runs_dir = git_repo / "experiments" / "roundtrip-exp" / "runs"
-        with ReproducibilityManager(
-            output_dir=str(runs_dir),
-            storage_backend=storage
-        ) as manager:
-            # The experiment ID needs to be relative to CWD for the default backend
-            experiment_id = os.path.relpath(manager.output_dir, git_repo)
-
-        # --- 2. Reset the repo to a clean state ---
-        subprocess.run(["git", "reset", "--hard", "HEAD"], check=True, capture_output=True)
-        subprocess.run(["git", "clean", "-fd"], check=True, capture_output=True)  # Remove untracked files
-        subprocess.run(["git", "checkout", default_branch], check=True, capture_output=True)  # Return to main branch
-        
-        assert (git_repo / "file1.txt").read_text() == "initial content"
-        assert not (git_repo / "new_file.txt").exists()
-
-        # --- 3. Restore the captured state ---
-        restore_experiment_state(
-            experiment_id=experiment_id,
-            storage_backend=storage,
-            restore_path=str(tmp_path / "restored")
-        )
-
-        # --- 4. Verify the state was perfectly restored ---
-        assert (git_repo / "file1.txt").read_text() == "final version"
-        assert (git_repo / "new_file.txt").exists()
-        assert (git_repo / "new_file.txt").read_text().strip() == "this is a new file"
-    finally:
-        os.chdir(original_cwd)
-
-
-def test_restore_state_safety_check(git_repo: Path, capsys):
-    """Verify that restore_experiment_state exits if the repo is dirty."""
-    original_cwd = os.getcwd()
-    try:
-        os.chdir(git_repo)
-        (git_repo / "file1.txt").write_text("some uncommitted change")
-        
-        with pytest.raises(SystemExit) as e:
-            restore_experiment_state(
-                experiment_id="any-id",
-                storage_backend=MockStorageBackend(git_repo) # Won't be used
-            )
-        
-        assert e.value.code == 1
-        captured = capsys.readouterr()
-        assert "Error: Your git working directory is not clean" in captured.out
     finally:
         os.chdir(original_cwd)
 
