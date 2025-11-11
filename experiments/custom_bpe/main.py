@@ -4,6 +4,7 @@ import pickle
 import logging
 from itertools import chain
 from typing import List, Dict
+import datetime
 
 import regex
 import tiktoken
@@ -385,9 +386,9 @@ if __name__ == "__main__":
 
     with DistributedManager() as dist_manager:
         config = get_config(parser)
-        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         with ReproducibilityManager(
-            output_dir=runs_dir,
+            output_dir=run_dir,
             is_main_process=dist_manager.is_main_process,
         ) as repro_manager:
             # Broadcast the output directory from the main process to all other processes

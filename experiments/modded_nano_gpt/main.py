@@ -4,6 +4,7 @@ import time
 from contextlib import nullcontext
 from typing import Dict, Any
 import logging
+import datetime
 
 import random
 import numpy as np
@@ -281,9 +282,9 @@ To specify a different config file:
     with DistributedManager() as dist:
         config = get_config(parser)
         
-        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         with ReproducibilityManager(
-            output_dir=runs_dir,
+            output_dir=run_dir,
             is_main_process=dist.is_main_process
         ) as rep:
             # Broadcast the output directory from the main process to all other processes

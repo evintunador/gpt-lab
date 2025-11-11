@@ -3,6 +3,7 @@ import os
 import math
 import logging
 from typing import Dict, Any, List
+import datetime
 
 import torch
 import tiktoken
@@ -11,7 +12,6 @@ from torch.utils.data import Subset
 from gpt_lab.configuration import get_config
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
-#from gpt_lab.reproducibility.storage_backends.local_filesystem import LocalFileSystemBackend
 from gpt_lab.logger import setup_experiment_logging
 from gpt_lab.checkpointer import load_checkpoint
 from gpt_lab.data_sources.pretraining.fineweb import create_fineweb_dataset, FineWebSize
@@ -201,11 +201,10 @@ To specify a different config file:
     with DistributedManager() as dist:
         config = get_config(parser)
         
-        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
+        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
         with ReproducibilityManager(
-            output_dir=runs_dir,
+            output_dir=run_dir,
             is_main_process=dist.is_main_process,
-            #storage_backend=LocalFileSystemBackend()
         ) as rep:
             # Broadcast the output directory from the main process to all other processes
             rep.output_dir = dist.broadcast_object(rep.output_dir)

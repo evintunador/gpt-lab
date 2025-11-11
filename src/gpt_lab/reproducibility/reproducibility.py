@@ -196,7 +196,7 @@ class ReproducibilityManager:
 
         self.storage_backend = storage_backend
         if self.storage_backend is None and self.is_main_process:
-            logger.warning(f"No backup storage backend initialized."
+            logger.warning(f"No backup storage backend initialized. "
                 f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted.")
 
     def _get_git_info(self):
