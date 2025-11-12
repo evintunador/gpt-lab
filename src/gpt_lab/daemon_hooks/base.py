@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any
 
 
 class BaseDaemonHook(ABC):
@@ -9,11 +8,11 @@ class BaseDaemonHook(ABC):
     """
 
     @abstractmethod
-    def on_run_start(self, run_info: Dict[str, Any]):
+    def on_run_start(self):
         """Called when the experiment run starts."""
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     def on_run_end(self):
         """Called when the experiment run ends (successfully or not)."""
-        pass
+        raise NotImplementedError

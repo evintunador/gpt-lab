@@ -9,7 +9,7 @@ import sys
 from unittest.mock import MagicMock
 
 from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.reproducibility.storage_backends.base import BaseStorageBackend
+from gpt_lab.backup_storage_backends.base import BaseBackupStorageBackend
 
 
 # --- Test Fixtures and Helpers ---
@@ -38,28 +38,26 @@ def git_repo(tmp_path: Path) -> Path:
         os.chdir(original_cwd)
 
 
-class MockStorageBackend(BaseStorageBackend):
+class MockStorageBackend(BaseBackupStorageBackend):
     """A mock storage backend that records calls for testing purposes."""
-    def __init__(self, source_artifacts_dir: Path):
+    def __init__(self, remote_dir: Path):
         self.upload_calls = []
         self.download_calls = []
-        self.source_artifacts_dir = source_artifacts_dir
+        self.remote_dir = remote_dir
 
-    def upload(self, local_source_dir: str, experiment_id: str):
-        self.upload_calls.append((local_source_dir, experiment_id))
+    def upload(self, source_dir: str):
+        self.upload_calls.append(source_dir)
         # Simulate the upload by copying to a "remote" location
-        remote_path = self.source_artifacts_dir / experiment_id
-        if remote_path.exists():
-            shutil.rmtree(remote_path)
-        shutil.copytree(local_source_dir, remote_path)
+        if self.remote_dir.exists():
+            shutil.rmtree(self.remote_dir)
+        shutil.copytree(source_dir, self.remote_dir)
 
-    def download(self, experiment_id: str, local_destination_dir: str):
-        self.download_calls.append((experiment_id, local_destination_dir))
+    def download(self, destination_dir: str):
+        self.download_calls.append(destination_dir)
         # Simulate download by copying from the "remote" location
-        remote_path = self.source_artifacts_dir / experiment_id
-        if not remote_path.exists():
-            raise FileNotFoundError(f"'{experiment_id}' not found in mock remote storage.")
-        shutil.copytree(remote_path, local_destination_dir)
+        if not self.remote_dir.exists():
+            raise FileNotFoundError(f"Remote not found: {self.remote_dir}")
+        shutil.copytree(self.remote_dir, destination_dir)
 
 
 # --- Core Functionality Tests ---
@@ -139,13 +137,13 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
-        mock_storage = MockStorageBackend(source_artifacts_dir=tmp_path / "remote_storage")
+        mock_storage = MockStorageBackend(remote_dir=tmp_path / "remote_storage")
         
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
             output_dir=str(runs_dir),
             is_main_process=True,
-            storage_backend=mock_storage
+            backup_storage_backend=mock_storage
         ) as manager:
             # Simulate creating an output file in the experiment dir
             (Path(manager.output_dir) / "results.txt").write_text("success")
@@ -153,9 +151,7 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         assert len(mock_storage.upload_calls) == 1
         
         # Check that the uploaded content is correct
-        uploaded_dir, experiment_id = mock_storage.upload_calls[0]
-        assert "test-exp" in experiment_id
-        assert (tmp_path / "remote_storage" / experiment_id / "results.txt").read_text() == "success"
+        assert (tmp_path / "remote_storage" / "results.txt").read_text() == "success"
     finally:
         os.chdir(original_cwd)
 
@@ -176,13 +172,6 @@ def test_daemon_hook_lifecycle(git_repo: Path):
         ):
             # 1. Check on_run_start was called
             mock_hook.on_run_start.assert_called_once()
-            
-            # Extract the run_info dict from the call
-            call_args, _ = mock_hook.on_run_start.call_args
-            run_info = call_args[0]
-            
-            assert "pid" in run_info
-            assert "output_dir" in run_info
 
         # 2. Check on_run_end was called on __exit__
         mock_hook.on_run_end.assert_called_once()
@@ -222,14 +211,14 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
-        mock_storage = MockStorageBackend(source_artifacts_dir=tmp_path / "remote_storage")
+        mock_storage = MockStorageBackend(remote_dir=tmp_path / "remote_storage")
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
 
         with pytest.raises(SystemExit) as e:
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
                 is_main_process=True,
-                storage_backend=mock_storage
+                backup_storage_backend=mock_storage
             ) as manager:
                 (Path(manager.output_dir) / "results.txt").write_text("partial success")
                 os.kill(os.getpid(), sig)
@@ -239,9 +228,7 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         assert e.value.code == 1
         assert len(mock_storage.upload_calls) == 1
         
-        uploaded_dir, experiment_id = mock_storage.upload_calls[0]
-        assert "test-exp" in experiment_id
-        remote_file = tmp_path / "remote_storage" / experiment_id / "results.txt"
+        remote_file = tmp_path / "remote_storage" / "results.txt"
         assert remote_file.read_text() == "partial success"
     finally:
         os.chdir(original_cwd)

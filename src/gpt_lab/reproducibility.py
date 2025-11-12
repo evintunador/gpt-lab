@@ -12,7 +12,7 @@ import torch
 import numpy as np
 
 from .daemon_hooks.base import BaseDaemonHook
-from .storage_backends.base import BaseStorageBackend
+from .backup_storage_backends.base import BaseBackupStorageBackend
 
 
 logger = logging.getLogger(__name__)
@@ -166,7 +166,7 @@ class ReproducibilityManager:
         self,
         output_dir: str,
         is_main_process: bool,
-        storage_backend: Optional[BaseStorageBackend] = None,
+        backup_storage_backend: Optional[BaseBackupStorageBackend] = None,
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
         self.is_main_process = is_main_process
@@ -194,10 +194,10 @@ class ReproducibilityManager:
         self.original_sigint_handler = None
         self.original_sigterm_handler = None
 
-        self.storage_backend = storage_backend
-        if self.storage_backend is None and self.is_main_process:
+        self.backup_storage_backend = backup_storage_backend
+        if self.backup_storage_backend is None and self.is_main_process:
             logger.warning(f"No backup storage backend initialized. "
-                f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted.")
+                f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted without a backup.")
 
     def _get_git_info(self):
         commit_hash = get_git_commit_hash()
@@ -262,12 +262,7 @@ class ReproducibilityManager:
             logger.info("Entering reproducibility manager")
             
             if self.daemon_hook:
-                run_info = {
-                    "pid": self.pid,
-                    "output_dir": self.output_dir,
-                    "start_time_utc": datetime.datetime.utcnow().isoformat(),
-                }
-                self.daemon_hook.on_run_start(run_info)                
+                self.daemon_hook.on_run_start()                
 
             logger.debug("Registering signal handlers for graceful shutdown.")
             self.original_sigint_handler = signal.signal(signal.SIGINT, self._signal_handler)
@@ -284,7 +279,7 @@ class ReproducibilityManager:
         if self.daemon_hook:
             self.daemon_hook.on_run_end()
 
-        if self.storage_backend and self.output_dir:
+        if self.backup_storage_backend and self.output_dir:
             if exc_type is not None:
                 if exc_type in ("SIGINT", "SIGTERM"):
                     # The message is printed in the handler
@@ -295,19 +290,9 @@ class ReproducibilityManager:
 
             logger.info("Finalizing experiment artifacts")
 
-            # The experiment ID is the path relative to the CWD for clean storage paths.
             try:
-                experiment_id = os.path.relpath(self.output_dir, os.getcwd())
-            except ValueError:
-                # Fallback for cases like different drives on Windows
-                experiment_id = self.output_dir
-
-            try:
-                self.storage_backend.upload(
-                    local_source_dir=self.output_dir,
-                    experiment_id=experiment_id
-                )
-                logger.info(f"Artifacts uploaded for experiment: {experiment_id}")
+                self.backup_storage_backend.upload(source_dir=self.output_dir)
+                logger.info(f"Artifacts uploaded to backup storage backend from {self.output_dir}")
             except Exception as e:
                 print(f"[Reproducibility] Warning: Failed to upload artifacts: {e}")
                 logger.error(f"Failed to upload artifacts: {e}", exc_info=True)

@@ -3,13 +3,13 @@ import shutil
 from typing import Optional
 import logging
 
-from gpt_lab.reproducibility.storage_backends.base import BaseStorageBackend
+from gpt_lab.backup_storage_backends.base import BaseBackupStorageBackend
 
 
 logger = logging.getLogger(__name__)
 
 
-class LocalFileSystemBackend(BaseStorageBackend):
+class LocalFileSystemBackend(BaseBackupStorageBackend):
     """A backend that saves artifacts to another local directory."""
     def __init__(
         self, 

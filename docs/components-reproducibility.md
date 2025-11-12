@@ -8,7 +8,8 @@ The reproducibility component is designed to:
 - Capture complete git state (commit hash, branch, remote URL, dirty status, and GitHub URL when possible)
 - Save patches of uncommitted and untracked changes for dirty repositories
 - Create the output directory you specify (main process only)
-- Optionally store artifacts with customizable storage backends
+- Optionally store artifacts with customizable backup storage backends (catalog: `gpt_lab.backup_storage_backends`)
+- Optionally notify daemon hooks on run start/end (catalog: `gpt_lab.daemon_hooks`)
 - Gracefully handle interrupts (SIGINT/SIGTERM) and still upload artifacts when configured
 
 ## Key Components
@@ -23,8 +24,8 @@ from gpt_lab.reproducibility import ReproducibilityManager
 with ReproducibilityManager(
     output_dir="./experiments/my_exp/runs",
     is_main_process=True,
-    storage_backend=None,
-    daemon_hook=None
+    backup_storage_backend=None,  # optional catalog item
+    daemon_hook=None              # optional catalog item
 ) as repro:
     # repro.output_dir: absolute path you provided
     # repro.git_info: dict with git metadata
@@ -35,8 +36,8 @@ with ReproducibilityManager(
 **Parameters:**
 - `output_dir`: Root directory for experiment outputs (created if `is_main_process=True`)
 - `is_main_process`: Whether this is the main process (for distributed training)
-- `storage_backend`: Optional secondary/backup storage backend for artifacts (if provided, uploads on exit)
-- `daemon_hook`: An optional hook for external monitoring of the run's liveness.
+- `backup_storage_backend`: Optional backup storage backend for artifacts (uploads on exit when provided). Items come from the `gpt_lab.backup_storage_backends` catalog.
+- `daemon_hook`: Optional hook for liveness monitoring. Items come from the `gpt_lab.daemon_hooks` catalog.
 
 **Behavior:**
 
@@ -51,7 +52,7 @@ On **entry** (`__enter__`):
 
 On **exit** (`__exit__`):
 1. Calls `on_run_end` on the provided `daemon_hook` if provided.
-2. Uploads artifacts to the storage backend if provided
+2. Uploads artifacts to the backup storage backend if provided
 3. Works even if experiment exits with an error or is interrupted
 4. Restores original signal handlers to avoid side effects.
 
@@ -96,38 +97,21 @@ info = get_system_info(git_info=repro.git_info)
 # }
 ```
 
-### Storage Backends
+### Backup Storage Backends (Catalog)
 
-#### `LocalFileSystemBackend`
-
-Example backend that copies artifacts to another local directory:
+Backups are handled by catalog items implementing a standard interface. The manager calls:
 
 ```python
-from gpt_lab.reproducibility import LocalFileSystemBackend
-
-backend = LocalFileSystemBackend(root_dir="./experiment_artifacts")
+backup_storage_backend.upload(source_dir="./original_run")
 ```
 
-**Methods:**
-- `upload(local_source_dir, experiment_id)`: Copies directory
-- `download(experiment_id, local_destination_dir)`: Restores directory
-
-#### `BaseStorageBackend`
-
-Abstract base class for custom backends:
+And for restoration:
 
 ```python
-from gpt_lab.reproducibility.storage_backends.base import BaseStorageBackend
-
-class S3StorageBackend(BaseStorageBackend):
-    def upload(self, local_source_dir: str, experiment_id: str):
-        # Upload to S3
-        pass
-    
-    def download(self, experiment_id: str, local_destination_dir: str):
-        # Download from S3
-        pass
+backup_storage_backend.download(destination_dir="./restored_run")
 ```
+
+For more info on Backup Storage Backends, see [this doc](catalogs-backup-storage-backends.md).
 
 ## Helper Functions
 
@@ -189,68 +173,6 @@ with ReproducibilityManager(output_dir="./runs", is_main_process=is_main_process
         print(f"Output directory: {repro.output_dir}")
         # broadcast repro.output_dir to workers with your distributed framework
     train_distributed(...)
-```
-
-### Custom Storage Backend (S3 Example)
-
-```python
-import boto3
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.reproducibility.storage_backends.base import BaseStorageBackend
-
-class S3StorageBackend(BaseStorageBackend):
-    def __init__(self, bucket_name: str, prefix: str = ""):
-        self.s3_client = boto3.client('s3')
-        self.bucket_name = bucket_name
-        self.prefix = prefix
-    
-    def upload(self, local_source_dir: str, experiment_id: str):
-        import os
-        from pathlib import Path
-        
-        # Upload all files in directory
-        for root, dirs, files in os.walk(local_source_dir):
-            for file in files:
-                local_path = os.path.join(root, file)
-                relative_path = os.path.relpath(local_path, local_source_dir)
-                s3_key = f"{self.prefix}/{experiment_id}/{relative_path}"
-                
-                self.s3_client.upload_file(local_path, self.bucket_name, s3_key)
-        
-        print(f"Uploaded to s3://{self.bucket_name}/{self.prefix}/{experiment_id}")
-    
-    def download(self, experiment_id: str, local_destination_dir: str):
-        import os
-        
-        os.makedirs(local_destination_dir, exist_ok=True)
-        
-        # List and download all objects with the prefix
-        prefix = f"{self.prefix}/{experiment_id}/"
-        response = self.s3_client.list_objects_v2(
-            Bucket=self.bucket_name,
-            Prefix=prefix
-        )
-        
-        for obj in response.get('Contents', []):
-            s3_key = obj['Key']
-            relative_path = s3_key[len(prefix):]
-            local_path = os.path.join(local_destination_dir, relative_path)
-            
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            self.s3_client.download_file(self.bucket_name, s3_key, local_path)
-        
-        print(f"Downloaded from s3://{self.bucket_name}/{prefix}")
-
-# Use custom backend
-s3_backend = S3StorageBackend(bucket_name="my-experiments", prefix="ml-runs")
-
-with ReproducibilityManager(
-    output_dir="./runs",
-    storage_backend=s3_backend,
-    is_main_process=True
-) as repro:
-    train_model()
-    # Artifacts automatically uploaded to S3 on exit
 ```
 
 ## Best Practices
