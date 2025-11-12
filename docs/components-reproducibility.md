@@ -1,15 +1,16 @@
 # Reproducibility
 
-The `gpt_lab.reproducibility` module provides comprehensive experiment reproducibility by capturing git state, creating timestamped output directories, and enabling exact experiment restoration.
+The `gpt_lab.reproducibility` module captures experiment state (git, environment) and helps persist artifacts reliably with optional storage backends and graceful shutdown.
 
 ## Overview
 
 The reproducibility component is designed to:
-- Capture complete git state (commit hash, branch, remote URL, dirty status)
-- Save patches of uncommitted changes for dirty repositories
-- Create unique timestamped directories for each experiment run
-- Store artifacts with customizable storage backends
-- Enable exact restoration of experiment code state
+- Capture complete git state (commit hash, branch, remote URL, dirty status, and GitHub URL when possible)
+- Save patches of uncommitted and untracked changes for dirty repositories
+- Create the output directory you specify (main process only)
+- Optionally store artifacts with customizable backup storage backends (catalog: `gpt_lab.backup_storage_backends`)
+- Optionally notify daemon hooks on run start/end (catalog: `gpt_lab.daemon_hooks`)
+- Gracefully handle interrupts (SIGINT/SIGTERM) and still upload artifacts when configured
 
 ## Key Components
 
@@ -22,27 +23,26 @@ from gpt_lab.reproducibility import ReproducibilityManager
 
 with ReproducibilityManager(
     output_dir="./experiments/my_exp/runs",
-    storage_backend=None,  # Uses LocalFileSystemBackend by default
-    is_main_process=True
+    backup_storage_backend=None,  # optional catalog item
+    daemon_hook=None              # optional catalog item
 ) as repro:
-    # repro.output_dir: unique timestamped directory
+    # repro.output_dir: absolute path you provided
     # repro.git_info: dict with git metadata
     # Your experiment code here
     train_model()
 ```
 
 **Parameters:**
-- `output_dir`: Root directory for experiment outputs
-- `storage_backend`: Secondary/backup storage backend for artifacts (default: `LocalFileSystemBackend` is equivalent to not having a secondary/backup storage location)
-- `is_main_process`: Whether this is the main process (for distributed training)
-- `daemon_hook`: An optional hook for external monitoring of the run's liveness.
+- `output_dir`: Root directory for experiment outputs (created only by the main process)
+- `backup_storage_backend`: Optional backup storage backend for artifacts (uploads on exit when provided). Items come from the `gpt_lab.backup_storage_backends` catalog.
+- `daemon_hook`: Optional hook for liveness monitoring. Items come from the `gpt_lab.daemon_hooks` catalog.
 
 **Behavior:**
 
 On **entry** (`__enter__`):
-1. Captures git state (commit, branch, remote URL)
+1. Captures git state (commit, branch, remote URL, GitHub URL when derivable)
 2. Checks if working directory is dirty
-3. Creates timestamped output directory: `{timestamp}_{commit_short}/`
+3. Creates the provided output directory (main process only; determined via `gpt_lab.distributed.is_main_process()`)
 4. Saves `git_info.json` with metadata
 5. If dirty, creates `uncommitted_changes.patch` file
 6. Calls `on_run_start` on the provided `daemon_hook` if provided.
@@ -50,19 +50,19 @@ On **entry** (`__enter__`):
 
 On **exit** (`__exit__`):
 1. Calls `on_run_end` on the provided `daemon_hook` if provided.
-2. Uploads artifacts to secondary/backup storage backend (saving to local designated folder was already being done live during the experiment)
+2. Uploads artifacts to the backup storage backend if provided
 3. Works even if experiment exits with an error or is interrupted
-4. Restores original signal handlers to avoid side effects.
+4. Restores original signal handlers to avoid side effects
+5. Synchronizes processes using `gpt_lab.distributed.barrier()` so non-main processes wait for the main process to finish uploads (no-op in single-process mode)
 
 **Created Directory Structure:**
 ```
-experiments/my_exp/runs/
-└── 2025-10-12_14-30-45_a1b2c3d/
-    ├── git_info.json
-    ├── uncommitted_changes.patch  (if dirty)
-    ├── checkpoints/
-    ├── logs/
-    └── ... (your experiment outputs)
+experiments/my_exp/runs/<specific_run_id>/
+├── git_info.json
+├── uncommitted_changes.patch  (if dirty)
+├── checkpoints/
+├── logs/
+└── ... (your experiment outputs)
 ```
 
 ### `git_info` Dictionary
@@ -75,42 +75,42 @@ The captured git information includes:
     "branch": "main",
     "remote_url": "git@github.com:user/repo.git",
     "github_url": "https://github.com/user/repo/commit/a1b2c3d...",
-    "was_dirty": False
+    "git_is_dirty": False
 }
 ```
 
-### Storage Backends
-
-#### `LocalFileSystemBackend`
-
-Default backend that copies artifacts to another local directory:
+### System and Package Information
 
 ```python
-from gpt_lab.reproducibility import LocalFileSystemBackend
+from gpt_lab.reproducibility import get_system_info
 
-backend = LocalFileSystemBackend(root_dir="./experiment_artifacts")
+info = get_system_info(git_info=repro.git_info)
+# {
+#   "python_version": "...",
+#   "torch_version": "...",
+#   "cuda_available": ...,
+#   "device_count": ...,
+#   "devices": [...],
+#   "package_versions": {...},
+#   "git_info": {...}  # if provided
+# }
 ```
 
-**Methods:**
-- `upload(local_source_dir, experiment_id)`: Copies directory
-- `download(experiment_id, local_destination_dir)`: Restores directory
+### Backup Storage Backends (Catalog)
 
-#### `BaseStorageBackend`
-
-Abstract base class for custom backends:
+Backups are handled by catalog items implementing a standard interface. The manager calls:
 
 ```python
-from gpt_lab.reproducibility import BaseStorageBackend
-
-class S3StorageBackend(BaseStorageBackend):
-    def upload(self, local_source_dir: str, experiment_id: str):
-        # Upload to S3
-        pass
-    
-    def download(self, experiment_id: str, local_destination_dir: str):
-        # Download from S3
-        pass
+backup_storage_backend.upload(source_dir="./original_run")
 ```
+
+And for restoration:
+
+```python
+backup_storage_backend.download(destination_dir="./restored_run")
+```
+
+For more info on Backup Storage Backends, see [this doc](catalogs-backup-storage-backends.md).
 
 ## Helper Functions
 
@@ -131,7 +131,7 @@ remote = get_git_remote_url()       # "git@github.com:user/repo.git"
 branch = get_git_branch()           # "main"
 dirty = is_git_dirty()              # True/False
 
-# Create patch of uncommitted changes
+# Create patch of uncommitted and untracked changes
 patch = create_git_patch()          # Full git diff as string
 ```
 
@@ -142,12 +142,12 @@ patch = create_git_patch()          # Full git diff as string
 ```python
 import logging
 from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import setup_experiment_logging
+# from gpt_lab.logger import setup_experiment_logging  # optional
 
 with ReproducibilityManager(output_dir="./runs") as repro:
     # Setup logging
-    log_dir = os.path.join(repro.output_dir, "logs")
-    setup_experiment_logging(log_dir, rank=0, is_main_process=True)
+    # log_dir = os.path.join(repro.output_dir, "logs")
+    # setup_experiment_logging(log_dir, rank=0, is_main_process=True)
     
     logger = logging.getLogger(__name__)
     
@@ -156,97 +156,6 @@ with ReproducibilityManager(output_dir="./runs") as repro:
     
     # Run experiment
     train_model()
-```
-
-### Distributed Training Setup
-
-```python
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.distributed import DistributedManager
-
-dist = DistributedManager()
-
-# Only main process captures git state and creates directories
-with ReproducibilityManager(
-    output_dir="./runs",
-    is_main_process=dist.is_main_process
-) as repro:
-    # Main process has repro.output_dir set
-    # Worker processes have repro.output_dir = None
-    
-    if dist.is_main_process:
-        print(f"Output directory: {repro.output_dir}")
-    
-    # Broadcast output directory to all processes
-    if dist.is_main_process:
-        output_dir = repro.output_dir
-    else:
-        output_dir = None
-    
-    output_dir = dist.broadcast_object(output_dir, src=0)
-    
-    # All processes can now use the same output directory
-    train_distributed(output_dir, dist)
-```
-
-### Custom Storage Backend (S3 Example)
-
-```python
-import boto3
-from gpt_lab.reproducibility import BaseStorageBackend, ReproducibilityManager
-
-class S3StorageBackend(BaseStorageBackend):
-    def __init__(self, bucket_name: str, prefix: str = ""):
-        self.s3_client = boto3.client('s3')
-        self.bucket_name = bucket_name
-        self.prefix = prefix
-    
-    def upload(self, local_source_dir: str, experiment_id: str):
-        import os
-        from pathlib import Path
-        
-        # Upload all files in directory
-        for root, dirs, files in os.walk(local_source_dir):
-            for file in files:
-                local_path = os.path.join(root, file)
-                relative_path = os.path.relpath(local_path, local_source_dir)
-                s3_key = f"{self.prefix}/{experiment_id}/{relative_path}"
-                
-                self.s3_client.upload_file(local_path, self.bucket_name, s3_key)
-        
-        print(f"Uploaded to s3://{self.bucket_name}/{self.prefix}/{experiment_id}")
-    
-    def download(self, experiment_id: str, local_destination_dir: str):
-        import os
-        
-        os.makedirs(local_destination_dir, exist_ok=True)
-        
-        # List and download all objects with the prefix
-        prefix = f"{self.prefix}/{experiment_id}/"
-        response = self.s3_client.list_objects_v2(
-            Bucket=self.bucket_name,
-            Prefix=prefix
-        )
-        
-        for obj in response.get('Contents', []):
-            s3_key = obj['Key']
-            relative_path = s3_key[len(prefix):]
-            local_path = os.path.join(local_destination_dir, relative_path)
-            
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
-            self.s3_client.download_file(self.bucket_name, s3_key, local_path)
-        
-        print(f"Downloaded from s3://{self.bucket_name}/{prefix}")
-
-# Use custom backend
-s3_backend = S3StorageBackend(bucket_name="my-experiments", prefix="ml-runs")
-
-with ReproducibilityManager(
-    output_dir="./runs",
-    storage_backend=s3_backend
-) as repro:
-    train_model()
-    # Artifacts automatically uploaded to S3 on exit
 ```
 
 ## Best Practices
@@ -289,10 +198,10 @@ save_checkpoint(
 
 ## Testing
 
-Comprehensive tests are in `src/gpt_lab/tests/test_reproducibility.py`:
+Comprehensive tests are in `tests/src/gpt_lab/test_reproducibility.py`:
 
 ```bash
-pytest src/gpt_lab/tests/test_reproducibility.py -v
+pytest tests/src/gpt_lab/test_reproducibility.py -v
 ```
 
 **Test coverage includes:**
@@ -301,5 +210,4 @@ pytest src/gpt_lab/tests/test_reproducibility.py -v
 - Patch file creation and application
 - Storage backend upload/download
 - Distributed training awareness
-- Full restoration roundtrip
-- Safety checks for dirty state during restoration
+- Signal handling for graceful shutdown and artifact upload

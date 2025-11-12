@@ -4,6 +4,7 @@ import time
 from contextlib import nullcontext
 from typing import Dict, Any
 import logging
+import datetime
 
 import random
 import numpy as np
@@ -13,8 +14,8 @@ import tiktoken
 from gpt_lab.configuration import get_config
 from gpt_lab.device import to_device
 from gpt_lab.distributed import DistributedManager
-from gpt_lab.reproducibility import ReproducibilityManager
-from gpt_lab.logger import setup_experiment_logging, get_system_info
+from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
+from gpt_lab.logger import setup_experiment_logging
 from gpt_lab.checkpointer import save_checkpoint, load_checkpoint
 from gpt_lab.data_sources.pretraining.fineweb import PrecachedFineWebDataset, FineWebSize
 from gpt_lab.data_sources.catalog_utils import Split
@@ -278,15 +279,10 @@ To specify a different config file:
     parser.add_argument("--train-seq-len", dest="sequence.train_seq_len", type=int, help="Sequence length used during training.")
     parser.add_argument("--val-seq-len", dest="sequence.val_seq_len", type=int, help="Sequence length used during evaluation.")
     
-    with DistributedManager() as dist:
-        config = get_config(parser)
-        
-        runs_dir = os.path.join(os.path.dirname(__file__), "runs")
-        with ReproducibilityManager(
-            output_dir=runs_dir,
-            is_main_process=dist.is_main_process
-        ) as rep:
-            # Broadcast the output directory from the main process to all other processes
-            rep.output_dir = dist.broadcast_object(rep.output_dir)
-            
-            main(config, dist, rep)
+    config = get_config(parser)
+    run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    dist = DistributedManager()
+    rep = ReproducibilityManager(output_dir=run_dir)
+    
+    with dist, rep:
+        main(config, dist, rep)

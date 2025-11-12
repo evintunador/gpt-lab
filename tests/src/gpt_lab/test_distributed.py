@@ -4,7 +4,29 @@ from unittest import mock
 import pytest
 import torch
 
-from gpt_lab.distributed import DistributedManager
+from gpt_lab.distributed import (
+    DistributedManager,
+    is_available,
+    is_initialized,
+    get_rank,
+    get_local_rank,
+    get_world_size,
+    is_main_process,
+    barrier
+)
+
+
+def test_standalone_functions_default_state():
+    """Test that standalone functions return correct defaults before manager is used."""
+    # Availability reflects torch's build capability
+    assert is_available() == torch.distributed.is_available()
+    # Not initialized by default; defaults for ranks/size
+    assert not is_initialized()
+    assert get_rank() == 0
+    assert get_local_rank() == 0
+    assert get_world_size() == 1
+    assert is_main_process()
+    barrier()  # Should be a no-op
 
 
 def test_context_manager_basic():
@@ -17,6 +39,19 @@ def test_context_manager_basic():
         assert manager.world_size == 1
         assert not manager.is_distributed
         assert manager.is_main_process
+        
+        # Test standalone functions reflect manager state
+        assert is_available() == torch.distributed.is_available()
+        assert is_initialized() == manager.is_initialized()
+        assert get_rank() == manager.rank
+        assert get_local_rank() == manager.local_rank
+        assert get_world_size() == manager.world_size
+        assert is_main_process() == manager.is_main_process
+
+    # Test that state is reset after exit
+    assert not is_initialized()
+    assert get_rank() == 0
+    assert get_world_size() == 1
 
 
 def test_device_selection_logic():
@@ -85,16 +120,21 @@ def test_set_seed_deterministic():
 
 def test_set_seed_rank_aware():
     """Test that set_seed is rank-aware (different seeds for different ranks)."""
-    # Test by directly modifying rank on manager instances
+    # Test by directly modifying rank on shared state via separate contexts
     with DistributedManager() as manager1:
-        manager1.rank = 0
+        # emulate rank 0
         manager1.set_seed(42)
         rand1 = torch.rand(3)
     
     with DistributedManager() as manager2:
-        manager2.rank = 1
-        manager2.set_seed(42)
-        rand2 = torch.rand(3)
+        # emulate rank 1 by temporarily tweaking internal state
+        from gpt_lab import distributed as dist_module
+        dist_module._DIST_STATE["rank"] = 1
+        try:
+            manager2.set_seed(42)
+            rand2 = torch.rand(3)
+        finally:
+            dist_module._DIST_STATE["rank"] = 0
     
     # Different ranks should produce different random numbers even with same base seed
     assert not torch.allclose(rand1, rand2)
@@ -115,8 +155,20 @@ def test_torchrun_environment_detection(mock_set_device, mock_cuda_available, mo
         assert manager.rank == 0
         assert manager.local_rank == 0
         assert manager.world_size == 2
+        
+        # Test standalone functions
+        assert is_initialized()
+        assert get_rank() == 0
+        assert get_local_rank() == 0
+        assert get_world_size() == 2
+        assert is_main_process()
     
     mock_destroy.assert_called_once()
+
+    # Test that state is reset after exit
+    assert not is_initialized()
+    assert get_rank() == 0
+    assert get_world_size() == 1
 
 
 @mock.patch.dict(os.environ, {
@@ -139,6 +191,14 @@ def test_slurm_environment_detection(mock_set_device, mock_cuda_available, mock_
         assert manager.rank == 1
         assert manager.local_rank == 1
         assert manager.world_size == 4
+        
+        # Test standalone functions
+        assert is_initialized()
+        assert get_rank() == 1
+        assert get_local_rank() == 1
+        assert get_world_size() == 4
+        assert not is_main_process()
+
         # Check that SLURM sets master address/port
         assert os.environ["MASTER_ADDR"] == "node001"
         assert os.environ["MASTER_PORT"] == "12345"

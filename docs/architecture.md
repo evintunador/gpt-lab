@@ -35,6 +35,8 @@ GPT-Lab organizes components into **catalog types**:
 | `benchmarks` | Evaluation frameworks | Multiple choice, fill-in-blank |
 | `data_sources` | Dataset loaders | FineWeb, HellaSwag |
 | `models` | High-level model wrappers | Tokenizers, inference APIs |
+| `backup_storage_backends` | Artifact backup destinations | LocalFilesystem, S3 |
+| `daemon_hooks` | Run lifecycle/liveness integrations | FileDaemonHook, HealthCheckHook |
 
 ## Roots and Precedence
 
@@ -99,7 +101,9 @@ gpt-lab/
 │       └── gpt_lab/
 │           ├── nn_modules/
 │           ├── optimizers/
-│           └── train_loops/
+│           ├── train_loops/
+│           ├── backup_storage_backends/
+│           └── daemon_hooks/
 │
 ├── src/gpt_lab/              # Main package source (not a root)
 │   ├── checkpointer.py       # Importable utilities

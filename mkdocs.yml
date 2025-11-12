@@ -33,6 +33,8 @@ nav:
     - Optimizers: catalogs-optimizers.md
     - Benchmarks: catalogs-benchmarks.md
     - Models: catalogs-models.md
+    - Backup Storage Backends: catalogs-backup-storage-backends.md
+    - Daemon Hooks: catalogs-daemon-hooks.md
   - Existing Catalog Packs:
     - Core: packs-core.md
     - NLP: packs-nlp.md
