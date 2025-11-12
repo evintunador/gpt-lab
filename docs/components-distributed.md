@@ -1,7 +1,7 @@
 # Distributed
 
 The `gpt_lab.distributed` module provides a unified interface for distributed training that automatically detects and configures `torchrun`, SLURM, or single-process environments. 
-The hope is that eventually, as it develops, you'll be able write scripts that are completely agnostic to whether they're being run on single GPU, torchrun, or slurm without having to manage separate utilities.
+The hope is that eventually, as it develops, you'll be able write scripts that are completely agnostic to whether they're being run on single GPU, torchrun, or slurm without having to manage separate utilities. The module also exposes backend-agnostic, module-level accessors (rank, world size, barrier) for convenient read-only queries anywhere.
 
 ## Overview
 
@@ -10,6 +10,7 @@ The distributed component is designed to:
 - Initialize and manage PyTorch distributed process groups
 - Provide rank-aware device placement
 - Offer convenient wrappers for collective operations
+- Expose module-level accessors for distributed state
 - Support rank-aware deterministic seeding
 - Work seamlessly in both distributed and single-process modes
 
@@ -36,6 +37,20 @@ with DistributedManager() as dist:
         print(f"Training on {dist.world_size} processes")
 ```
 
+When using `as dist`, the manager also mirrors common accessors as static methods, emulating a torch.distributed-like interface:
+
+```python
+with DistributedManager() as dist:
+    # Static accessors (equivalent module-level functions also exist)
+    dist.is_available()      # reflects torch.distributed.is_available()
+    dist.is_initialized()    # True if process group initialized
+    dist.get_rank()          # 0 if not initialized
+    dist.get_local_rank()    # 0 if not initialized
+    dist.get_world_size()    # 1 if not initialized
+    dist.is_main()           # True if rank == 0
+    dist.barrier()           # no-op if not initialized
+```
+
 **Attributes:**
 - `rank`: Global rank (0 to world_size-1)
 - `local_rank`: Local rank on this node (0 to local_world_size-1)
@@ -52,6 +67,27 @@ with DistributedManager() as dist:
 - `all_reduce(tensor, op)`: Reduce tensor across all processes
 - `broadcast(tensor, src=0)`: Broadcast tensor from source rank
 - `set_seed(seed)`: Set rank-aware deterministic seed
+
+### Module-Level Accessors
+
+These functions are available directly from `gpt_lab.distributed` and provide read-only access to the distributed state. They are backend-agnostic and safe in both single-process and distributed contexts.
+
+```python
+from gpt_lab.distributed import (
+    is_available,        # reflects torch.distributed.is_available()
+    is_initialized,      # True after process group init
+    get_rank,            # 0 if not initialized
+    get_local_rank,      # 0 if not initialized
+    get_world_size,      # 1 if not initialized
+    is_main_process,     # True if rank == 0
+    barrier              # no-op if not initialized
+)
+```
+
+Notes:
+- `is_available()` reports PyTorch build capability (delegates to `torch.distributed.is_available()`).
+- `is_initialized()` indicates whether a process group has been successfully created in this process.
+- `barrier()` is a no-op when not initialized.
 
 ## Environment Detection
 
@@ -212,19 +248,21 @@ with DistributedManager() as dist:
 Synchronize all processes:
 
 ```python
+from gpt_lab.distributed import DistributedManager, barrier
+
 with DistributedManager() as dist:
     # Each process does some work
     process_data()
     
     # Wait for all processes to finish
-    dist.barrier()
+    dist.barrier()     # or barrier()
     
     # Only main process saves results
     if dist.is_main_process:
         save_results()
     
     # Wait for save to complete
-    dist.barrier()
+    barrier()          # module-level barrier is equivalent
 ```
 
 ### Rank-Aware Seeding
@@ -250,10 +288,10 @@ with DistributedManager() as dist:
 
 ## Testing
 
-Comprehensive tests are in `src/gpt_lab/tests/test_distributed.py`:
+Comprehensive tests are in `tests/src/gpt_lab/test_distributed.py`:
 
 ```bash
-pytest src/gpt_lab/tests/test_distributed.py -v
+pytest tests/src/gpt_lab/test_distributed.py -v
 ```
 
 **Test coverage includes:**
