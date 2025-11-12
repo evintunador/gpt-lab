@@ -13,7 +13,7 @@ import numpy as np
 
 from .daemon_hooks.base import BaseDaemonHook
 from .backup_storage_backends.base import BaseBackupStorageBackend
-from .distributed import is_main_process as dist_is_main_process, barrier
+from .distributed import barrier
 
 
 logger = logging.getLogger(__name__)
@@ -320,5 +320,11 @@ class ReproducibilityManager:
 
     @property
     def _is_main_process(self) -> bool:
-        """Dynamically reflects whether this process is the main process (rank 0)."""
-        return dist_is_main_process()
+        """Dynamically reflects whether this process is the main process (rank 0).
+        
+        Reads directly from the distributed module's shared state so tests that
+        tweak `_DIST_STATE` are respected without requiring a real process group.
+        """
+        # Local import to avoid circulars and to ensure we read the live module state
+        from . import distributed as dist_module
+        return dist_module._DIST_STATE.get("rank", 0) == 0
