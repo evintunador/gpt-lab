@@ -279,15 +279,10 @@ To specify a different config file:
     parser.add_argument("--train-seq-len", dest="sequence.train_seq_len", type=int, help="Sequence length used during training.")
     parser.add_argument("--val-seq-len", dest="sequence.val_seq_len", type=int, help="Sequence length used during evaluation.")
     
-    with DistributedManager() as dist:
-        config = get_config(parser)
-        
-        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-        with ReproducibilityManager(
-            output_dir=run_dir,
-            is_main_process=dist.is_main_process
-        ) as rep:
-            # Broadcast the output directory from the main process to all other processes
-            rep.output_dir = dist.broadcast_object(rep.output_dir)
-            
-            main(config, dist, rep)
+    config = get_config(parser)
+    run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    dist = DistributedManager()
+    rep = ReproducibilityManager(output_dir=run_dir)
+    
+    with dist, rep:
+        main(config, dist, rep)

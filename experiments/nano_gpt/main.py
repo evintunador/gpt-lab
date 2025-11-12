@@ -198,15 +198,10 @@ To specify a different config file:
     parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, 
     help="Number of samples to use for validation. Set to -1 for no limit.")
     
-    with DistributedManager() as dist:
-        config = get_config(parser)
-        
-        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-        with ReproducibilityManager(
-            output_dir=run_dir,
-            is_main_process=dist.is_main_process,
-        ) as rep:
-            # Broadcast the output directory from the main process to all other processes
-            rep.output_dir = dist.broadcast_object(rep.output_dir)
-            
-            main(config, dist, rep)
+    config = get_config(parser)
+    run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    dist = DistributedManager()
+    rep = ReproducibilityManager(output_dir=run_dir)
+
+    with dist, rep:
+        main(config, dist, rep)

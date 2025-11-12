@@ -383,15 +383,11 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--pat-str", dest="pat_str", type=str,
         help="Pattern string. Options are {gpt2, gpt4, gpt5} or a custom pattern.")
     parser.add_argument("-s", "--seed", dest="seed", type=int, help="Seed for the data loader.")
-
-    with DistributedManager() as dist_manager:
-        config = get_config(parser)
-        run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-        with ReproducibilityManager(
-            output_dir=run_dir,
-            is_main_process=dist_manager.is_main_process,
-        ) as repro_manager:
-            # Broadcast the output directory from the main process to all other processes
-            repro_manager.output_dir = dist_manager.broadcast_object(repro_manager.output_dir)
-            
-            run(config, dist_manager, repro_manager)
+    
+    config = get_config(parser)
+    dist_manager = DistributedManager()
+    run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+    repro_manager = ReproducibilityManager(output_dir=run_dir)
+    
+    with dist_manager, repro_manager:
+        run(config, dist_manager, repro_manager)

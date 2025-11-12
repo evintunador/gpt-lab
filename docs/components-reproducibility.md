@@ -23,7 +23,6 @@ from gpt_lab.reproducibility import ReproducibilityManager
 
 with ReproducibilityManager(
     output_dir="./experiments/my_exp/runs",
-    is_main_process=True,
     backup_storage_backend=None,  # optional catalog item
     daemon_hook=None              # optional catalog item
 ) as repro:
@@ -34,8 +33,7 @@ with ReproducibilityManager(
 ```
 
 **Parameters:**
-- `output_dir`: Root directory for experiment outputs (created if `is_main_process=True`)
-- `is_main_process`: Whether this is the main process (for distributed training)
+- `output_dir`: Root directory for experiment outputs (created only by the main process)
 - `backup_storage_backend`: Optional backup storage backend for artifacts (uploads on exit when provided). Items come from the `gpt_lab.backup_storage_backends` catalog.
 - `daemon_hook`: Optional hook for liveness monitoring. Items come from the `gpt_lab.daemon_hooks` catalog.
 
@@ -44,7 +42,7 @@ with ReproducibilityManager(
 On **entry** (`__enter__`):
 1. Captures git state (commit, branch, remote URL, GitHub URL when derivable)
 2. Checks if working directory is dirty
-3. Creates the provided output directory (main process only)
+3. Creates the provided output directory (main process only; determined via `gpt_lab.distributed.is_main_process()`)
 4. Saves `git_info.json` with metadata
 5. If dirty, creates `uncommitted_changes.patch` file
 6. Calls `on_run_start` on the provided `daemon_hook` if provided.
@@ -54,7 +52,8 @@ On **exit** (`__exit__`):
 1. Calls `on_run_end` on the provided `daemon_hook` if provided.
 2. Uploads artifacts to the backup storage backend if provided
 3. Works even if experiment exits with an error or is interrupted
-4. Restores original signal handlers to avoid side effects.
+4. Restores original signal handlers to avoid side effects
+5. Synchronizes processes using `gpt_lab.distributed.barrier()` so non-main processes wait for the main process to finish uploads (no-op in single-process mode)
 
 **Created Directory Structure:**
 ```
@@ -145,7 +144,7 @@ import logging
 from gpt_lab.reproducibility import ReproducibilityManager
 # from gpt_lab.logger import setup_experiment_logging  # optional
 
-with ReproducibilityManager(output_dir="./runs", is_main_process=True) as repro:
+with ReproducibilityManager(output_dir="./runs") as repro:
     # Setup logging
     # log_dir = os.path.join(repro.output_dir, "logs")
     # setup_experiment_logging(log_dir, rank=0, is_main_process=True)
@@ -162,17 +161,17 @@ with ReproducibilityManager(output_dir="./runs", is_main_process=True) as repro:
 ### Distributed Training Setup
 
 ```python
+from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
-# from gpt_lab.distributed import DistributedManager
 
-is_main_process = get_is_main_process_somehow()
-
-# Only main process captures git state and creates directories/uploads
-with ReproducibilityManager(output_dir="./runs", is_main_process=is_main_process) as repro:
-    if is_main_process:
-        print(f"Output directory: {repro.output_dir}")
-        # broadcast repro.output_dir to workers with your distributed framework
-    train_distributed(...)
+with DistributedManager() as dist:
+    with ReproducibilityManager(output_dir="./runs") as repro:
+        # Broadcast the output directory to all ranks so they can write under the same run dir
+        repro.output_dir = dist.broadcast_object(repro.output_dir, src=0)
+        
+        # Only the main process (rank 0) creates directories, saves git info, and uploads
+        # Non-main processes proceed without those side effects
+        train_distributed(...)
 ```
 
 ## Best Practices
@@ -183,7 +182,7 @@ Wrap your experiment entry point:
 
 ```python
 def main():
-    with ReproducibilityManager(output_dir="./runs", is_main_process=True) as repro:
+    with ReproducibilityManager(output_dir="./runs") as repro:
         # All experiment code here
         train_model()
 
@@ -215,10 +214,10 @@ save_checkpoint(
 
 ## Testing
 
-Comprehensive tests are in `tests/src/gpt_lab/reproducibility/test_reproducibility.py`:
+Comprehensive tests are in `tests/src/gpt_lab/test_reproducibility.py`:
 
 ```bash
-pytest tests/src/gpt_lab/reproducibility/test_reproducibility.py -v
+pytest tests/src/gpt_lab/test_reproducibility.py -v
 ```
 
 **Test coverage includes:**

@@ -57,7 +57,9 @@ def is_main() -> bool:
 
 def barrier() -> None:
     """Synchronizes all processes. Does nothing if not initialized."""
-    if is_initialized():
+    # Use PyTorch's actual initialization state to avoid errors in tests or
+    # contexts where module-level state was mocked but no process group exists.
+    if dist.is_available() and dist.is_initialized():
         dist.barrier()
 
 

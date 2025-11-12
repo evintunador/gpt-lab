@@ -67,7 +67,7 @@ def test_manager_clean_repo(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -97,7 +97,7 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             (git_repo / "new_file.txt").write_text("untracked file")
 
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
@@ -122,11 +122,22 @@ def test_manager_distributed_awareness(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(
-            output_dir=str(runs_dir),
-            is_main_process=False
-        ) as manager:
-            assert manager.is_main_process is False
+        # Simulate a distributed, non-main process by tweaking shared state
+        from gpt_lab import distributed as dist_module
+        prev = dist_module._DIST_STATE.copy()
+        try:
+            dist_module._DIST_STATE.update({
+                "is_initialized": True,
+                "rank": 1,
+                "local_rank": 1,
+                "world_size": 2,
+            })
+            with ReproducibilityManager(
+                output_dir=str(runs_dir),
+            ) as manager:
+                assert manager._is_main_process is False
+        finally:
+            dist_module._DIST_STATE.update(prev)
     finally:
         os.chdir(original_cwd)
 
@@ -141,7 +152,6 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
             output_dir=str(runs_dir),
-            is_main_process=True,
             backup_storage_backend=mock_storage
         ) as manager:
             # Simulate creating an output file in the experiment dir
@@ -166,7 +176,6 @@ def test_daemon_hook_lifecycle(git_repo: Path):
         
         with ReproducibilityManager(
             output_dir=str(runs_dir),
-            is_main_process=True,
             daemon_hook=mock_hook
         ):
             # 1. Check on_run_start was called
@@ -191,7 +200,6 @@ def test_daemon_hook_survives_exception(git_repo: Path):
         with pytest.raises(ValueError, match="Experiment failed"):
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
-                is_main_process=True,
                 daemon_hook=mock_hook
             ):
                 mock_hook.on_run_start.assert_called_once()
@@ -216,7 +224,6 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         with pytest.raises(SystemExit) as e:
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
-                is_main_process=True,
                 backup_storage_backend=mock_storage
             ) as manager:
                 (Path(manager.output_dir) / "results.txt").write_text("partial success")

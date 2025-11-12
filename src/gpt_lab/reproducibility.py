@@ -13,6 +13,7 @@ import numpy as np
 
 from .daemon_hooks.base import BaseDaemonHook
 from .backup_storage_backends.base import BaseBackupStorageBackend
+from .distributed import is_main_process as dist_is_main_process, barrier
 
 
 logger = logging.getLogger(__name__)
@@ -165,19 +166,16 @@ class ReproducibilityManager:
     def __init__(
         self,
         output_dir: str,
-        is_main_process: bool,
         backup_storage_backend: Optional[BaseBackupStorageBackend] = None,
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
-        self.is_main_process = is_main_process
-
         self.output_dir = os.path.abspath(output_dir)
-        if self.is_main_process:
+        if self._is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
             logger.info(f"Experiment output directory set: {self.output_dir}", extra={"output_dir": self.output_dir})
 
         self._get_git_info()
-        if self.is_main_process:
+        if self._is_main_process:
             git_info_file = os.path.join(self.output_dir, "git_info.json")
             with open(git_info_file, 'w') as f:
                 json.dump(self.git_info, f, indent=2)
@@ -195,7 +193,7 @@ class ReproducibilityManager:
         self.original_sigterm_handler = None
 
         self.backup_storage_backend = backup_storage_backend
-        if self.backup_storage_backend is None and self.is_main_process:
+        if self.backup_storage_backend is None and self._is_main_process:
             logger.warning(f"No backup storage backend initialized. "
                 f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted without a backup.")
 
@@ -258,7 +256,7 @@ class ReproducibilityManager:
 
     def __enter__(self):
         """Sets up the experiment environment and captures git state."""
-        if self.is_main_process:
+        if self._is_main_process:
             logger.info("Entering reproducibility manager")
             
             if self.daemon_hook:
@@ -272,7 +270,7 @@ class ReproducibilityManager:
 
     def _cleanup_and_upload(self, exc_type=None, exc_val=None):
         """Handles daemon hook cleanup and artifact uploading."""
-        if not self.is_main_process:
+        if not self._is_main_process:
             return
 
         # Call daemon hook on end, regardless of outcome
@@ -306,12 +304,21 @@ class ReproducibilityManager:
         self._cleanup_and_upload(exc_type, exc_val)
 
         # Restore original signal handlers
-        if self.is_main_process:
+        if self._is_main_process:
             if self.original_sigint_handler:
                 signal.signal(signal.SIGINT, self.original_sigint_handler)
             if self.original_sigterm_handler:
                 signal.signal(signal.SIGTERM, self.original_sigterm_handler)
 
+        # Ensure distributed peers wait for main to finish uploads/cleanup
+        # No-op in single-process mode
+        barrier()
+
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
         return self.git_info.copy()
+
+    @property
+    def _is_main_process(self) -> bool:
+        """Dynamically reflects whether this process is the main process (rank 0)."""
+        return dist_is_main_process()
