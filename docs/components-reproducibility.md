@@ -158,22 +158,6 @@ with ReproducibilityManager(output_dir="./runs") as repro:
     train_model()
 ```
 
-### Distributed Training Setup
-
-```python
-from gpt_lab.distributed import DistributedManager
-from gpt_lab.reproducibility import ReproducibilityManager
-
-with DistributedManager() as dist:
-    with ReproducibilityManager(output_dir="./runs") as repro:
-        # Broadcast the output directory to all ranks so they can write under the same run dir
-        repro.output_dir = dist.broadcast_object(repro.output_dir, src=0)
-        
-        # Only the main process (rank 0) creates directories, saves git info, and uploads
-        # Non-main processes proceed without those side effects
-        train_distributed(...)
-```
-
 ## Best Practices
 
 ### 1. Always Use ReproducibilityManager
