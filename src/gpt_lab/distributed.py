@@ -10,7 +10,59 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+_DIST_STATE = {
+    "is_initialized": False,
+    "rank": 0,
+    "local_rank": 0,
+    "world_size": 1,
+}
+
+
+# --- Standalone distributed accessors ---
+
+def is_available() -> bool:
+    """Checks if torch.distributed is available in this build of PyTorch."""
+    return dist.is_available()
+
+
+def is_initialized() -> bool:
+    """Returns True if the distributed process group has been initialized."""
+    return _DIST_STATE["is_initialized"]
+
+
+def get_rank() -> int:
+    """Gets the rank of the current process, defaulting to 0 if not in a distributed context."""
+    return _DIST_STATE["rank"]
+
+
+def get_local_rank() -> int:
+    """Gets the local rank of the current process, defaulting to 0 if not in a distributed context."""
+    return _DIST_STATE["local_rank"]
+
+
+def get_world_size() -> int:
+    """Gets the total number of processes, defaulting to 1 if not in a distributed context."""
+    return _DIST_STATE["world_size"]
+
+
+def is_main_process() -> bool:
+    """Returns True if the current process is the main one (rank 0)."""
+    return get_rank() == 0
+
+
+def is_main() -> bool:
+    # alias for clarity if users prefer shorter name
+    return is_main_process()
+
+
+def barrier() -> None:
+    """Synchronizes all processes. Does nothing if not initialized."""
+    if is_initialized():
+        dist.barrier()
+
+
 T = TypeVar('T')
+
 
 class DistributedManager:
     """
@@ -19,36 +71,68 @@ class DistributedManager:
     This class automatically detects and initializes the process group for
     distributed training if run in a torchrun or SLURM environment. It
     manages the device placement and provides convenience methods for
-    distributed operations.
-
-    Usage:
-        with DistributedManager() as dist_manager:
-            # Your training code here
-            model = MyModel().to(dist_manager.device)
-            if dist_manager.is_main_process:
-                print(f"Running on {dist_manager.world_size} GPUs.")
-            dist_manager.barrier()
+    distributed operations. It also updates a module-level state that can
+    be accessed via standalone functions (e.g., `get_rank()`, `is_main_process()`).
     """
 
     def __init__(self):
-        self.is_distributed: bool = False
-        self.rank: int = 0
-        self.local_rank: int = 0
-        self.world_size: int = 1
+        # Device is instance-specific; ranks are read from module state via properties
         self.device: torch.device = torch.device("cpu")
 
+    # Properties read the single shared state to avoid duplication/drift
+    @property
+    def is_distributed(self) -> bool:
+        return is_initialized()
+
+    @property
+    def rank(self) -> int:
+        return get_rank()
+
+    @property
+    def local_rank(self) -> int:
+        return get_local_rank()
+
+    @property
+    def world_size(self) -> int:
+        return get_world_size()
+
+    @property
+    def is_main_process(self) -> bool:
+        return is_main_process()
+
+    # Static methods emulate torch.distributed API for convenience when using `as dist`
     @staticmethod
     def is_available() -> bool:
-        """Checks if the distributed package is available."""
-        return dist.is_available()
+        return is_available()
 
-    def is_initialized(self) -> bool:
-        """Returns True if the distributed process group has been initialized."""
-        return self.is_distributed
+    @staticmethod
+    def is_initialized() -> bool:
+        return is_initialized()
+
+    @staticmethod
+    def get_rank() -> int:
+        return get_rank()
+
+    @staticmethod
+    def get_local_rank() -> int:
+        return get_local_rank()
+
+    @staticmethod
+    def get_world_size() -> int:
+        return get_world_size()
+
+    @staticmethod
+    def is_main() -> bool:
+        # alias for clarity if users prefer shorter name
+        return is_main_process()
+
+    @staticmethod
+    def barrier() -> None:
+        barrier()
 
     def __enter__(self):
         """Initializes the distributed environment."""
-        if self.is_available() and self._is_dist_env():
+        if is_available() and self._is_dist_env():
             self._init_distributed()
         else:
             logger.info("Running in single-process mode")
@@ -61,42 +145,50 @@ class DistributedManager:
         """Cleans up the distributed environment."""
         self.cleanup()
 
+        # Reset module state to safe defaults
+        _DIST_STATE["is_initialized"] = False
+        _DIST_STATE["rank"] = 0
+        _DIST_STATE["local_rank"] = 0
+        _DIST_STATE["world_size"] = 1
+
     def _is_dist_env(self) -> bool:
         """Checks if the script is running in a distributed environment."""
         return "WORLD_SIZE" in os.environ or "SLURM_NTASKS" in os.environ
 
-    def _init_distributed(self):
-        """Sets up the process group."""
+    def _init_distributed(self) -> None:
+        """Sets up the process group and updates shared state."""
         if "SLURM_PROCID" in os.environ:
-            # SLURM environment variables
-            self.rank = int(os.environ["SLURM_PROCID"])
-            self.local_rank = int(os.environ["SLURM_LOCALID"])
-            self.world_size = int(os.environ["SLURM_NTASKS"])
-            # SLURM uses HOST:PORT for master address
-            # This is a common setup, might need adjustment based on specific SLURM config
+            rank = int(os.environ["SLURM_PROCID"])
+            local_rank = int(os.environ["SLURM_LOCALID"])
+            world_size = int(os.environ["SLURM_NTASKS"])
+            # Configure master address/port from SLURM
             os.environ["MASTER_ADDR"] = os.environ["SLURM_SRUN_COMM_HOST"]
             os.environ["MASTER_PORT"] = str(int(os.environ["SLURM_SRUN_COMM_PORT"]))
-            logger.info(f"Detected SLURM environment - Rank {self.rank}/{self.world_size}")
+            logger.info(f"Detected SLURM environment - Rank {rank}/{world_size}")
         elif "RANK" in os.environ and "WORLD_SIZE" in os.environ:
-            # torchrun environment variables
-            self.rank = int(os.environ["RANK"])
-            self.local_rank = int(os.environ["LOCAL_RANK"])
-            self.world_size = int(os.environ["WORLD_SIZE"])
-            logger.info(f"Detected torchrun environment - Rank {self.rank}/{self.world_size}")
+            rank = int(os.environ["RANK"])
+            local_rank = int(os.environ["LOCAL_RANK"])
+            world_size = int(os.environ["WORLD_SIZE"])
+            logger.info(f"Detected torchrun environment - Rank {rank}/{world_size}")
         else:
             return  # Not a distributed environment
 
         backend = "nccl" if torch.cuda.is_available() else "gloo"
         logger.info(f"Initializing process group with backend: {backend}")
         dist.init_process_group(
-            backend=backend, 
-            rank=self.rank, 
-            world_size=self.world_size
+            backend=backend,
+            rank=rank,
+            world_size=world_size
         )
-        self.is_distributed = True
-        logger.info(f"Process group initialized successfully")
+
+        # Update shared state after successful init
+        _DIST_STATE["is_initialized"] = True
+        _DIST_STATE["rank"] = rank
+        _DIST_STATE["local_rank"] = local_rank
+        _DIST_STATE["world_size"] = world_size
+        logger.info("Process group initialized successfully")
         
-    def _set_device(self):
+    def _set_device(self) -> None:
         """Sets the device for the current process."""
         if torch.cuda.is_available():
             self.device = torch.device(f"cuda:{self.local_rank}")
@@ -110,21 +202,10 @@ class DistributedManager:
             self.device = torch.device("cpu")
             logger.debug("Set device to CPU")
 
-    @property
-    def is_main_process(self) -> bool:
-        """Returns True if the current process is the main one (rank 0)."""
-        return self.rank == 0
-
-    def barrier(self):
-        """Synchronizes all processes."""
-        if self.is_distributed:
-            dist.barrier()
-
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Destroys the process group."""
         if self.is_distributed:
             dist.destroy_process_group()
-            self.is_distributed = False
 
     def all_gather_object(self, obj: T) -> List[T]:
         """Gathers a pickleable object from all processes and returns a list."""
@@ -169,7 +250,6 @@ class DistributedManager:
 
     def set_seed(self, seed: int) -> None:
         """Sets a deterministic, rank-aware seed for reproducibility."""
-        # Each rank gets a different seed to avoid identical-but-distributed randomness
         final_seed = seed + self.rank
         random.seed(final_seed)
         np.random.seed(final_seed)

@@ -5,7 +5,6 @@ from pathlib import Path
 import shutil
 import pytest
 import signal
-import sys
 from unittest.mock import MagicMock
 
 from gpt_lab.reproducibility import ReproducibilityManager
