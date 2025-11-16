@@ -6,6 +6,7 @@ import shutil
 import pytest
 import signal
 from unittest.mock import MagicMock
+import torch
 
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.backup_storage_backends.base import BaseBackupStorageBackend
@@ -161,6 +162,142 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         
         # Check that the uploaded content is correct
         assert (tmp_path / "remote_storage" / "results.txt").read_text() == "success"
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_system_info_persisted_and_exposed(git_repo: Path):
+    """Verify that system info is saved and exposed via the manager."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+            output_dir = Path(manager.output_dir)
+
+            # File was written
+            system_info_file = output_dir / "system_info.json"
+            assert system_info_file.exists()
+            data = json.loads(system_info_file.read_text())
+            assert "python_version" in data
+            assert "package_versions" in data
+            # torch_determinism should be nested inside system_info
+            assert "torch_determinism" in data
+
+            # Property is available
+            si = manager.system_info
+            assert isinstance(si, dict)
+            assert "python_version" in si
+            assert "torch_determinism" in si
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
+    """Verify that initial RNG state is saved and exposed via the manager."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+            output_dir = Path(manager.output_dir)
+
+            # File was written
+            rng_file = output_dir / "rng_state_initial.pt"
+            assert rng_file.exists()
+            # RNG state includes non-tensor Python/numpy objects; use weights_only=False
+            # to avoid PyTorch's safe-loading restrictions.
+            loaded = torch.load(rng_file, weights_only=False)
+            assert isinstance(loaded, dict)
+            for key in ("torch", "numpy", "random"):
+                assert key in loaded
+
+            # Properties/methods are available
+            initial = manager.initial_rng_state
+            assert isinstance(initial, dict)
+            current = manager.get_rng_states()
+            assert isinstance(current, dict)
+
+            # Sanity check set_rng_states works round-trip for torch RNG
+            rng_before = manager.get_rng_states()
+            _ = torch.rand(1)  # change RNG
+            manager.set_rng_states(rng_before)
+            rng_after = manager.get_rng_states()
+            assert torch.equal(rng_before["torch"], rng_after["torch"])
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_run_invocation_persisted_and_exposed(git_repo: Path):
+    """Verify that run invocation information is saved and exposed."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+            output_dir = Path(manager.output_dir)
+
+            inv_file = output_dir / "run_invocation.json"
+            assert inv_file.exists()
+            data = json.loads(inv_file.read_text())
+            assert "argv" in data
+            assert "env" in data
+            assert isinstance(data["argv"], list)
+            assert isinstance(data["env"], dict)
+
+            # Property mirrors the file contents' structure
+            ri = manager.run_invocation
+            assert isinstance(ri, dict)
+            assert "argv" in ri and isinstance(ri["argv"], list)
+            assert "env" in ri and isinstance(ri["env"], dict)
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_torch_determinism_persisted_and_exposed(git_repo: Path):
+    """Verify that torch determinism metadata is saved and exposed."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+            output_dir = Path(manager.output_dir)
+
+            det_file = output_dir / "torch_determinism.json"
+            assert det_file.exists()
+            data = json.loads(det_file.read_text())
+            assert isinstance(data, dict)
+            # We don't assert on specific keys to avoid PyTorch-version flakiness,
+            # but the snapshot should never be empty.
+            assert data
+
+            td = manager.torch_determinism
+            assert isinstance(td, dict)
+            assert td
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_distributed_topology_persisted_and_exposed(git_repo: Path):
+    """Verify that distributed topology snapshot is saved and exposed."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+            output_dir = Path(manager.output_dir)
+
+            topo_file = output_dir / "distributed_topology.json"
+            assert topo_file.exists()
+            data = json.loads(topo_file.read_text())
+            assert isinstance(data, dict)
+            for key in ("is_initialized", "is_distributed", "world_size", "rank", "local_rank"):
+                assert key in data
+
+            topo = manager.distributed_topology
+            assert isinstance(topo, dict)
+            for key in ("is_initialized", "is_distributed", "world_size", "rank", "local_rank"):
+                assert key in topo
     finally:
         os.chdir(original_cwd)
 

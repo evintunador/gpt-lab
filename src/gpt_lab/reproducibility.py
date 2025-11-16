@@ -138,7 +138,7 @@ def get_system_info(git_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
     Returns:
         A dictionary containing system details.
     """
-    info = {
+    info: Dict[str, Any] = {
         "python_version": sys.version,
         "torch_version": torch.__version__,
         "cuda_available": torch.cuda.is_available(),
@@ -152,9 +152,109 @@ def get_system_info(git_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]
         else [],
         "package_versions": get_package_versions(),
     }
+    # Include PyTorch determinism/precision knobs for better reproducibility introspection
+    info["torch_determinism"] = get_torch_determinism_info()
     if git_info:
         info["git_info"] = git_info
     return info
+
+
+def get_run_invocation_info() -> Dict[str, Any]:
+    """
+    Captures command-line arguments and a filtered snapshot of environment variables
+    relevant to training/distributed execution.
+    """
+    # Focus on knobs that meaningfully affect runtime behavior; avoid dumping full env.
+    prefixes = (
+        "CUDA_",
+        "NCCL_",
+        "OMP_",
+        "WORLD_SIZE",
+        "RANK",
+        "LOCAL_RANK",
+        "SLURM_",
+        "MASTER_ADDR",
+        "MASTER_PORT",
+    )
+    env_filtered = {
+        k: v
+        for k, v in os.environ.items()
+        if any(k.startswith(prefix) for prefix in prefixes)
+    }
+    return {
+        "argv": list(sys.argv),
+        "env": env_filtered,
+    }
+
+
+def get_torch_determinism_info() -> Dict[str, Any]:
+    """
+    Introspects PyTorch determinism and precision-related knobs.
+    """
+    info: Dict[str, Any] = {}
+
+    # Deterministic algorithms switch
+    try:
+        if hasattr(torch, "are_deterministic_algorithms_enabled"):
+            info["deterministic_algorithms"] = torch.are_deterministic_algorithms_enabled()
+    except Exception as e:  # pragma: no cover - very defensive
+        info["deterministic_algorithms_error"] = str(e)
+
+    # Default dtype and float32 matmul precision (PyTorch 2.x+)
+    try:
+        info["default_dtype"] = str(torch.get_default_dtype())
+    except Exception:
+        pass
+
+    if hasattr(torch, "get_float32_matmul_precision"):
+        try:
+            info["float32_matmul_precision"] = torch.get_float32_matmul_precision()
+        except Exception:
+            pass
+
+    # cuDNN / CUDA backend knobs
+    cudnn_info: Dict[str, Any] = {}
+    if hasattr(torch.backends, "cudnn"):
+        for attr in ("deterministic", "benchmark", "allow_tf32"):
+            if hasattr(torch.backends.cudnn, attr):
+                cudnn_info[attr] = getattr(torch.backends.cudnn, attr)
+    if cudnn_info:
+        info["cudnn"] = cudnn_info
+
+    cuda_matmul_info: Dict[str, Any] = {}
+    if hasattr(torch.backends, "cuda") and hasattr(torch.backends.cuda, "matmul"):
+        matmul = torch.backends.cuda.matmul
+        for attr in ("allow_tf32", "allow_fp16_reduced_precision_reduction"):
+            if hasattr(matmul, attr):
+                cuda_matmul_info[attr] = getattr(matmul, attr)
+    if cuda_matmul_info:
+        info["cuda_matmul"] = cuda_matmul_info
+
+    return info
+
+
+def get_distributed_topology() -> Dict[str, Any]:
+    """
+    Returns a lightweight snapshot of the distributed topology as seen by
+    gpt_lab.distributed.
+    """
+    # Local import to avoid creating a hard dependency at module import time
+    from . import distributed as dist_module  # type: ignore
+
+    is_init = dist_module.is_initialized()
+    world_size = dist_module.get_world_size()
+    rank = dist_module.get_rank()
+    local_rank = dist_module.get_local_rank()
+
+    topology: Dict[str, Any] = {
+        "is_initialized": is_init,
+        "is_distributed": bool(is_init and world_size > 1),
+        "world_size": world_size,
+        "rank": rank,
+        "local_rank": local_rank,
+    }
+
+    return topology
 
 
 class ReproducibilityManager:
@@ -177,6 +277,9 @@ class ReproducibilityManager:
         # Lazily populated caches for additional reproducibility metadata
         self._system_info: Optional[Dict[str, Any]] = None
         self._initial_rng_state: Optional[Dict[str, Any]] = None
+        self._run_invocation: Optional[Dict[str, Any]] = None
+        self._torch_determinism: Optional[Dict[str, Any]] = None
+        self._distributed_topology: Optional[Dict[str, Any]] = None
 
         self._get_git_info()
         if self._is_main_process:
@@ -201,6 +304,27 @@ class ReproducibilityManager:
             rng_state_file = os.path.join(self.output_dir, "rng_state_initial.pt")
             torch.save(self._initial_rng_state, rng_state_file)
             logger.info(f"Saved initial RNG state to: {rng_state_file}")
+
+            # Capture and persist run-time invocation details (argv + filtered env)
+            self._run_invocation = get_run_invocation_info()
+            run_invocation_file = os.path.join(self.output_dir, "run_invocation.json")
+            with open(run_invocation_file, 'w') as f:
+                json.dump(self._run_invocation, f, indent=2)
+            logger.info(f"Saved run invocation info to: {run_invocation_file}")
+
+            # Capture and persist PyTorch determinism knobs
+            self._torch_determinism = get_torch_determinism_info()
+            torch_det_file = os.path.join(self.output_dir, "torch_determinism.json")
+            with open(torch_det_file, 'w') as f:
+                json.dump(self._torch_determinism, f, indent=2)
+            logger.info(f"Saved torch determinism info to: {torch_det_file}")
+
+            # Capture and persist distributed topology snapshot
+            self._distributed_topology = get_distributed_topology()
+            dist_topology_file = os.path.join(self.output_dir, "distributed_topology.json")
+            with open(dist_topology_file, 'w') as f:
+                json.dump(self._distributed_topology, f, indent=2)
+            logger.info(f"Saved distributed topology to: {dist_topology_file}")
         
         self.pid = os.getpid()
         self.daemon_hook = daemon_hook
@@ -345,6 +469,28 @@ class ReproducibilityManager:
             # We intentionally do not pass git_info here to avoid implicit file I/O
             self._system_info = get_system_info(self.git_info)
         return self._system_info.copy()
+
+    @property
+    def run_invocation(self) -> Dict[str, Any]:
+        """Returns the captured run invocation (argv + filtered env vars)."""
+        if self._run_invocation is None:
+            self._run_invocation = get_run_invocation_info()
+        # Shallow copy is sufficient; nested values are simple types
+        return self._run_invocation.copy()
+
+    @property
+    def torch_determinism(self) -> Dict[str, Any]:
+        """Returns PyTorch determinism/precision settings snapshot."""
+        if self._torch_determinism is None:
+            self._torch_determinism = get_torch_determinism_info()
+        return self._torch_determinism.copy()
+
+    @property
+    def distributed_topology(self) -> Dict[str, Any]:
+        """Returns the distributed topology snapshot."""
+        if self._distributed_topology is None:
+            self._distributed_topology = get_distributed_topology()
+        return self._distributed_topology.copy()
 
     @property
     def initial_rng_state(self) -> Dict[str, Any]:
