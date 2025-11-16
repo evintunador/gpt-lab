@@ -166,8 +166,8 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         os.chdir(original_cwd)
 
 
-def test_system_info_persisted_and_exposed(git_repo: Path):
-    """Verify that system info is saved and exposed via the manager."""
+def test_environment_snapshots_persisted_and_exposed(git_repo: Path):
+    """Verify that software and runtime environment info are saved and exposed via the manager."""
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
@@ -175,20 +175,31 @@ def test_system_info_persisted_and_exposed(git_repo: Path):
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
 
-            # File was written
-            system_info_file = output_dir / "system_info.json"
-            assert system_info_file.exists()
-            data = json.loads(system_info_file.read_text())
-            assert "python_version" in data
-            assert "package_versions" in data
-            # torch_determinism should be nested inside system_info
-            assert "torch_determinism" in data
+            # Software environment
+            software_file = output_dir / "software_environment.json"
+            assert software_file.exists()
+            sw = json.loads(software_file.read_text())
+            assert "python_version" in sw
+            assert "package_versions" in sw
+            assert "torch_repro_settings" in sw
 
-            # Property is available
-            si = manager.system_info
-            assert isinstance(si, dict)
-            assert "python_version" in si
-            assert "torch_determinism" in si
+            sw_prop = manager.software_environment
+            assert isinstance(sw_prop, dict)
+            assert "python_version" in sw_prop
+            assert "torch_repro_settings" in sw_prop
+
+            # Runtime environment
+            runtime_file = output_dir / "runtime_environment.json"
+            assert runtime_file.exists()
+            rt = json.loads(runtime_file.read_text())
+            assert "cuda_available" in rt
+            assert "device_count" in rt
+            assert "distributed" in rt
+
+            rt_prop = manager.runtime_environment
+            assert isinstance(rt_prop, dict)
+            assert "cuda_available" in rt_prop
+            assert "distributed" in rt_prop
     finally:
         os.chdir(original_cwd)
 
@@ -224,6 +235,14 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
             manager.set_rng_states(rng_before)
             rng_after = manager.get_rng_states()
             assert torch.equal(rng_before["torch"], rng_after["torch"])
+            # Final RNG state file should exist by the time context exits
+        final_rng_file = runs_dir / "rng_state_final.pt"
+        assert final_rng_file.exists()
+        final_state = torch.load(final_rng_file, weights_only=False)
+        assert isinstance(final_state, dict)
+        for key in ("torch", "numpy", "random"):
+            assert key in final_state
+
     finally:
         os.chdir(original_cwd)
 

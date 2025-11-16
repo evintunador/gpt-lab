@@ -128,37 +128,6 @@ def get_package_versions() -> Dict[str, Any]:
         return {"error": f"Could not run 'pip freeze': {e}"}
 
 
-def get_system_info(git_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Collects system information, package versions, and optional git information.
-
-    Args:
-        git_info: Optional git information dictionary from ReproducibilityManager.
-
-    Returns:
-        A dictionary containing system details.
-    """
-    info: Dict[str, Any] = {
-        "python_version": sys.version,
-        "torch_version": torch.__version__,
-        "cuda_available": torch.cuda.is_available(),
-        "device_count": (
-            torch.cuda.device_count() if torch.cuda.is_available() else 0
-        ),
-        "devices": [
-            torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
-        ]
-        if torch.cuda.is_available()
-        else [],
-        "package_versions": get_package_versions(),
-    }
-    # Include PyTorch determinism/precision knobs for better reproducibility introspection
-    info["torch_determinism"] = get_torch_determinism_info()
-    if git_info:
-        info["git_info"] = git_info
-    return info
-
-
 def get_run_invocation_info() -> Dict[str, Any]:
     """
     Captures command-line arguments and a filtered snapshot of environment variables
@@ -257,6 +226,36 @@ def get_distributed_topology() -> Dict[str, Any]:
     return topology
 
 
+def get_software_environment_info() -> Dict[str, Any]:
+    """
+    Captures the software environment: Python / PyTorch versions, installed packages,
+    and PyTorch determinism / precision knobs.
+    """
+    return {
+        "python_version": sys.version,
+        "torch_version": torch.__version__,
+        "package_versions": get_package_versions(),
+        "torch_repro_settings": get_torch_determinism_info(),
+    }
+
+
+def get_runtime_environment_info() -> Dict[str, Any]:
+    """
+    Captures the runtime environment: devices and distributed topology.
+    """
+    cuda_available = torch.cuda.is_available()
+    devices = [
+        torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+    ] if cuda_available else []
+
+    return {
+        "cuda_available": cuda_available,
+        "device_count": torch.cuda.device_count() if cuda_available else 0,
+        "devices": devices,
+        "distributed": get_distributed_topology(),
+    }
+
+
 class ReproducibilityManager:
     """
     Manages the reproducibility of an experiment.
@@ -275,7 +274,8 @@ class ReproducibilityManager:
             logger.info(f"Experiment output directory set: {self.output_dir}", extra={"output_dir": self.output_dir})
 
         # Lazily populated caches for additional reproducibility metadata
-        self._system_info: Optional[Dict[str, Any]] = None
+        self._software_environment: Optional[Dict[str, Any]] = None
+        self._runtime_environment: Optional[Dict[str, Any]] = None
         self._initial_rng_state: Optional[Dict[str, Any]] = None
         self._run_invocation: Optional[Dict[str, Any]] = None
         self._torch_determinism: Optional[Dict[str, Any]] = None
@@ -292,12 +292,19 @@ class ReproducibilityManager:
                     f.write(self.git_info['patch_content'])
                 logger.info(f"Saved git patch file to: {self.git_info['patch_file']}")
 
-            # Capture and persist system / environment information
-            self._system_info = get_system_info(self.git_info)
-            system_info_file = os.path.join(self.output_dir, "system_info.json")
-            with open(system_info_file, 'w') as f:
-                json.dump(self._system_info, f, indent=2)
-            logger.info(f"Saved system info to: {system_info_file}")
+            # Capture and persist software environment information
+            self._software_environment = get_software_environment_info()
+            software_env_file = os.path.join(self.output_dir, "software_environment.json")
+            with open(software_env_file, 'w') as f:
+                json.dump(self._software_environment, f, indent=2)
+            logger.info(f"Saved software environment info to: {software_env_file}")
+
+            # Capture and persist runtime environment information (devices + distributed)
+            self._runtime_environment = get_runtime_environment_info()
+            runtime_env_file = os.path.join(self.output_dir, "runtime_environment.json")
+            with open(runtime_env_file, 'w') as f:
+                json.dump(self._runtime_environment, f, indent=2)
+            logger.info(f"Saved runtime environment info to: {runtime_env_file}")
 
             # Capture and persist initial RNG state for reproducibility
             self._initial_rng_state = get_rng_state()
@@ -389,6 +396,12 @@ class ReproducibilityManager:
         logger.info(f"\n--- Interrupted by {signal_name}. Saving artifacts before exiting. ---")
         logger.warning(f"Received {signal_name}, attempting graceful shutdown.")
 
+        # Best-effort capture of final RNG state before cleanup/upload
+        try:
+            self._save_final_rng_state()
+        except Exception as e:
+            logger.error(f"Failed to save final RNG state on signal {signal_name}: {e}", exc_info=True)
+
         # Perform cleanup and upload
         self._cleanup_and_upload(exc_type=signal_name)
 
@@ -441,6 +454,12 @@ class ReproducibilityManager:
         if self._is_shutting_down:
             return  # Shutdown is already being handled by the signal handler
 
+        # Capture final RNG state at end of context (normal or error exit)
+        try:
+            self._save_final_rng_state()
+        except Exception as e:
+            logger.error(f"Failed to save final RNG state on __exit__: {e}", exc_info=True)
+
         # Perform cleanup and upload for normal exit or exception
         self._cleanup_and_upload(exc_type, exc_val)
 
@@ -455,20 +474,34 @@ class ReproducibilityManager:
         # No-op in single-process mode
         barrier()
 
+    def _save_final_rng_state(self) -> None:
+        """Saves the final RNG state to disk on the main process."""
+        if not self._is_main_process:
+            return
+        if not self.output_dir:
+            return
+        rng_state = get_rng_state()
+        rng_state_file = os.path.join(self.output_dir, "rng_state_final.pt")
+        torch.save(rng_state, rng_state_file)
+        logger.info(f"Saved final RNG state to: {rng_state_file}")
+
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
         return self.git_info.copy()
 
     @property
-    def system_info(self) -> Dict[str, Any]:
-        """Returns captured system / environment information.
+    def software_environment(self) -> Dict[str, Any]:
+        """Returns captured software environment information."""
+        if self._software_environment is None:
+            self._software_environment = get_software_environment_info()
+        return self._software_environment.copy()
 
-        If it was not captured yet on this process (e.g., non-main), it is computed lazily.
-        """
-        if self._system_info is None:
-            # We intentionally do not pass git_info here to avoid implicit file I/O
-            self._system_info = get_system_info(self.git_info)
-        return self._system_info.copy()
+    @property
+    def runtime_environment(self) -> Dict[str, Any]:
+        """Returns captured runtime environment information."""
+        if self._runtime_environment is None:
+            self._runtime_environment = get_runtime_environment_info()
+        return self._runtime_environment.copy()
 
     @property
     def run_invocation(self) -> Dict[str, Any]:
@@ -501,6 +534,15 @@ class ReproducibilityManager:
         if self._initial_rng_state is None:
             self._initial_rng_state = get_rng_state()
         return self._initial_rng_state
+
+    @property
+    def final_rng_state(self) -> Optional[Dict[str, Any]]:
+        """Returns the RNG state captured at the end of the run, if available."""
+        rng_state_file = os.path.join(self.output_dir, "rng_state_final.pt")
+        if os.path.exists(rng_state_file):
+            # RNG state includes Python/numpy objects; use weights_only=False.
+            return torch.load(rng_state_file, weights_only=False)
+        return None
 
     def get_rng_states(self) -> Dict[str, Any]:
         """Returns the current RNG states for torch, numpy, and random."""
