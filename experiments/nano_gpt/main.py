@@ -11,7 +11,7 @@ from torch.utils.data import Subset
 
 from gpt_lab.configuration import get_config
 from gpt_lab.distributed import DistributedManager
-from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
+from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging
 from gpt_lab.checkpointer import load_checkpoint
 from gpt_lab.data_sources.pretraining.fineweb import create_fineweb_dataset, FineWebSize
@@ -55,10 +55,19 @@ class NanoGPTCollator:
 def main(cfg: Dict[str, Any], dist: DistributedManager, rep: ReproducibilityManager):
     if rep.output_dir:
         setup_experiment_logging(rep.output_dir, dist.rank, dist.is_main_process)
-    
-    dist.set_seed(cfg['seed'])
-    
-    logger.info("System Information", extra=get_system_info(rep.get_git_info()))
+
+    dist.set_seed(cfg["seed"])
+
+    # Log a structured snapshot of the reproducibility context
+    logger.info(
+        "System Information",
+        extra={
+            "git_info": rep.get_git_info(),
+            "software_environment": rep.software_environment,
+            "runtime_environment": rep.runtime_environment,
+            "run_invocation": rep.run_invocation,
+        },
+    )
     logger.info("Hyperparameters", extra=cfg)
 
     enc = tiktoken.get_encoding("gpt2")
