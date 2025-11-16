@@ -174,6 +174,10 @@ class ReproducibilityManager:
             os.makedirs(self.output_dir, exist_ok=True)
             logger.info(f"Experiment output directory set: {self.output_dir}", extra={"output_dir": self.output_dir})
 
+        # Lazily populated caches for additional reproducibility metadata
+        self._system_info: Optional[Dict[str, Any]] = None
+        self._initial_rng_state: Optional[Dict[str, Any]] = None
+
         self._get_git_info()
         if self._is_main_process:
             git_info_file = os.path.join(self.output_dir, "git_info.json")
@@ -184,6 +188,19 @@ class ReproducibilityManager:
                 with open(self.git_info['patch_file'], 'w') as f:
                     f.write(self.git_info['patch_content'])
                 logger.info(f"Saved git patch file to: {self.git_info['patch_file']}")
+
+            # Capture and persist system / environment information
+            self._system_info = get_system_info(self.git_info)
+            system_info_file = os.path.join(self.output_dir, "system_info.json")
+            with open(system_info_file, 'w') as f:
+                json.dump(self._system_info, f, indent=2)
+            logger.info(f"Saved system info to: {system_info_file}")
+
+            # Capture and persist initial RNG state for reproducibility
+            self._initial_rng_state = get_rng_state()
+            rng_state_file = os.path.join(self.output_dir, "rng_state_initial.pt")
+            torch.save(self._initial_rng_state, rng_state_file)
+            logger.info(f"Saved initial RNG state to: {rng_state_file}")
         
         self.pid = os.getpid()
         self.daemon_hook = daemon_hook
@@ -317,6 +334,37 @@ class ReproducibilityManager:
     def get_git_info(self) -> Dict[str, Any]:
         """Returns the git information captured for this experiment."""
         return self.git_info.copy()
+
+    @property
+    def system_info(self) -> Dict[str, Any]:
+        """Returns captured system / environment information.
+
+        If it was not captured yet on this process (e.g., non-main), it is computed lazily.
+        """
+        if self._system_info is None:
+            # We intentionally do not pass git_info here to avoid implicit file I/O
+            self._system_info = get_system_info(self.git_info)
+        return self._system_info.copy()
+
+    @property
+    def initial_rng_state(self) -> Dict[str, Any]:
+        """Returns the RNG state that was captured at experiment start.
+
+        If it was not captured yet on this process (e.g., non-main), returns the current RNG state.
+        """
+        if self._initial_rng_state is None:
+            self._initial_rng_state = get_rng_state()
+        return self._initial_rng_state
+
+    def get_rng_states(self) -> Dict[str, Any]:
+        """Returns the current RNG states for torch, numpy, and random."""
+        return get_rng_state()
+
+    def set_rng_states(self, rng_state: Dict[str, Any]) -> None:
+        """Restores RNG states for torch, numpy, and random."""
+        torch.set_rng_state(rng_state["torch"])
+        np.random.set_state(rng_state["numpy"])
+        random.setstate(rng_state["random"])
 
     @property
     def _is_main_process(self) -> bool:
