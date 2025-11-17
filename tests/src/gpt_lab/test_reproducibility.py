@@ -294,39 +294,24 @@ def test_torch_determinism_persisted_and_exposed(git_repo: Path):
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
-            output_dir = Path(manager.output_dir)
-
-            det_file = output_dir / "torch_determinism.json"
-            assert det_file.exists()
-            data = json.loads(det_file.read_text())
-            assert isinstance(data, dict)
-            # We don't assert on specific keys to avoid PyTorch-version flakiness,
-            # but the snapshot should never be empty.
-            assert data
-
+            # We only assert on the property, since the detailed data lives inside
+            # the software_environment snapshot.
             td = manager.torch_determinism
             assert isinstance(td, dict)
+            # We don't assert on specific keys to avoid PyTorch-version flakiness,
+            # but the snapshot should never be empty.
             assert td
     finally:
         os.chdir(original_cwd)
 
 
 def test_distributed_topology_persisted_and_exposed(git_repo: Path):
-    """Verify that distributed topology snapshot is saved and exposed."""
+    """Verify that distributed topology snapshot is exposed."""
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
-            output_dir = Path(manager.output_dir)
-
-            topo_file = output_dir / "distributed_topology.json"
-            assert topo_file.exists()
-            data = json.loads(topo_file.read_text())
-            assert isinstance(data, dict)
-            for key in ("is_initialized", "is_distributed", "world_size", "rank", "local_rank"):
-                assert key in data
-
             topo = manager.distributed_topology
             assert isinstance(topo, dict)
             for key in ("is_initialized", "is_distributed", "world_size", "rank", "local_rank"):

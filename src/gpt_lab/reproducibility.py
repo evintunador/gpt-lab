@@ -62,7 +62,7 @@ def is_git_dirty(repo_path: Optional[str] = None) -> bool:
     try:
         # Check for modified files
         result = subprocess.run(
-            ["git", "diff", "--quiet"],
+            ["git", "diff", "--quiet"], 
             capture_output=True,
             cwd=repo_path,
         )
@@ -242,7 +242,6 @@ def get_software_environment_info() -> Dict[str, Any]:
     """
     return {
         "python_version": sys.version,
-        "torch_version": torch.__version__,
         "package_versions": get_package_versions(),
         "torch_repro_settings": get_torch_determinism_info(),
     }
@@ -479,20 +478,6 @@ class ReproducibilityManager:
             with open(run_invocation_file, 'w') as f:
                 json.dump(self._run_invocation, f, indent=2)
             logger.info(f"Saved run invocation info to: {run_invocation_file}")
-
-            # Capture and persist PyTorch determinism knobs
-            self._torch_determinism = get_torch_determinism_info()
-            torch_det_file = os.path.join(self.output_dir, "torch_determinism.json")
-            with open(torch_det_file, 'w') as f:
-                json.dump(self._torch_determinism, f, indent=2)
-            logger.info(f"Saved torch determinism info to: {torch_det_file}")
-
-            # Capture and persist distributed topology snapshot
-            self._distributed_topology = get_distributed_topology()
-            dist_topology_file = os.path.join(self.output_dir, "distributed_topology.json")
-            with open(dist_topology_file, 'w') as f:
-                json.dump(self._distributed_topology, f, indent=2)
-            logger.info(f"Saved distributed topology to: {dist_topology_file}")
         
         self.pid = os.getpid()
         self.daemon_hook = daemon_hook
