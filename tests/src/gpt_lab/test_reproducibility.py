@@ -8,7 +8,11 @@ import signal
 from unittest.mock import MagicMock
 import torch
 
-from gpt_lab.reproducibility import ReproducibilityManager
+from gpt_lab.reproducibility import (
+    ReproducibilityManager,
+    get_git_submodules_info,
+    get_git_superprojects_info,
+)
 from gpt_lab.backup_storage_backends.base import BaseBackupStorageBackend
 
 
@@ -78,6 +82,11 @@ def test_manager_clean_repo(git_repo: Path):
             with open(git_info_file, 'r') as f:
                 git_info = json.load(f)
             assert not git_info["git_is_dirty"]
+            # New git topology fields should be present, even if empty
+            assert "submodules" in git_info
+            assert "superprojects" in git_info
+            assert isinstance(git_info["submodules"], list)
+            assert isinstance(git_info["superprojects"], list)
         
             # Check that no patch file was created
             assert not (output_dir / "uncommitted_changes.patch").exists()
@@ -108,6 +117,11 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             with open(git_info_file, 'r') as f:
                 git_info = json.load(f)
             assert git_info["git_is_dirty"]
+            # New git topology fields should be present, even if empty
+            assert "submodules" in git_info
+            assert "superprojects" in git_info
+            assert isinstance(git_info["submodules"], list)
+            assert isinstance(git_info["superprojects"], list)
         
             # Check that a patch file was created and is not empty
             patch_file = output_dir / "uncommitted_changes.patch"
@@ -392,6 +406,20 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         
         remote_file = tmp_path / "remote_storage" / "results.txt"
         assert remote_file.read_text() == "partial success"
+
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_git_helpers_no_submodules_or_superprojects(git_repo: Path):
+    """Verify git helper functions return empty lists in a simple repo."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        submodules = get_git_submodules_info(output_dir=None)
+        superprojects = get_git_superprojects_info(output_dir=None)
+        assert submodules == []
+        assert superprojects == []
     finally:
         os.chdir(original_cwd)
 

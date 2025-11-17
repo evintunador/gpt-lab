@@ -27,74 +27,83 @@ def get_rng_state():
     }
 
 
-def get_git_commit_hash() -> Optional[str]:
-    """Retrieves the current git commit hash."""
+def get_git_commit_hash(repo_path: Optional[str] = None) -> Optional[str]:
+    """Retrieves the current git commit hash for the given repository."""
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], text=True
+            ["git", "rev-parse", "HEAD"], text=True, cwd=repo_path
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
-def get_git_remote_url() -> Optional[str]:
-    """Retrieves the git remote URL."""
+def get_git_remote_url(repo_path: Optional[str] = None) -> Optional[str]:
+    """Retrieves the git remote URL for the given repository."""
     try:
         return subprocess.check_output(
-            ["git", "config", "--get", "remote.origin.url"], text=True
+            ["git", "config", "--get", "remote.origin.url"], text=True, cwd=repo_path
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
-def get_git_branch() -> Optional[str]:
-    """Retrieves the current git branch name."""
+def get_git_branch(repo_path: Optional[str] = None) -> Optional[str]:
+    """Retrieves the current git branch name for the given repository."""
     try:
         return subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True, cwd=repo_path
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         return None
 
 
-def is_git_dirty() -> bool:
+def is_git_dirty(repo_path: Optional[str] = None) -> bool:
     """Checks if the git working directory has uncommitted changes."""
     try:
         # Check for modified files
         result = subprocess.run(
-            ["git", "diff", "--quiet"], 
-            capture_output=True
+            ["git", "diff", "--quiet"],
+            capture_output=True,
+            cwd=repo_path,
         )
         if result.returncode != 0:
             return True
             
         # Check for untracked files
         result = subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard"], text=True
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            text=True,
+            cwd=repo_path,
         )
         return bool(result.strip())
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False
 
 
-def create_git_patch() -> Optional[str]:
-    """Creates a patch file containing all uncommitted changes."""
+def create_git_patch(repo_path: Optional[str] = None) -> Optional[str]:
+    """Creates a patch string containing all uncommitted changes for a repo."""
+    root_path = repo_path or os.getcwd()
     try:
         # Get all changes (staged and unstaged)
         diff_output = subprocess.check_output(
-            ["git", "diff", "HEAD"], text=True
+            ["git", "diff", "HEAD"],
+            text=True,
+            cwd=root_path,
         )
         
         # Get untracked files
         untracked_files = subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard"], text=True
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            text=True,
+            cwd=root_path,
         ).strip().split('\n')
         
         # Add untracked files to the patch
         for file_path in untracked_files:
             if file_path:  # Skip empty strings
                 try:
-                    with open(file_path, 'r') as f:
+                    file_on_disk = os.path.join(root_path, file_path)
+                    with open(file_on_disk, 'r') as f:
                         file_content = f.read()
                     diff_output += f"\ndiff --git a/{file_path} b/{file_path}\n"
                     diff_output += f"new file mode 100644\n"
@@ -256,6 +265,162 @@ def get_runtime_environment_info() -> Dict[str, Any]:
     }
 
 
+def _build_github_url(commit_hash: Optional[str], remote_url: Optional[str]) -> Optional[str]:
+    """Best-effort construction of a GitHub commit URL from a remote+hash."""
+    if not commit_hash or not remote_url:
+        return None
+    if "github.com" not in remote_url:
+        return None
+
+    if remote_url.startswith("git@github.com:"):
+        repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
+        return f"https://github.com/{repo_path}/commit/{commit_hash}"
+    # HTTPS or other GitHub-style URL
+    repo_path = remote_url.split("github.com/")[-1].replace(".git", "")
+    return f"https://github.com/{repo_path}/commit/{commit_hash}"
+
+
+def _sanitize_path_for_patch(path: str) -> str:
+    """Sanitize a relative path for safe inclusion in a filename."""
+    safe = path.replace(os.sep, "__")
+    safe = safe.replace("..", "__")
+    return safe or "root"
+
+
+def get_git_submodules_info(
+    output_dir: Optional[str] = None,
+    repo_root: Optional[str] = None,
+) -> Any:
+    """
+    Returns git metadata for all submodules (recursively), optionally writing
+    patch files for dirty submodules into output_dir.
+    """
+    root = repo_root or os.getcwd()
+    try:
+        status = subprocess.check_output(
+            ["git", "submodule", "status", "--recursive"],
+            text=True,
+            cwd=root,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return []
+
+    submodules = []
+
+    for line in status.strip().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        # Format: "[+-]SHA path (branch)" – we only need the path here.
+        rel_path = parts[1]
+        sub_repo_path = os.path.abspath(os.path.join(root, rel_path))
+
+        commit_hash = get_git_commit_hash(sub_repo_path)
+        remote_url = get_git_remote_url(sub_repo_path)
+        branch = get_git_branch(sub_repo_path)
+        git_is_dirty = is_git_dirty(sub_repo_path)
+        github_url = _build_github_url(commit_hash, remote_url)
+
+        info: Dict[str, Any] = {
+            "path": rel_path,
+            "repo_path": sub_repo_path,
+            "commit_hash": commit_hash,
+            "branch": branch,
+            "remote_url": remote_url,
+            "github_url": github_url,
+            "git_is_dirty": git_is_dirty,
+        }
+
+        if git_is_dirty and output_dir is not None:
+            patch_content = create_git_patch(sub_repo_path)
+            if patch_content:
+                safe_name = _sanitize_path_for_patch(rel_path)
+                patch_file = os.path.join(
+                    output_dir, f"uncommitted_changes.submodule.{safe_name}.patch"
+                )
+                try:
+                    with open(patch_file, "w") as f:
+                        f.write(patch_content)
+                    info["patch_file"] = patch_file
+                except OSError:
+                    # Best-effort; if we can't write the patch file, we just skip it.
+                    pass
+
+        submodules.append(info)
+
+    return submodules
+
+
+def get_git_superprojects_info(output_dir: Optional[str] = None) -> Any:
+    """
+    Returns git metadata for any enclosing superprojects (if this repo is used
+    as a submodule), walking up through nested superprojects if present.
+    """
+    superprojects = []
+    seen_paths = set()
+    current_path = os.getcwd()
+
+    while True:
+        try:
+            super_root = subprocess.check_output(
+                ["git", "rev-parse", "--show-superproject-working-tree"],
+                text=True,
+                cwd=current_path,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            break
+
+        if not super_root or super_root in seen_paths:
+            break
+
+        seen_paths.add(super_root)
+
+        commit_hash = get_git_commit_hash(super_root)
+        remote_url = get_git_remote_url(super_root)
+        branch = get_git_branch(super_root)
+        git_is_dirty = is_git_dirty(super_root)
+        github_url = _build_github_url(commit_hash, remote_url)
+
+        info: Dict[str, Any] = {
+            "path": super_root,
+            "commit_hash": commit_hash,
+            "branch": branch,
+            "remote_url": remote_url,
+            "github_url": github_url,
+            "git_is_dirty": git_is_dirty,
+        }
+
+        # Also capture any submodules that live inside this superproject
+        submodules = get_git_submodules_info(output_dir=output_dir, repo_root=super_root)
+        if submodules:
+            info["submodules"] = submodules
+
+        if git_is_dirty and output_dir is not None:
+            patch_content = create_git_patch(super_root)
+            if patch_content:
+                safe_name = _sanitize_path_for_patch(os.path.basename(super_root) or "superproject")
+                idx = len(superprojects)
+                patch_file = os.path.join(
+                    output_dir,
+                    f"uncommitted_changes.superproject.{idx}.{safe_name}.patch",
+                )
+                try:
+                    with open(patch_file, "w") as f:
+                        f.write(patch_content)
+                    info["patch_file"] = patch_file
+                except OSError:
+                    pass
+
+        superprojects.append(info)
+        current_path = super_root
+
+    return superprojects
+
+
 class ReproducibilityManager:
     """
     Manages the reproducibility of an experiment.
@@ -287,10 +452,6 @@ class ReproducibilityManager:
             with open(git_info_file, 'w') as f:
                 json.dump(self.git_info, f, indent=2)
             logger.info(f"Saved git info to: {git_info_file}")
-            if self.git_info['git_is_dirty'] and self.git_info['patch_content'] is not None:
-                with open(self.git_info['patch_file'], 'w') as f:
-                    f.write(self.git_info['patch_content'])
-                logger.info(f"Saved git patch file to: {self.git_info['patch_file']}")
 
             # Capture and persist software environment information
             self._software_environment = get_software_environment_info()
@@ -354,17 +515,7 @@ class ReproducibilityManager:
         logger.debug(f"Git branch: {branch}")
         logger.debug(f"Git dirty: {git_is_dirty}")
 
-        # Create GitHub/GitLab URL if possible
-        github_url = None
-        if commit_hash and remote_url:
-            if "github.com" in remote_url:
-                # Convert SSH URL to HTTPS if needed
-                if remote_url.startswith("git@github.com:"):
-                    repo_path = remote_url.replace("git@github.com:", "").replace(".git", "")
-                    github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
-                elif "github.com" in remote_url:
-                    repo_path = remote_url.split("github.com/")[-1].replace(".git", "")
-                    github_url = f"https://github.com/{repo_path}/commit/{commit_hash}"
+        github_url = _build_github_url(commit_hash, remote_url)
 
         self.git_info = {
             "commit_hash": commit_hash,
@@ -374,16 +525,24 @@ class ReproducibilityManager:
             "git_is_dirty": git_is_dirty,
         }
 
-        # Save git patch if dirty
-        if git_is_dirty:
+        # Save git patch for the main repository if dirty
+        if git_is_dirty and self.output_dir:
             patch_content = create_git_patch()
-            self.git_info['patch_content'] = patch_content
             if patch_content:
                 patch_file = os.path.join(self.output_dir, "uncommitted_changes.patch")
-                self.git_info['patch_file'] = patch_file
+                try:
+                    with open(patch_file, "w") as f:
+                        f.write(patch_content)
+                    self.git_info["patch_file"] = patch_file
+                except OSError:
+                    logger.warning(f"Failed to write main repo patch file to {patch_file}")
 
-        # Log all git info except potentially large "patch_content"
-        log_git_info = {k: v for k, v in self.git_info.items() if k != "patch_content"}
+        # Collect submodule and superproject git metadata (and write their patches)
+        self.git_info["submodules"] = get_git_submodules_info(self.output_dir)
+        self.git_info["superprojects"] = get_git_superprojects_info(self.output_dir)
+
+        # Log git info (without any large patch content, which we don't store)
+        log_git_info = dict(self.git_info)
         logger.info(f"Git state captured", extra={"git_info": log_git_info})
 
     def _signal_handler(self, signum, frame):
