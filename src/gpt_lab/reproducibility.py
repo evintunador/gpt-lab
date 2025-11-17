@@ -7,6 +7,7 @@ import signal
 import sys
 from typing import Optional, Dict, Any
 import random
+import platform
 
 import torch 
 import numpy as np
@@ -154,11 +155,15 @@ def get_run_invocation_info() -> Dict[str, Any]:
         "MASTER_ADDR",
         "MASTER_PORT",
     )
-    env_filtered = {
-        k: v
-        for k, v in os.environ.items()
-        if any(k.startswith(prefix) for prefix in prefixes)
-    }
+    extra_keys = (
+        "PYTHONHASHSEED",
+        "PYTHONPATH",
+        "VIRTUAL_ENV",
+    )
+    env_filtered: Dict[str, Any] = {}
+    for k, v in os.environ.items():
+        if any(k.startswith(prefix) for prefix in prefixes) or k in extra_keys:
+            env_filtered[k] = v
     return {
         "argv": list(sys.argv),
         "env": env_filtered,
@@ -252,15 +257,76 @@ def get_runtime_environment_info() -> Dict[str, Any]:
     Captures the runtime environment: devices and distributed topology.
     """
     cuda_available = torch.cuda.is_available()
+    device_count = torch.cuda.device_count() if cuda_available else 0
+
+    # Basic device names list (kept for backwards compatibility)
     devices = [
-        torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())
+        torch.cuda.get_device_name(i) for i in range(device_count)
     ] if cuda_available else []
+
+    # Richer device properties
+    device_properties = []
+    if cuda_available:
+        for idx in range(device_count):
+            try:
+                name = torch.cuda.get_device_name(idx)
+                capability = torch.cuda.get_device_capability(idx)
+                props = torch.cuda.get_device_properties(idx)
+                total_memory = getattr(props, "total_memory", None)
+            except Exception:
+                name = devices[idx] if idx < len(devices) else f"cuda:{idx}"
+                capability = None
+                total_memory = None
+
+            device_properties.append(
+                {
+                    "index": idx,
+                    "name": name,
+                    "capability": capability,
+                    "total_memory_bytes": int(total_memory) if total_memory is not None else None,
+                }
+            )
+
+    # OS / platform information
+    os_info = {
+        "system": platform.system(),
+        "release": platform.release(),
+        "version": platform.version(),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+    }
+
+    # CUDA / driver versions (best-effort)
+    cuda_runtime: Dict[str, Any] = {
+        "torch_cuda_version": getattr(torch.version, "cuda", None),
+        "cudnn_version": None,
+        "nvidia_driver_version": None,
+    }
+    try:
+        if hasattr(torch.backends, "cudnn") and hasattr(torch.backends.cudnn, "version"):
+            cuda_runtime["cudnn_version"] = torch.backends.cudnn.version()
+    except Exception:
+        pass
+
+    try:
+        # This will fail gracefully on systems without nvidia-smi
+        out = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            text=True,
+        )
+        first_line = out.strip().splitlines()[0].strip() if out.strip() else None
+        cuda_runtime["nvidia_driver_version"] = first_line
+    except Exception:
+        pass
 
     return {
         "cuda_available": cuda_available,
-        "device_count": torch.cuda.device_count() if cuda_available else 0,
+        "device_count": device_count,
         "devices": devices,
+        "device_properties": device_properties,
         "distributed": get_distributed_topology(),
+        "os": os_info,
+        "cuda_runtime": cuda_runtime,
     }
 
 
