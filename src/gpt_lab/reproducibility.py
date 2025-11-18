@@ -8,8 +8,9 @@ import sys
 from typing import Optional, Dict, Any
 import random
 import platform
+import shutil
 
-import torch 
+import torch
 import numpy as np
 
 from .daemon_hooks.base import BaseDaemonHook
@@ -499,9 +500,17 @@ class ReproducibilityManager:
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
         self.output_dir = os.path.abspath(output_dir)
+
+        # Dedicated subdirectory for reproducibility metadata/artifacts
+        self._repro_dir = os.path.join(self.output_dir, "reproducibility")
+
         if self._is_main_process:
             os.makedirs(self.output_dir, exist_ok=True)
-            logger.info(f"Experiment output directory set: {self.output_dir}", extra={"output_dir": self.output_dir})
+            os.makedirs(self._repro_dir, exist_ok=True)
+            logger.info(
+                f"Experiment output directory set: {self.output_dir}",
+                extra={"output_dir": self.output_dir},
+            )
 
         # Lazily populated caches for additional reproducibility metadata
         self._software_environment: Optional[Dict[str, Any]] = None
@@ -513,35 +522,38 @@ class ReproducibilityManager:
 
         self._get_git_info()
         if self._is_main_process:
-            git_info_file = os.path.join(self.output_dir, "git_info.json")
-            with open(git_info_file, 'w') as f:
+            os.makedirs(self._repro_dir, exist_ok=True)
+
+            # Save canonical git_info.json inside the reproducibility directory
+            git_info_file = os.path.join(self._repro_dir, "git_info.json")
+            with open(git_info_file, "w") as f:
                 json.dump(self.git_info, f, indent=2)
             logger.info(f"Saved git info to: {git_info_file}")
 
             # Capture and persist software environment information
             self._software_environment = get_software_environment_info()
-            software_env_file = os.path.join(self.output_dir, "software_environment.json")
-            with open(software_env_file, 'w') as f:
+            software_env_file = os.path.join(self._repro_dir, "software_environment.json")
+            with open(software_env_file, "w") as f:
                 json.dump(self._software_environment, f, indent=2)
             logger.info(f"Saved software environment info to: {software_env_file}")
 
             # Capture and persist runtime environment information (devices + distributed)
             self._runtime_environment = get_runtime_environment_info()
-            runtime_env_file = os.path.join(self.output_dir, "runtime_environment.json")
-            with open(runtime_env_file, 'w') as f:
+            runtime_env_file = os.path.join(self._repro_dir, "runtime_environment.json")
+            with open(runtime_env_file, "w") as f:
                 json.dump(self._runtime_environment, f, indent=2)
             logger.info(f"Saved runtime environment info to: {runtime_env_file}")
 
             # Capture and persist initial RNG state for reproducibility
             self._initial_rng_state = get_rng_state()
-            rng_state_file = os.path.join(self.output_dir, "rng_state_initial.pt")
+            rng_state_file = os.path.join(self._repro_dir, "rng_state_initial.pt")
             torch.save(self._initial_rng_state, rng_state_file)
             logger.info(f"Saved initial RNG state to: {rng_state_file}")
 
             # Capture and persist run-time invocation details (argv + filtered env)
             self._run_invocation = get_run_invocation_info()
-            run_invocation_file = os.path.join(self.output_dir, "run_invocation.json")
-            with open(run_invocation_file, 'w') as f:
+            run_invocation_file = os.path.join(self._repro_dir, "run_invocation.json")
+            with open(run_invocation_file, "w") as f:
                 json.dump(self._run_invocation, f, indent=2)
             logger.info(f"Saved run invocation info to: {run_invocation_file}")
         
@@ -580,7 +592,7 @@ class ReproducibilityManager:
         if git_is_dirty and self.output_dir:
             patch_content = create_git_patch()
             if patch_content:
-                patch_file = os.path.join(self.output_dir, "uncommitted_changes.patch")
+                patch_file = os.path.join(self._repro_dir, "uncommitted_changes.patch")
                 try:
                     with open(patch_file, "w") as f:
                         f.write(patch_content)
@@ -589,8 +601,8 @@ class ReproducibilityManager:
                     logger.warning(f"Failed to write main repo patch file to {patch_file}")
 
         # Collect submodule and superproject git metadata (and write their patches)
-        self.git_info["submodules"] = get_git_submodules_info(self.output_dir)
-        self.git_info["superprojects"] = get_git_superprojects_info(self.output_dir)
+        self.git_info["submodules"] = get_git_submodules_info(self._repro_dir)
+        self.git_info["superprojects"] = get_git_superprojects_info(self._repro_dir)
 
         # Log git info (without any large patch content, which we don't store)
         log_git_info = dict(self.git_info)
@@ -691,7 +703,7 @@ class ReproducibilityManager:
         if not self.output_dir:
             return
         rng_state = get_rng_state()
-        rng_state_file = os.path.join(self.output_dir, "rng_state_final.pt")
+        rng_state_file = os.path.join(self._repro_dir, "rng_state_final.pt")
         torch.save(rng_state, rng_state_file)
         logger.info(f"Saved final RNG state to: {rng_state_file}")
 
@@ -748,7 +760,7 @@ class ReproducibilityManager:
     @property
     def final_rng_state(self) -> Optional[Dict[str, Any]]:
         """Returns the RNG state captured at the end of the run, if available."""
-        rng_state_file = os.path.join(self.output_dir, "rng_state_final.pt")
+        rng_state_file = os.path.join(self._repro_dir, "rng_state_final.pt")
         if os.path.exists(rng_state_file):
             # RNG state includes Python/numpy objects; use weights_only=False.
             return torch.load(rng_state_file, weights_only=False)

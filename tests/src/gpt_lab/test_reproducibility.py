@@ -76,10 +76,13 @@ def test_manager_clean_repo(git_repo: Path):
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
-            # Check git_info.json
-            git_info_file = output_dir / "git_info.json"
+            repro_dir = output_dir / "reproducibility"
+            assert repro_dir.is_dir()
+
+            # Check git_info.json (now in reproducibility subfolder)
+            git_info_file = repro_dir / "git_info.json"
             assert git_info_file.exists()
-            with open(git_info_file, 'r') as f:
+            with open(git_info_file, "r") as f:
                 git_info = json.load(f)
             assert not git_info["git_is_dirty"]
             # New git topology fields should be present, even if empty
@@ -89,7 +92,7 @@ def test_manager_clean_repo(git_repo: Path):
             assert isinstance(git_info["superprojects"], list)
         
             # Check that no patch file was created
-            assert not (output_dir / "uncommitted_changes.patch").exists()
+            assert not (repro_dir / "uncommitted_changes.patch").exists()
     finally:
         os.chdir(original_cwd)
 
@@ -111,10 +114,13 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
+            repro_dir = output_dir / "reproducibility"
+            assert repro_dir.is_dir()
+
             # Check git_info.json
-            git_info_file = output_dir / "git_info.json"
+            git_info_file = repro_dir / "git_info.json"
             assert git_info_file.exists()
-            with open(git_info_file, 'r') as f:
+            with open(git_info_file, "r") as f:
                 git_info = json.load(f)
             assert git_info["git_is_dirty"]
             # New git topology fields should be present, even if empty
@@ -124,7 +130,7 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             assert isinstance(git_info["superprojects"], list)
         
             # Check that a patch file was created and is not empty
-            patch_file = output_dir / "uncommitted_changes.patch"
+            patch_file = repro_dir / "uncommitted_changes.patch"
             assert patch_file.exists()
             assert patch_file.read_text().strip() != ""
     finally:
@@ -188,9 +194,11 @@ def test_environment_snapshots_persisted_and_exposed(git_repo: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
+            repro_dir = output_dir / "reproducibility"
+            assert repro_dir.is_dir()
 
             # Software environment
-            software_file = output_dir / "software_environment.json"
+            software_file = repro_dir / "software_environment.json"
             assert software_file.exists()
             sw = json.loads(software_file.read_text())
             assert "python_version" in sw
@@ -203,7 +211,7 @@ def test_environment_snapshots_persisted_and_exposed(git_repo: Path):
             assert "torch_repro_settings" in sw_prop
 
             # Runtime environment
-            runtime_file = output_dir / "runtime_environment.json"
+            runtime_file = repro_dir / "runtime_environment.json"
             assert runtime_file.exists()
             rt = json.loads(runtime_file.read_text())
             assert "cuda_available" in rt
@@ -226,9 +234,11 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
+            repro_dir = output_dir / "reproducibility"
+            assert repro_dir.is_dir()
 
             # File was written
-            rng_file = output_dir / "rng_state_initial.pt"
+            rng_file = repro_dir / "rng_state_initial.pt"
             assert rng_file.exists()
             # RNG state includes non-tensor Python/numpy objects; use weights_only=False
             # to avoid PyTorch's safe-loading restrictions.
@@ -250,7 +260,7 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
             rng_after = manager.get_rng_states()
             assert torch.equal(rng_before["torch"], rng_after["torch"])
             # Final RNG state file should exist by the time context exits
-        final_rng_file = runs_dir / "rng_state_final.pt"
+        final_rng_file = runs_dir / "reproducibility" / "rng_state_final.pt"
         assert final_rng_file.exists()
         final_state = torch.load(final_rng_file, weights_only=False)
         assert isinstance(final_state, dict)
@@ -269,8 +279,10 @@ def test_run_invocation_persisted_and_exposed(git_repo: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
             output_dir = Path(manager.output_dir)
+            repro_dir = output_dir / "reproducibility"
+            assert repro_dir.is_dir()
 
-            inv_file = output_dir / "run_invocation.json"
+            inv_file = repro_dir / "run_invocation.json"
             assert inv_file.exists()
             data = json.loads(inv_file.read_text())
             assert "argv" in data
