@@ -4,40 +4,43 @@
 ## important / urgent
 
 - [ ] do first experiment ([[DAGSeq2DAGSeq]])
-    - [ ] dataset
+    - [x] dataset
         - [x] wiki dump parser
         - [x] graph structure constructor
-        - [ ] torch dataset object
-    - [ ] data loader
-    - [ ] data sampler
-        - [ ] factory
-        - [ ] graph straversal strategy interface
-        - [ ] different graph traversal algorithms
-            - [ ] depth-first
-            - [ ] breadth-first
-            - [ ] random walk
-            - [ ] composite graph traversal algorithm wrapper
+        - [x] torch dataset object
+    - [x] data loader
+    - [x] data sampler
+        - [x] graph straversal strategy interface
+        - [x] different graph traversal algorithms
+            - [x] depth-first
+            - [x] breadth-first
+            - [x] random walk
+            - [x] composite graph traversal algorithm wrapper
+    - [ ] factory for config-accessible composition
+        - [ ] of traversal strategies
+        - [ ] of separate graph datasets
     - [ ] model
         - [ ] base model (ripped from modded nanogpt or my own flavor)
         - [ ] flex attention mask
         - [ ] sequence-parallel???
     - [ ] reassess what we need after having actually used this system in DAGSeq2DAGSeq
 - reproducibility manager:
-    - [ ] turn `is_main_process` back into an argument
-    - [ ] also check for git submodules & supermodules
-    - [ ] make sure every one of the info giving functions is actually being called & saved into the folder. pretty sure rn some are not
+    - [x] turn `is_main_process` back into an argument
+    - [x] also check for git submodules & supermodules
+    - [x] make sure every one of the info giving functions is actually being called & saved into the folder. pretty sure rn some are not
+    - [x] remove reproducibility awareness from checkpointer
 - logger.py
     - [ ] draw a clearer conceptual distinction between logs (unstructured output) and metrics (structured output)
     - [ ] can i simplify all these overly complicated attempts somehow? maybe just forcibly intercept all print() statements so that dumb ML engineers end up always logging by accident? idk, this sdtout/err thing is killing me
 
 ### important / not-urgent
 
+- [ ] abstract out experiments/ and catalogs/ into just projects/
 - [ ] design & build a mu-parametrization utility
 - [ ] design and build a system for comparing performance between two experiments or/
 and i guess different config settings within an experiment both directly and as a function of the performance per runtime/memory difference
-    - [x] minimal proof of concept
-    - [ ] time series
-    - [ ] more adaptable to whatever's available in the experiments
+    - [ ] add time series
+    - [ ] make more adaptable to whatever's available in the experiments
 - [ ] add slurm capabilities to DistributedManager
 - [ ] build a tool to allow the experiment to dynamically increase or decrease the number of nodes it's taking up by periodically checking for outside requests. it'd have to effectively re-adjust gradient accumulation settings in order to make the experiment numerically equivalent to when it had more/fewer nodes. i guess it wouldn't have to be aware of VRAM utilization since we'd keep the micro batch size the same and only change number of nodes and number of gradient accumulation steps? i don't think this would have to be aware of the gradient accumulation atomic feature; you'd just need to tell it which argument is the right one. also this would have to overwrite whatever "waiting in line" system submitit has going on in order to restart a given experiment but smaller and let it skip forward in line. also ugly af thinking about resuming from the most recent checkpoint ew. not sure how feasible this is but i feel like it's necessary eventually. yeah it'd basically have to be a daemon that monitors for open nodes and alerts scripts that a node is available, which they check for every so often during training iterations, and if they get it then they get to shut themselves down and scale themsevles up. then when it comes to reducing jobs, i'd like a command like `sreduce` for people to manually use that writes to a file or something, and then that job checks said file for if a request to reduce itself is up. under this system it basically has to be the case that people play fair and only do it while there's nobody waiting in line, or only one person waiting in line and that job is going to take up the exact number of nodes that are being freed up. need some kind of guarantee to assure that the resume from checkpoint new job doesn't just get stuck at the back of the line
 - [ ] implement more advanced parallel abilities for `src/gpt_lab/nn_modules/` testing and benchmarking and general utils to help with the various types of parallelization, maybe in DistributedManager? maybe in its own ParallelizationManager?
@@ -74,12 +77,9 @@ and i guess different config settings within an experiment both directly and as 
 - [ ] improve attribute names and standardize all test & bench configs (hint: rename 'output_validator' to 'output_validator_fn' in nn.Modules bulk testing)
 - [ ] write equivalents of `to_device` and `to_dtype` but for `.clone()`, `.detach()`, `.contiguous()`, etc. maybe even abstract it out for fun. i guess it's just a recursive type-aware apply huh. sounds dumb now that i say it that way
 - [ ] build a schema tracking system for updating a model's checkpoints as they change over time. like hash the combination keys, shapes, and dtypes and keep track of existing conversion functions that we have in a registry of some sort
-- [x] move reproducibility's storage backup backend ABC & daemon ABC over to the catalog system
 - multi-run
     - [ ] add non-grid indivdiual-command ability
     - [ ] figure out how to make it aware of when a run ends. have it be a process acting as a daemon monitoring some file or something? have it monitor what files those processes are _writing_ to and set a timeout to trigger of said processes stop writing to their folders? monitor said files for a file they should be printing upon __exit__ in order for them to be compatible? infer said folder the process is working in as the lowest folder that that process has written (not read) to?
 - [ ] develop pre-tokenizing/caching as its own catalog system
-    - [x] separate the IO ops from the llm squential tokens logic
     - [ ] geenralize the IO class to different dtypes
     - [ ] do something more intelligent than the 11041999 doc prefix signature. maybe each doc prefix is a hash of its own code or something? or just test requirement that each implementation in the system write a different prefix?
-- [x] move a couple reproducibility-related method from logger.py to reproducibility.py
