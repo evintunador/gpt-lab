@@ -77,17 +77,10 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
     model_orig = SimpleModel().to(device)
     optimizer_orig = optim.Adam(model_orig.parameters(), lr=0.001)
 
-    git_info = {
-        "commit_hash": get_git_commit_hash(),
-        "branch": "test-branch",
-        "remote_url": "https://github.com/test/repo.git",
-        "was_dirty": False,
-    }
     metadata_orig = {
         "epoch": 10,
         "step": 1234,
         "best_val_loss": 0.05,
-        "git_info": git_info,
     }
 
     optimizer_orig.zero_grad()
@@ -119,11 +112,6 @@ def _checkpointing_roundtrip_test(device: torch.device, tmp_path):
     )
 
     assert loaded_metadata == metadata_orig, "Metadata was not loaded correctly"
-
-    assert "git_info" in loaded_metadata, "Git info not found in metadata"
-    assert (
-        loaded_metadata["git_info"]["commit_hash"] == git_info["commit_hash"]
-    ), "Git commit hash not preserved"
 
     for p_orig, p_loaded in zip(model_orig.parameters(), model_loaded.parameters()):
         assert torch.equal(

@@ -71,14 +71,6 @@ def save_checkpoint(
     """
     logger.info(f"Saving checkpoint to: {filepath}")
 
-    if metadata is not None:
-        for key in ['git_info', 'rng_state']:
-            if key not in metadata.keys():
-                logger.warning(
-                    f"Key '{key}' not found in metadata dictionary. "
-                    f"Future provenance tracking and reproducibility efforts may not be possible without it if the checkpoint file is moved."
-                )
-
     save_dir = os.path.dirname(filepath)
     if save_dir:
         os.makedirs(save_dir, exist_ok=True)
