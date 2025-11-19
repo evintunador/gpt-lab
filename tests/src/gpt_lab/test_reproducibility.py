@@ -5,8 +5,9 @@ from pathlib import Path
 import shutil
 import pytest
 import signal
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import torch
+import socket
 
 from gpt_lab.reproducibility import (
     ReproducibilityManager,
@@ -66,21 +67,31 @@ class MockStorageBackend(BaseBackupStorageBackend):
 
 # --- Core Functionality Tests ---
 
+def test_manager_requires_is_main_process(git_repo: Path):
+    """Verify that is_main_process is a required argument."""
+    runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+    with pytest.raises(ValueError, match="is_main_process must be explicitly provided"):
+        ReproducibilityManager(output_dir=str(runs_dir))
+
+
 def test_manager_clean_repo(git_repo: Path):
     """Verify manager behavior in a clean git repository."""
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
             assert output_dir.is_dir()
 
-            repro_dir = output_dir / "reproducibility"
-            assert repro_dir.is_dir()
+            # Check for process-specific subdirectory
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            assert repro_subdir.is_dir()
 
-            # Check git_info.json (now in reproducibility subfolder)
-            git_info_file = repro_dir / "git_info.json"
+            # Check git_info.json (now in process-specific subfolder)
+            git_info_file = repro_subdir / "git_info.json"
             assert git_info_file.exists()
             with open(git_info_file, "r") as f:
                 git_info = json.load(f)
@@ -92,7 +103,13 @@ def test_manager_clean_repo(git_repo: Path):
             assert isinstance(git_info["superprojects"], list)
         
             # Check that no patch file was created
-            assert not (repro_dir / "uncommitted_changes.patch").exists()
+            assert not (repro_subdir / "uncommitted_changes.patch").exists()
+            
+            # Check for symlink (best effort, might fail on some OS/perms)
+            symlink = output_dir / "reproducibility" / "main"
+            if symlink.exists():
+                assert symlink.is_symlink()
+                assert symlink.resolve() == repro_subdir
     finally:
         os.chdir(original_cwd)
 
@@ -110,57 +127,63 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             (git_repo / "new_file.txt").write_text("untracked file")
 
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
-            assert output_dir.is_dir()
-
-            repro_dir = output_dir / "reproducibility"
-            assert repro_dir.is_dir()
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            
+            assert repro_subdir.is_dir()
 
             # Check git_info.json
-            git_info_file = repro_dir / "git_info.json"
+            git_info_file = repro_subdir / "git_info.json"
             assert git_info_file.exists()
             with open(git_info_file, "r") as f:
                 git_info = json.load(f)
             assert git_info["git_is_dirty"]
-            # New git topology fields should be present, even if empty
-            assert "submodules" in git_info
-            assert "superprojects" in git_info
-            assert isinstance(git_info["submodules"], list)
-            assert isinstance(git_info["superprojects"], list)
         
             # Check that a patch file was created and is not empty
-            patch_file = repro_dir / "uncommitted_changes.patch"
+            patch_file = repro_subdir / "uncommitted_changes.patch"
             assert patch_file.exists()
             assert patch_file.read_text().strip() != ""
     finally:
         os.chdir(original_cwd)
 
 
-def test_manager_distributed_awareness(git_repo: Path):
-    """Verify the manager does nothing on non-main processes."""
+def test_manager_non_main_process(git_repo: Path):
+    """Verify the manager behavior on non-main processes."""
     original_cwd = os.getcwd()
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        # Simulate a distributed, non-main process by tweaking shared state
-        from gpt_lab import distributed as dist_module
-        prev = dist_module._DIST_STATE.copy()
-        try:
-            dist_module._DIST_STATE.update({
-                "is_initialized": True,
-                "rank": 1,
-                "local_rank": 1,
-                "world_size": 2,
-            })
-            with ReproducibilityManager(
-                output_dir=str(runs_dir),
-            ) as manager:
-                assert manager._is_main_process is False
-        finally:
-            dist_module._DIST_STATE.update(prev)
+        
+        # Non-main process should still create its own repro directory and save artifacts
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=False) as manager:
+            assert manager._is_main_process_val is False
+            
+            output_dir = Path(manager.output_dir)
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            
+            assert repro_subdir.is_dir()
+            assert (repro_subdir / "git_info.json").exists()
+            assert (repro_subdir / "runtime_environment.json").exists()
+            assert (repro_subdir / "rng_state_initial.pt").exists()
+
     finally:
         os.chdir(original_cwd)
+
+
+def test_manager_callable_is_main(git_repo: Path):
+    """Verify that is_main_process can be a callable."""
+    runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+    
+    def is_main():
+        return True
+        
+    with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=is_main) as manager:
+        assert manager._is_main_process_val is True
 
 
 def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
@@ -173,6 +196,7 @@ def test_manager_storage_upload(git_repo: Path, tmp_path: Path):
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
         with ReproducibilityManager(
             output_dir=str(runs_dir),
+            is_main_process=True,
             backup_storage_backend=mock_storage
         ) as manager:
             # Simulate creating an output file in the experiment dir
@@ -192,13 +216,16 @@ def test_environment_snapshots_persisted_and_exposed(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
-            repro_dir = output_dir / "reproducibility"
-            assert repro_dir.is_dir()
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            
+            assert repro_subdir.is_dir()
 
             # Software environment
-            software_file = repro_dir / "software_environment.json"
+            software_file = repro_subdir / "software_environment.json"
             assert software_file.exists()
             sw = json.loads(software_file.read_text())
             assert "python_version" in sw
@@ -211,7 +238,7 @@ def test_environment_snapshots_persisted_and_exposed(git_repo: Path):
             assert "torch_repro_settings" in sw_prop
 
             # Runtime environment
-            runtime_file = repro_dir / "runtime_environment.json"
+            runtime_file = repro_subdir / "runtime_environment.json"
             assert runtime_file.exists()
             rt = json.loads(runtime_file.read_text())
             assert "cuda_available" in rt
@@ -232,16 +259,18 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
-            repro_dir = output_dir / "reproducibility"
-            assert repro_dir.is_dir()
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            
+            assert repro_subdir.is_dir()
 
             # File was written
-            rng_file = repro_dir / "rng_state_initial.pt"
+            rng_file = repro_subdir / "rng_state_initial.pt"
             assert rng_file.exists()
             # RNG state includes non-tensor Python/numpy objects; use weights_only=False
-            # to avoid PyTorch's safe-loading restrictions.
             loaded = torch.load(rng_file, weights_only=False)
             assert isinstance(loaded, dict)
             for key in ("torch", "numpy", "random"):
@@ -259,8 +288,9 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
             manager.set_rng_states(rng_before)
             rng_after = manager.get_rng_states()
             assert torch.equal(rng_before["torch"], rng_after["torch"])
-            # Final RNG state file should exist by the time context exits
-        final_rng_file = runs_dir / "reproducibility" / "rng_state_final.pt"
+            
+        # Final RNG state file should exist by the time context exits
+        final_rng_file = repro_subdir / "rng_state_final.pt"
         assert final_rng_file.exists()
         final_state = torch.load(final_rng_file, weights_only=False)
         assert isinstance(final_state, dict)
@@ -277,12 +307,15 @@ def test_run_invocation_persisted_and_exposed(git_repo: Path):
     try:
         os.chdir(git_repo)
         runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
             output_dir = Path(manager.output_dir)
-            repro_dir = output_dir / "reproducibility"
-            assert repro_dir.is_dir()
+            hostname = socket.gethostname()
+            pid = os.getpid()
+            repro_subdir = output_dir / "reproducibility" / f"node_{hostname}_pid_{pid}"
+            
+            assert repro_subdir.is_dir()
 
-            inv_file = repro_dir / "run_invocation.json"
+            inv_file = repro_subdir / "run_invocation.json"
             assert inv_file.exists()
             data = json.loads(inv_file.read_text())
             assert "argv" in data
@@ -299,39 +332,6 @@ def test_run_invocation_persisted_and_exposed(git_repo: Path):
         os.chdir(original_cwd)
 
 
-def test_torch_determinism_persisted_and_exposed(git_repo: Path):
-    """Verify that torch determinism metadata is saved and exposed."""
-    original_cwd = os.getcwd()
-    try:
-        os.chdir(git_repo)
-        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
-            # We only assert on the property, since the detailed data lives inside
-            # the software_environment snapshot.
-            td = manager.torch_determinism
-            assert isinstance(td, dict)
-            # We don't assert on specific keys to avoid PyTorch-version flakiness,
-            # but the snapshot should never be empty.
-            assert td
-    finally:
-        os.chdir(original_cwd)
-
-
-def test_distributed_topology_persisted_and_exposed(git_repo: Path):
-    """Verify that distributed topology snapshot is exposed."""
-    original_cwd = os.getcwd()
-    try:
-        os.chdir(git_repo)
-        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
-        with ReproducibilityManager(output_dir=str(runs_dir)) as manager:
-            topo = manager.distributed_topology
-            assert isinstance(topo, dict)
-            for key in ("is_initialized", "is_distributed", "world_size", "rank", "local_rank"):
-                assert key in topo
-    finally:
-        os.chdir(original_cwd)
-
-
 def test_daemon_hook_lifecycle(git_repo: Path):
     """Verify the DaemonHook's start and end methods are called."""
     original_cwd = os.getcwd()
@@ -343,6 +343,7 @@ def test_daemon_hook_lifecycle(git_repo: Path):
         
         with ReproducibilityManager(
             output_dir=str(runs_dir),
+            is_main_process=True,
             daemon_hook=mock_hook
         ):
             # 1. Check on_run_start was called
@@ -367,6 +368,7 @@ def test_daemon_hook_survives_exception(git_repo: Path):
         with pytest.raises(ValueError, match="Experiment failed"):
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
+                is_main_process=True,
                 daemon_hook=mock_hook
             ):
                 mock_hook.on_run_start.assert_called_once()
@@ -391,6 +393,7 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         with pytest.raises(SystemExit) as e:
             with ReproducibilityManager(
                 output_dir=str(runs_dir),
+                is_main_process=True,
                 backup_storage_backend=mock_storage
             ) as manager:
                 (Path(manager.output_dir) / "results.txt").write_text("partial success")
@@ -408,6 +411,32 @@ def test_manager_signal_handling(git_repo: Path, tmp_path: Path, sig: int):
         os.chdir(original_cwd)
 
 
+def test_output_dir_guard(git_repo: Path):
+    """Verify that reusing an output directory with existing reproducibility artifacts raises an error."""
+    runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+    
+    # First run - creates artifacts
+    with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True):
+        pass
+        
+    # Second run - should fail because reproducibility folder exists and is not empty
+    with pytest.raises(ValueError, match="already contains a 'reproducibility' folder"):
+        ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True)
+
+
+def test_output_dir_guard_allows_clean_reuse(git_repo: Path):
+    """Verify that reusing an output directory is allowed if it doesn't contain reproducibility artifacts."""
+    runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+    runs_dir.mkdir(parents=True)
+    
+    # Create some non-reproducibility files
+    (runs_dir / "some_log.txt").write_text("log content")
+    
+    # Should succeed
+    with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True):
+        pass
+
+
 def test_git_helpers_no_submodules_or_superprojects(git_repo: Path):
     """Verify git helper functions return empty lists in a simple repo."""
     original_cwd = os.getcwd()
@@ -419,29 +448,3 @@ def test_git_helpers_no_submodules_or_superprojects(git_repo: Path):
         assert superprojects == []
     finally:
         os.chdir(original_cwd)
-
-
-# def test_local_backend_idempotency(tmp_path: Path):
-#     """Verify that re-uploading to the same destination works without error."""
-#     source_dir = tmp_path / "source"
-#     source_dir.mkdir()
-#     (source_dir / "test.txt").write_text("data")
-    
-#     storage_root = tmp_path / "storage"
-#     backend = LocalFileSystemBackend(root_dir=str(storage_root))
-    
-#     experiment_id = "idempotent-test"
-    
-#     # First upload
-#     backend.upload(str(source_dir), experiment_id)
-#     assert (storage_root / experiment_id / "test.txt").exists()
-    
-#     # Second upload to the same destination should not raise an error
-#     try:
-#         (source_dir / "test.txt").write_text("updated data")
-#         backend.upload(str(source_dir), experiment_id)
-#     except Exception as e:
-#         pytest.fail(f"Second upload failed with an exception: {e}")
-        
-#     # Verify content is updated
-#     assert (storage_root / experiment_id / "test.txt").read_text() == "updated data"

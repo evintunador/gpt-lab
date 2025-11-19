@@ -210,7 +210,7 @@ To specify a different config file:
     config = get_config(parser)
     run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
     dist = DistributedManager()
-    rep = ReproducibilityManager(output_dir=run_dir)
+    rep = ReproducibilityManager(output_dir=run_dir, is_main_process=dist.is_main)
 
     with dist, rep:
         main(config, dist, rep)

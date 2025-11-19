@@ -5,10 +5,11 @@ import datetime
 import logging
 import signal
 import sys
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Union, Callable
 import random
 import platform
 import shutil
+import socket
 
 import torch
 import numpy as np
@@ -219,16 +220,20 @@ def get_torch_determinism_info() -> Dict[str, Any]:
 
 def get_distributed_topology() -> Dict[str, Any]:
     """
-    Returns a lightweight snapshot of the distributed topology as seen by
-    gpt_lab.distributed.
+    Returns a lightweight snapshot of the distributed topology.
     """
-    # Local import to avoid creating a hard dependency at module import time
-    from . import distributed as dist_module  # type: ignore
-
-    is_init = dist_module.is_initialized()
-    world_size = dist_module.get_world_size()
-    rank = dist_module.get_rank()
-    local_rank = dist_module.get_local_rank()
+    is_avail = torch.distributed.is_available()
+    is_init = is_avail and torch.distributed.is_initialized()
+    
+    if is_init:
+        world_size = torch.distributed.get_world_size()
+        rank = torch.distributed.get_rank()
+        # Try to infer local_rank from env vars since torch.distributed doesn't expose it directly
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+    else:
+        world_size = 1
+        rank = 0
+        local_rank = 0
 
     topology: Dict[str, Any] = {
         "is_initialized": is_init,
@@ -496,17 +501,42 @@ class ReproducibilityManager:
     def __init__(
         self,
         output_dir: str,
+        is_main_process: Union[bool, Callable[[], bool]] = None,
         backup_storage_backend: Optional[BaseBackupStorageBackend] = None,
         daemon_hook: Optional[BaseDaemonHook] = None,
     ):
+        if is_main_process is None:
+            raise ValueError("is_main_process must be explicitly provided (bool or callable).")
+            
+        if callable(is_main_process):
+            self._is_main_process_val = is_main_process()
+        else:
+            self._is_main_process_val = bool(is_main_process)
+
         self.output_dir = os.path.abspath(output_dir)
 
-        # Dedicated subdirectory for reproducibility metadata/artifacts
-        self._repro_dir = os.path.join(self.output_dir, "reproducibility")
+        # Guard against reusing an existing output directory that contains reproducibility artifacts
+        if self._is_main_process_val and os.path.exists(self.output_dir):
+            # Check for existing "reproducibility" directory
+            repro_dir_check = os.path.join(self.output_dir, "reproducibility")
+            if os.path.exists(repro_dir_check) and os.listdir(repro_dir_check):
+                raise ValueError(
+                    f"Output directory '{self.output_dir}' already contains a 'reproducibility' folder. "
+                    "To ensure reproducibility, please use a new, unique output directory for each run, "
+                    "or ensure the target directory does not contain previous reproducibility artifacts."
+                )
 
-        if self._is_main_process:
-            os.makedirs(self.output_dir, exist_ok=True)
-            os.makedirs(self._repro_dir, exist_ok=True)
+        # Unique subdirectory for this process's reproducibility artifacts
+        self.hostname = socket.gethostname()
+        self.pid = os.getpid()
+        self._repro_subdir_name = f"node_{self.hostname}_pid_{self.pid}"
+        self._repro_dir = os.path.join(self.output_dir, "reproducibility", self._repro_subdir_name)
+
+        # Ensure directories exist (all processes)
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self._repro_dir, exist_ok=True)
+
+        if self._is_main_process_val:
             logger.info(
                 f"Experiment output directory set: {self.output_dir}",
                 extra={"output_dir": self.output_dir},
@@ -521,43 +551,41 @@ class ReproducibilityManager:
         self._distributed_topology: Optional[Dict[str, Any]] = None
 
         self._get_git_info()
-        if self._is_main_process:
-            os.makedirs(self._repro_dir, exist_ok=True)
-
-            # Save canonical git_info.json inside the reproducibility directory
-            git_info_file = os.path.join(self._repro_dir, "git_info.json")
-            with open(git_info_file, "w") as f:
-                json.dump(self.git_info, f, indent=2)
-            logger.info(f"Saved git info to: {git_info_file}")
-
-            # Capture and persist software environment information
-            self._software_environment = get_software_environment_info()
-            software_env_file = os.path.join(self._repro_dir, "software_environment.json")
-            with open(software_env_file, "w") as f:
-                json.dump(self._software_environment, f, indent=2)
-            logger.info(f"Saved software environment info to: {software_env_file}")
-
-            # Capture and persist runtime environment information (devices + distributed)
-            self._runtime_environment = get_runtime_environment_info()
-            runtime_env_file = os.path.join(self._repro_dir, "runtime_environment.json")
-            with open(runtime_env_file, "w") as f:
-                json.dump(self._runtime_environment, f, indent=2)
-            logger.info(f"Saved runtime environment info to: {runtime_env_file}")
-
-            # Capture and persist initial RNG state for reproducibility
-            self._initial_rng_state = get_rng_state()
-            rng_state_file = os.path.join(self._repro_dir, "rng_state_initial.pt")
-            torch.save(self._initial_rng_state, rng_state_file)
-            logger.info(f"Saved initial RNG state to: {rng_state_file}")
-
-            # Capture and persist run-time invocation details (argv + filtered env)
-            self._run_invocation = get_run_invocation_info()
-            run_invocation_file = os.path.join(self._repro_dir, "run_invocation.json")
-            with open(run_invocation_file, "w") as f:
-                json.dump(self._run_invocation, f, indent=2)
-            logger.info(f"Saved run invocation info to: {run_invocation_file}")
         
-        self.pid = os.getpid()
+        # Save artifacts for ALL processes
+        # Save canonical git_info.json inside the reproducibility directory
+        git_info_file = os.path.join(self._repro_dir, "git_info.json")
+        with open(git_info_file, "w") as f:
+            json.dump(self.git_info, f, indent=2)
+        logger.info(f"Saved git info to: {git_info_file}")
+
+        # Capture and persist software environment information
+        self._software_environment = get_software_environment_info()
+        software_env_file = os.path.join(self._repro_dir, "software_environment.json")
+        with open(software_env_file, "w") as f:
+            json.dump(self._software_environment, f, indent=2)
+        logger.info(f"Saved software environment info to: {software_env_file}")
+
+        # Capture and persist runtime environment information (devices + distributed)
+        self._runtime_environment = get_runtime_environment_info()
+        runtime_env_file = os.path.join(self._repro_dir, "runtime_environment.json")
+        with open(runtime_env_file, "w") as f:
+            json.dump(self._runtime_environment, f, indent=2)
+        logger.info(f"Saved runtime environment info to: {runtime_env_file}")
+
+        # Capture and persist initial RNG state for reproducibility
+        self._initial_rng_state = get_rng_state()
+        rng_state_file = os.path.join(self._repro_dir, "rng_state_initial.pt")
+        torch.save(self._initial_rng_state, rng_state_file)
+        logger.info(f"Saved initial RNG state to: {rng_state_file}")
+
+        # Capture and persist run-time invocation details (argv + filtered env)
+        self._run_invocation = get_run_invocation_info()
+        run_invocation_file = os.path.join(self._repro_dir, "run_invocation.json")
+        with open(run_invocation_file, "w") as f:
+            json.dump(self._run_invocation, f, indent=2)
+        logger.info(f"Saved run invocation info to: {run_invocation_file}")
+        
         self.daemon_hook = daemon_hook
 
         self._is_shutting_down = False
@@ -565,7 +593,7 @@ class ReproducibilityManager:
         self.original_sigterm_handler = None
 
         self.backup_storage_backend = backup_storage_backend
-        if self.backup_storage_backend is None and self._is_main_process:
+        if self.backup_storage_backend is None and self._is_main_process_val:
             logger.warning(f"No backup storage backend initialized. "
                 f"Artifacts in {output_dir} may be lost or corrupted if edited/moved/deleted without a backup.")
 
@@ -632,9 +660,20 @@ class ReproducibilityManager:
 
     def __enter__(self):
         """Sets up the experiment environment and captures git state."""
-        if self._is_main_process:
+        if self._is_main_process_val:
             logger.info("Entering reproducibility manager")
             
+            # Try to create symlink 'main' -> this process's subdir
+            try:
+                repro_root = os.path.join(self.output_dir, "reproducibility")
+                symlink_path = os.path.join(repro_root, "main")
+                # Remove existing if it exists (e.g. from a previous run if output_dir reused)
+                if os.path.exists(symlink_path) or os.path.islink(symlink_path):
+                    os.remove(symlink_path)
+                os.symlink(self._repro_subdir_name, symlink_path)
+            except OSError:
+                pass # Best effort
+
             if self.daemon_hook:
                 self.daemon_hook.on_run_start()                
 
@@ -646,7 +685,7 @@ class ReproducibilityManager:
 
     def _cleanup_and_upload(self, exc_type=None, exc_val=None):
         """Handles daemon hook cleanup and artifact uploading."""
-        if not self._is_main_process:
+        if not self._is_main_process_val:
             return
 
         # Call daemon hook on end, regardless of outcome
@@ -686,7 +725,7 @@ class ReproducibilityManager:
         self._cleanup_and_upload(exc_type, exc_val)
 
         # Restore original signal handlers
-        if self._is_main_process:
+        if self._is_main_process_val:
             if self.original_sigint_handler:
                 signal.signal(signal.SIGINT, self.original_sigint_handler)
             if self.original_sigterm_handler:
@@ -697,9 +736,7 @@ class ReproducibilityManager:
         barrier()
 
     def _save_final_rng_state(self) -> None:
-        """Saves the final RNG state to disk on the main process."""
-        if not self._is_main_process:
-            return
+        """Saves the final RNG state to disk."""
         if not self.output_dir:
             return
         rng_state = get_rng_state()
@@ -775,14 +812,3 @@ class ReproducibilityManager:
         torch.set_rng_state(rng_state["torch"])
         np.random.set_state(rng_state["numpy"])
         random.setstate(rng_state["random"])
-
-    @property
-    def _is_main_process(self) -> bool:
-        """Dynamically reflects whether this process is the main process (rank 0).
-        
-        Reads directly from the distributed module's shared state so tests that
-        tweak `_DIST_STATE` are respected without requiring a real process group.
-        """
-        # Local import to avoid circulars and to ensure we read the live module state
-        from . import distributed as dist_module
-        return dist_module._DIST_STATE.get("rank", 0) == 0

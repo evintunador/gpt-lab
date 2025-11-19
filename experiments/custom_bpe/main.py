@@ -396,7 +396,7 @@ if __name__ == "__main__":
     config = get_config(parser)
     dist_manager = DistributedManager()
     run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-    repro_manager = ReproducibilityManager(output_dir=run_dir)
+    repro_manager = ReproducibilityManager(output_dir=run_dir, is_main_process=dist_manager.is_main)
     
     with dist_manager, repro_manager:
         run(config, dist_manager, repro_manager)
