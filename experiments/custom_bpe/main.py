@@ -17,7 +17,7 @@ import torch.distributed as dist
 from gpt_lab.data_sources.pretraining import create_fineweb_dataset
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.configuration import get_config
-from gpt_lab.reproducibility import ReproducibilityManager, get_system_info
+from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging
 
 logger = logging.getLogger(__name__)
@@ -307,9 +307,18 @@ def run(config: dict, dist_manager: DistributedManager, repro_manager: Reproduci
         setup_experiment_logging(
             log_dir=repro_manager.output_dir,
             rank=dist_manager.rank,
-            is_main_process=dist_manager.is_main_process
+            is_main_process=dist_manager.is_main_process,
         )
-    logger.info("System Information", extra=get_system_info(git_info=repro_manager.get_git_info()))
+    # Log a structured snapshot of the reproducibility context
+    logger.info(
+        "System Information",
+        extra={
+            "git_info": repro_manager.get_git_info(),
+            "software_environment": repro_manager.software_environment,
+            "runtime_environment": repro_manager.runtime_environment,
+            "run_invocation": repro_manager.run_invocation,
+        },
+    )
     logger.info("Hyperparameters", extra=config)
 
 
@@ -387,7 +396,7 @@ if __name__ == "__main__":
     config = get_config(parser)
     dist_manager = DistributedManager()
     run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
-    repro_manager = ReproducibilityManager(output_dir=run_dir)
+    repro_manager = ReproducibilityManager(output_dir=run_dir, is_main_process=dist_manager.is_main)
     
     with dist_manager, repro_manager:
         run(config, dist_manager, repro_manager)
