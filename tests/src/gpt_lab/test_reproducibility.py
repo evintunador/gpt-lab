@@ -8,11 +8,13 @@ import signal
 from unittest.mock import MagicMock, patch
 import torch
 import socket
+import hashlib
 
 from gpt_lab.reproducibility import (
     ReproducibilityManager,
     get_git_submodules_info,
     get_git_superprojects_info,
+    compute_file_hash,
 )
 from gpt_lab.backup_storage_backends.base import BaseBackupStorageBackend
 
@@ -146,6 +148,15 @@ def test_manager_dirty_repo(git_repo: Path, dirty_type: str):
             patch_file = repro_subdir / "uncommitted_changes.patch"
             assert patch_file.exists()
             assert patch_file.read_text().strip() != ""
+
+            # Verify patch file hash is present and correct
+            assert "patch_file_hash" in git_info
+            assert git_info["patch_file_hash"] is not None
+            
+            # Verify the hash matches the actual file content
+            computed_hash = compute_file_hash(str(patch_file))
+            assert git_info["patch_file_hash"] == computed_hash
+            assert len(git_info["patch_file_hash"]) == 64 
     finally:
         os.chdir(original_cwd)
 

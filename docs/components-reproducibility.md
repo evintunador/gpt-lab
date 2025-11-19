@@ -109,6 +109,7 @@ The captured git information for the main repository includes:
     "github_url": "https://github.com/user/repo/commit/a1b2c3d...",
     "git_is_dirty": False,
     "patch_file": "/path/to/.../reproducibility/.../uncommitted_changes.patch",  # present only if dirty
+    "patch_file_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", # SHA-256 of patch file
     "submodules": [
         {
             "path": "external/lib",
@@ -120,6 +121,7 @@ The captured git information for the main repository includes:
             "git_is_dirty": False,
             # Optional if dirty:
             # "patch_file": "/.../uncommitted_changes.submodule.external__lib.patch"
+            # "patch_file_hash": "..."
         },
         ...
     ],
@@ -133,6 +135,7 @@ The captured git information for the main repository includes:
             "git_is_dirty": False,
             # Optional if dirty:
             # "patch_file": "/.../uncommitted_changes.superproject.0.superproject.patch",
+            # "patch_file_hash": "..."
             # And any submodules inside the superproject:
             # "submodules": [...]
         },

@@ -10,6 +10,7 @@ import random
 import platform
 import shutil
 import socket
+import hashlib
 
 import torch
 import numpy as np
@@ -28,6 +29,21 @@ def get_rng_state():
         'numpy': np.random.get_state(),
         'random': random.getstate(),
     }
+
+
+def compute_file_hash(filepath: str) -> Optional[str]:
+    """Computes the SHA-256 hash of a file."""
+    if not os.path.exists(filepath):
+        return None
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(filepath, "rb") as f:
+            # Read and update hash string value in blocks of 4K
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except (IOError, OSError):
+        return None
 
 
 def get_git_commit_hash(repo_path: Optional[str] = None) -> Optional[str]:
@@ -417,6 +433,7 @@ def get_git_submodules_info(
                     with open(patch_file, "w") as f:
                         f.write(patch_content)
                     info["patch_file"] = patch_file
+                    info["patch_file_hash"] = compute_file_hash(patch_file)
                 except OSError:
                     # Best-effort; if we can't write the patch file, we just skip it.
                     pass
@@ -483,6 +500,7 @@ def get_git_superprojects_info(output_dir: Optional[str] = None) -> Any:
                     with open(patch_file, "w") as f:
                         f.write(patch_content)
                     info["patch_file"] = patch_file
+                    info["patch_file_hash"] = compute_file_hash(patch_file)
                 except OSError:
                     pass
 
@@ -625,6 +643,7 @@ class ReproducibilityManager:
                     with open(patch_file, "w") as f:
                         f.write(patch_content)
                     self.git_info["patch_file"] = patch_file
+                    self.git_info["patch_file_hash"] = compute_file_hash(patch_file)
                 except OSError:
                     logger.warning(f"Failed to write main repo patch file to {patch_file}")
 
