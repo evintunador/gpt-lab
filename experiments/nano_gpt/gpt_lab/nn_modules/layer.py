@@ -10,7 +10,7 @@ class NanoGPTBlock(nn.Module):
         self.ln_1 = nn.LayerNorm(n_embd, bias=bias)
         self.attn = CausalSelfAttention(n_embd=n_embd, n_head=n_head, dropout=dropout, bias=bias)
         self.ln_2 = nn.LayerNorm(n_embd, bias=bias)
-        # unlike NanoGPT, our MLP does not support bias on th elinear layers -_-
+        # unlike NanoGPT, our MLP does not support bias on the linear layers -_-
         self.mlp = MLP(in_dim=n_embd, out_dim=n_embd, hidden_dim=4*n_embd, activation="gelu", dropout=dropout)
 
     def forward(self, x):
