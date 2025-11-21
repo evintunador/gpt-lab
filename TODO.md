@@ -83,3 +83,5 @@ and i guess different config settings within an experiment both directly and as 
 - [ ] develop pre-tokenizing/caching as its own catalog system
     - [ ] geenralize the IO class to different dtypes
     - [ ] do something more intelligent than the 11041999 doc prefix signature. maybe each doc prefix is a hash of its own code or something? or just test requirement that each implementation in the system write a different prefix?
+- [ ] separate `src/gpt_lab/nn_modules/catalog_benchmark.py` out into its necessary import utilities and an actual CLI in the `CLIs/` folder
+- [ ] check whether `catalog_benchmark.py` has access to non-core modules
