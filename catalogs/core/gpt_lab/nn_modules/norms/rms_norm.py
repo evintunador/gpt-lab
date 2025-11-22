@@ -87,7 +87,7 @@ def benchmark_input_provider(init_args: dict) -> tuple:
     """Generates a standard input for benchmarking."""
     dim = init_args.get('dim', 768)
     # Benchmark with larger batch and sequence length
-    return (torch.randn(32, 512, dim),)
+    return (torch.randn(32, 512, dim, requires_grad=True),)
 
 
 __benchmark_config__ = BenchmarkConfig(

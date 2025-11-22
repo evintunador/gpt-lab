@@ -109,6 +109,7 @@ def measure_performance(
         torch.cuda.reset_peak_memory_stats(device)
         loss = get_total_loss(outputs)
         if loss is not None:
+            assert loss.requires_grad, "Loss does not require grad; backward pass cannot be benchmarked."
             loss.backward()
         results['Backward Peak Memory (GB)'] = torch.cuda.max_memory_allocated(device) / 1e9
 

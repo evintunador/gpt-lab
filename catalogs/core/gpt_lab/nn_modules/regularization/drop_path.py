@@ -199,7 +199,7 @@ __test_config__ = ModuleTestConfig(
 def benchmark_input_provider(init_args: dict) -> tuple:
     """Generates a standard input for benchmarking."""
     shape = init_args.get('shape', (128, 128, 768))
-    return (torch.randn(*shape),)
+    return (torch.randn(*shape, requires_grad=True),)
 
 
 __benchmark_config__ = BenchmarkConfig(

@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.14.10"
+__generated_with = "0.18.0"
 app = marimo.App(width="full")
 
 
@@ -13,17 +13,19 @@ def _():
     import glob
     import os
     from gpt_lab.catalog_bootstrap import get_artifact_root
-    return glob, go, mo, os, pd, px, Path, get_artifact_root
+    return get_artifact_root, glob, go, mo, os, pd, px
 
 
 @app.cell
 def _(mo):
-    mo.md("""# Benchmark Results Viewer""")
+    mo.md("""
+    # Benchmark Results Viewer
+    """)
     return
 
 
 @app.cell
-def _(glob, mo, os, get_artifact_root):
+def _(get_artifact_root, glob, mo, os):
     plot_titles = [
         "Forward Time (ms)",
         "Backward Time (ms)",
@@ -409,6 +411,11 @@ def _(
             row2 = mo.hstack([plots.get(plot_titles[2]), plots.get(plot_titles[3])], justify="center")
             plot = mo.vstack([custom_legend, row1, row2], align="center")
     plot
+    return
+
+
+@app.cell
+def _():
     return
 
 

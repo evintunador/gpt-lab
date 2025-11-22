@@ -14,7 +14,6 @@ from gpt_lab.nn_modules.norms.rms_norm import RMSNorm
 
 ignore_if_no_cuda()
 
-
 class HalfTruncatedRotary(nn.Module):
     """half-truncate RoPE by @YouJiacheng (w/ base freq tuning)"""
     def __init__(
@@ -37,7 +36,7 @@ class HalfTruncatedRotary(nn.Module):
         cos, sin = self.cos[None, :x_BTHD.size(-3), None, :], self.sin[None, :x_BTHD.size(-3), None, :]
         # Handle case where the number of dimensions is smaller
         dim_half = x_BTHD.size(-1) // 2
-        x1, x2 = x_BTHD.to(dtype=self.dtype).chunk(2, dim=-1)
+        x1, x2 = x_BTHD.to(dtype=self.cos.dtype).chunk(2, dim=-1)
         y1 = x1 * cos[..., :dim_half] + x2 * sin[..., :dim_half]
         y2 = x1 * (-sin[..., :dim_half]) + x2 * cos[..., :dim_half]
         return torch.cat((y1, y2), 3).type_as(x_BTHD)
@@ -72,7 +71,7 @@ class FlexSelfAttention(nn.Module):
     def forward(self, x: Tensor, block_mask: BlockMask):
         B, T = x.size(0), x.size(1) # batch size, sequence length
         assert B == 1, "Must use batch size = 1 for FlexAttention"
-        assert 'cuda' in x.device, "FlexAttention only supports CUDA devices"
+        assert x.device.type == 'cuda', "FlexAttention only supports CUDA devices"
         q, k, v = F.linear(x, self.Wqkv.flatten(end_dim=1).type_as(x)).view(B, T, 3 * self.num_heads, self.head_dim).chunk(3, dim=-2)
         q, k = self.norm(q), self.norm(k) # QK norm @Grad62304977
         q, k = self.rotary(q), self.rotary(k)
@@ -158,7 +157,7 @@ __test_config__ = ModuleTestConfig(
 def benchmark_input_provider(init_args: dict) -> tuple:
     return (
         torch.randn(1, init_args['max_seq_len'], init_args['dim'], requires_grad=True),
-        block_mask
+        block_mask(init_args['max_seq_len'])
     )
 
 
