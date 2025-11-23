@@ -79,7 +79,7 @@ python CLIs/print_active_paths.py -v
 
 ```python
 import argparse
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.logger import setup_experiment_logging
@@ -88,7 +88,7 @@ import logging
 
 def main():
     parser = argparse.ArgumentParser()
-    config = get_config(parser)
+    config = compose_config(parser)
     
     with DistributedManager() as dist:
         dist.set_seed(config['seed'])

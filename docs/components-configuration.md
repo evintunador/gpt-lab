@@ -5,32 +5,32 @@ The `gpt_lab.configuration` module provides flexible configuration management th
 ## Overview
 
 The configuration component is designed to:
-- Load base configuration from YAML files
+- Load base configuration from YAML or JSON files
 - Override config values via command-line arguments
 - Support nested configuration with dot-notation (e.g., `--model.dim=512`)
-- Automatically discover `config.yaml` in the script's directory
+- Automatically discover `config.yaml` or `config.json` in the script's directory
 - Type inference for CLI arguments (int, float, bool, string)
 - Recursive merging of nested dictionaries
 
-## Key Function
+## Core Functions
 
-### `get_config()`
+### `compose_config()`
 
-Builds a configuration dictionary by merging YAML and CLI arguments:
+The standard way to build a configuration dictionary by merging YAML/JSON files and CLI arguments:
 
 ```python
 import argparse
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 
 parser = argparse.ArgumentParser()
 # Optionally add your own arguments
 parser.add_argument('--verbose', action='store_true')
 
 # Load configuration
-config = get_config(parser)
+config = compose_config(parser)
 
-# Access nested config
-learning_rate = config['training']['learning_rate']
+# Access nested config (attribute style or dict style)
+learning_rate = config.training.learning_rate
 model_dim = config['model']['dim']
 ```
 
@@ -38,20 +38,59 @@ model_dim = config['model']['dim']
 - `parser`: An `argparse.ArgumentParser` instance
 
 **Returns:**
-- Dictionary containing merged configuration
+- `Config` object (dict subclass) containing merged configuration
 
 **Behavior:**
 1. Automatically adds `--config` argument if not present
-2. Loads YAML from config file (defaults to `./config.yaml` if exists)
+2. Loads YAML/JSON from config file (defaults to `./config.yaml` or `./config.json` if exists)
 3. Parses CLI arguments (both registered and unknown)
-4. Merges CLI args into YAML config (CLI takes precedence)
-5. Returns final merged dictionary
+4. Merges CLI args into the config (CLI takes precedence)
+5. Returns final merged `Config` object
+
+### `load_config()`
+
+Load a configuration file directly without using `argparse` or CLI overrides:
+
+```python
+from gpt_lab.configuration import load_config
+
+# Load specific file
+config = load_config("path/to/config.yaml")
+
+# Or load JSON
+config = load_config("path/to/config.json")
+```
+
+**Parameters:**
+- `path`: Path to the YAML or JSON file
+
+**Returns:**
+- `Config` object populated with data from the file
+
+### Direct Instantiation
+
+You can manually create a `Config` object from any dictionary:
+
+```python
+from gpt_lab.configuration import Config
+
+data = {
+    "model": {
+        "dim": 512,
+        "layers": 6
+    },
+    "optimizer": "adam"
+}
+
+config = Config(data)
+print(config.model.dim)  # 512
+```
 
 ## Configuration Precedence
 
 Configuration values are merged in this order (later overrides earlier):
 
-1. **YAML file** - Base configuration
+1. **YAML/JSON file** - Base configuration
 2. **Registered parser arguments** - Arguments added via `parser.add_argument()`
 3. **Unknown CLI arguments** - Dot-notation arguments (e.g., `--model.dim=512`)
 
@@ -87,19 +126,19 @@ data:
 
 ```python
 import argparse
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 
 def main():
     parser = argparse.ArgumentParser(description="Train model")
-    config = get_config(parser)
+    config = compose_config(parser)
     
-    print(f"Model dim: {config['model']['dim']}")
-    print(f"Learning rate: {config['training']['learning_rate']}")
+    print(f"Model dim: {config.model.dim}")
+    print(f"Learning rate: {config.training.learning_rate}")
     
     # Use configuration
     model = MyModel(
-        dim=config['model']['dim'],
-        n_layers=config['model']['n_layers']
+        dim=config.model.dim,
+        n_layers=config.model.n_layers
     )
 
 if __name__ == "__main__":
@@ -136,14 +175,14 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--verbose', action='store_true')
 parser.add_argument('--debug', action='store_true')
 
-config = get_config(parser)
+config = compose_config(parser)
 
 # Registered arguments are in config
 if config.get('verbose'):
     print("Verbose mode enabled")
 
 # Dot-notation overrides work
-lr = config['training']['learning_rate']  # Uses CLI value if provided
+lr = config.training.learning_rate  # Uses CLI value if provided
 ```
 
 ### Using Custom Config File
@@ -159,7 +198,7 @@ parser = argparse.ArgumentParser()
 # You can also set default
 parser.add_argument('--config', default='path/to/config.yaml')
 
-config = get_config(parser)
+config = compose_config(parser)
 ```
 
 ### Type Inference
@@ -168,7 +207,7 @@ CLI arguments are automatically converted to appropriate types:
 
 ```bash
 # Integer
-python train.py --model.dim=512  # config['model']['dim'] = 512 (int)
+python train.py --model.dim=512  # config.model.dim = 512 (int)
 
 # Float
 python train.py --training.learning_rate=0.001  # 0.001 (float)
@@ -193,13 +232,13 @@ Always validate your configuration before starting expensive training:
 
 ```python
 def validate_config(config):
-    assert config['model']['dim'] % config['model']['n_heads'] == 0, \
+    assert config.model.dim % config.model.n_heads == 0, \
         "model.dim must be divisible by model.n_heads"
     
-    assert config['training']['learning_rate'] > 0, \
+    assert config.training.learning_rate > 0, \
         "learning_rate must be positive"
     
-    assert config['training']['batch_size'] > 0, \
+    assert config.training.batch_size > 0, \
         "batch_size must be positive"
 ```
 
@@ -222,11 +261,11 @@ Always save the final merged configuration alongside your results:
 
 ```python
 with ReproducibilityManager(output_dir="./runs") as repro:
-    config = get_config(parser)
+    config = compose_config(parser)
     
-    # Save configuration
+    # Save configuration (Config object prints nicely as YAML)
     with open(f"{repro.output_dir}/config.yaml", 'w') as f:
-        yaml.dump(config, f)
+        f.write(str(config))
     
     train(config)
 ```
@@ -236,16 +275,13 @@ with ReproducibilityManager(output_dir="./runs") as repro:
 To contribute to the configuration component:
 
 1. **Adding Features**: Extend functionality in `src/gpt_lab/configuration.py`
-   - Add JSON config support
-   - Add config validation utilities
-   - Add config diffing utilities
    - Add environment variable substitution in YAML
+   - Add config diffing utilities
 
-2. **Adding Tests**: Add test cases to `src/gpt_lab/tests/test_configuration.py`
+2. **Adding Tests**: Add test cases to `tests/src/gpt_lab/test_configuration.py`
    - Test type inference edge cases
    - Test deeply nested config merging
-   - Test various YAML structures
-   - Test error handling
+   - Test various YAML/JSON structures
 
 3. **Guidelines**:
    - Maintain backward compatibility

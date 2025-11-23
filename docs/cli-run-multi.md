@@ -114,7 +114,7 @@ runs/
 
 ## Integration with Configuration System
 
-The multi-runner uses `get_config()` from `gpt_lab.configuration`, so you can override any parameter:
+The multi-runner uses `compose_config()` from `gpt_lab.configuration`, so you can override any parameter:
 
 ```bash
 # Override command

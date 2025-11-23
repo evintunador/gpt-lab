@@ -2,12 +2,14 @@ import argparse
 import pytest
 from pathlib import Path
 from unittest import mock
+import json
+import yaml
 
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config, Config
 
 
 @pytest.fixture
-def create_test_config(tmp_path: Path):
+def create_test_config_yaml(tmp_path: Path):
     """A pytest fixture to create a temporary YAML config file for tests."""
     config_content = """
     learning_rate: 0.001
@@ -23,41 +25,83 @@ def create_test_config(tmp_path: Path):
     return config_file
 
 
-def test_basic_yaml_loading(create_test_config):
+@pytest.fixture
+def create_test_config_json(tmp_path: Path):
+    """A pytest fixture to create a temporary JSON config file for tests."""
+    config_data = {
+        "learning_rate": 0.001,
+        "optimizer": "adam",
+        "model": {
+            "name": "transformer",
+            "dim": 512,
+            "layers": 6
+        },
+        "use_fp16": False
+    }
+    config_file = tmp_path / "config.json"
+    with open(config_file, 'w') as f:
+        json.dump(config_data, f)
+    return config_file
+
+
+def test_config_attribute_access():
+    """Tests attribute-style access on Config objects."""
+    data = {"a": 1, "b": {"c": 2}}
+    cfg = Config(data)
+    assert cfg.a == 1
+    assert cfg.b.c == 2
+    assert cfg['a'] == 1
+    assert cfg['b']['c'] == 2
+
+
+def test_basic_yaml_loading(create_test_config_yaml):
     """Tests that the config is loaded correctly from a YAML file."""
     parser = argparse.ArgumentParser()
     
-    with mock.patch('sys.argv', ['test_script', '--config', str(create_test_config)]):
-        config = get_config(parser)
+    with mock.patch('sys.argv', ['test_script', '--config', str(create_test_config_yaml)]):
+        config = compose_config(parser)
 
-    assert config['learning_rate'] == 0.001
-    assert config['model']['name'] == "transformer"
-    assert config['model']['dim'] == 512
-    assert not config['use_fp16']
+    assert config.learning_rate == 0.001
+    assert config.model.name == "transformer"
+    assert config.model.dim == 512
+    assert not config.use_fp16
 
 
-def test_cli_override(create_test_config):
-    """Tests that a flat CLI argument correctly overrides a YAML value."""
+def test_basic_json_loading(create_test_config_json):
+    """Tests that the config is loaded correctly from a JSON file."""
     parser = argparse.ArgumentParser()
-    argv = ['script', '--config', str(create_test_config), '--learning_rate', '0.05']
+    
+    with mock.patch('sys.argv', ['test_script', '--config', str(create_test_config_json)]):
+        config = compose_config(parser)
+
+    assert config.learning_rate == 0.001
+    assert config.model.name == "transformer"
+    assert config.model.dim == 512
+    assert not config.use_fp16
+
+
+def test_cli_override(create_test_config_yaml):
+    """Tests that a top-level CLI argument correctly overrides a YAML value."""
+    parser = argparse.ArgumentParser()
+    argv = ['script', '--config', str(create_test_config_yaml), '--learning_rate', '0.05']
     
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
-    assert config['learning_rate'] == 0.05
-    assert config['optimizer'] == "adam"  # Ensure other values are untouched
+    assert config.learning_rate == 0.05
+    assert config.optimizer == "adam"  # Ensure other values are untouched
 
 
-def test_nested_cli_override(create_test_config):
+def test_nested_cli_override(create_test_config_yaml):
     """Tests that a nested CLI argument with dot notation overrides a YAML value."""
     parser = argparse.ArgumentParser()
-    argv = ['script', '--config', str(create_test_config), '--model.dim', '1024']
+    argv = ['script', '--config', str(create_test_config_yaml), '--model.dim', '1024']
 
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
-    assert config['model']['dim'] == 1024
-    assert config['model']['name'] == "transformer"  # Ensure other nested values are untouched
+    assert config.model.dim == 1024
+    assert config.model.name == "transformer"  # Ensure other nested values are untouched
 
 
 @pytest.mark.parametrize(
@@ -86,12 +130,12 @@ def test_cli_type_conversion(tmp_path: Path, key, cli_value, expected_value):
     argv = ['script', '--config', str(config_file), f'--{key}', cli_value]
     
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
     assert config[key] == expected_value
 
 
-def test_user_defined_args(create_test_config):
+def test_user_defined_args(create_test_config_yaml):
     """
     Tests that arguments added to the parser by the user are correctly
     integrated and can be overridden by the config file.
@@ -101,26 +145,26 @@ def test_user_defined_args(create_test_config):
     parser.add_argument("--learning_rate", type=float)
 
     # Case 1: Use defaults from the parser and the YAML file
-    with mock.patch('sys.argv', ['script', '--config', str(create_test_config)]):
-        config = get_config(parser)
+    with mock.patch('sys.argv', ['script', '--config', str(create_test_config_yaml)]):
+        config = compose_config(parser)
     
-    assert config['batch_size'] == 32       # From parser default
-    assert config['learning_rate'] == 0.001  # From YAML
+    assert config.batch_size == 32       # From parser default
+    assert config.learning_rate == 0.001  # From YAML
 
     # Case 2: Override all with CLI arguments
     argv = [
-        'script', '--config', str(create_test_config), 
+        'script', '--config', str(create_test_config_yaml), 
         '--batch_size', '128', 
         '--learning_rate', '0.1'
     ]
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
-    assert config['batch_size'] == 128      # From CLI
-    assert config['learning_rate'] == 0.1    # From CLI
+    assert config.batch_size == 128      # From CLI
+    assert config.learning_rate == 0.1    # From CLI
 
 
-def test_user_defined_nested_dest(create_test_config):
+def test_user_defined_nested_dest(create_test_config_yaml):
     """
     Tests that user-defined arguments with nested `dest` attributes
     correctly create nested structures and override YAML values.
@@ -141,22 +185,22 @@ def test_user_defined_nested_dest(create_test_config):
     )
 
     # Case 1: Override existing key (dim) and add new key (dropout) from its default
-    argv = ['script', '--config', str(create_test_config), '--dim', '1024']
+    argv = ['script', '--config', str(create_test_config_yaml), '--dim', '1024']
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
-    assert config['model']['dim'] == 1024      # Overridden by CLI
-    assert config['model']['dropout'] == 0.1   # Added from parser default
-    assert config['model']['layers'] == 6      # Preserved from YAML
+    assert config.model.dim == 1024      # Overridden by CLI
+    assert config.model.dropout == 0.1   # Added from parser default
+    assert config.model.layers == 6      # Preserved from YAML
 
     # Case 2: Override both from the command line
     argv = [
-        'script', '--config', str(create_test_config),
+        'script', '--config', str(create_test_config_yaml),
         '--dim', '2048',
         '--dropout', '0.5'
     ]
     with mock.patch('sys.argv', argv):
-        config = get_config(parser)
+        config = compose_config(parser)
 
-    assert config['model']['dim'] == 2048      # Overridden by CLI
-    assert config['model']['dropout'] == 0.5   # Overridden by CLI
+    assert config.model.dim == 2048      # Overridden by CLI
+    assert config.model.dropout == 0.5   # Overridden by CLI

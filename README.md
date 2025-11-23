@@ -73,7 +73,7 @@ Then open `http://127.0.0.1:8000`
 
 ```python
 import argparse
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.logger import setup_experiment_logging
@@ -81,7 +81,7 @@ from gpt_lab.train_loops import smart_train
 
 def main():
     parser = argparse.ArgumentParser()
-    config = get_config(parser)
+    config = compose_config(parser)
     
     with DistributedManager() as dist:
         dist.set_seed(config['seed'])

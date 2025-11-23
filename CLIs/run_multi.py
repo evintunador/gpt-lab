@@ -13,7 +13,7 @@ import argparse
 import logging
 import sys
 
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 from gpt_lab.multi_runner import run_multi
 
 # Set up basic logging
@@ -110,9 +110,9 @@ using dot notation (e.g., --execution.mode sequential).
 """
     )
     
-    # The get_config function will automatically add the --config argument
-    # and handle merging YAML config with CLI overrides
-    config = get_config(parser)
+    # The compose_config function will automatically add the --config argument
+    # and handle merging YAML/JSON config with CLI overrides
+    config = compose_config(parser)
     
     exit_code = execute_multi_run(config)
     sys.exit(exit_code)

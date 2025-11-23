@@ -9,7 +9,7 @@ import torch
 import tiktoken
 from torch.utils.data import Subset
 
-from gpt_lab.configuration import get_config
+from gpt_lab.configuration import compose_config
 from gpt_lab.distributed import DistributedManager
 from gpt_lab.reproducibility import ReproducibilityManager
 from gpt_lab.logger import setup_experiment_logging
@@ -207,7 +207,7 @@ To specify a different config file:
     parser.add_argument("--val-set-limit", dest="data.val_set_limit", type=int, default=100, 
     help="Number of samples to use for validation. Set to -1 for no limit.")
     
-    config = get_config(parser)
+    config = compose_config(parser)
     run_dir = os.path.join(os.path.dirname(__file__), "runs", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
     dist = DistributedManager()
     rep = ReproducibilityManager(output_dir=run_dir, is_main_process=dist.is_main)
