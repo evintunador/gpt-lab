@@ -551,6 +551,11 @@ class ReproducibilityManager:
         self._repro_dir = os.path.join(self.output_dir, "reproducibility", self._repro_subdir_name)
 
         # Ensure directories exist (all processes)
+        # Wait for the main process to perform its checks and create the directory structure
+        # This prevents a race condition where non-main processes create the directory
+        # before the main process checks for its existence/emptiness.
+        barrier()
+        
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self._repro_dir, exist_ok=True)
 
