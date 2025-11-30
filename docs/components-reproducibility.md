@@ -187,17 +187,29 @@ with ReproducibilityManager(output_dir="./runs/my_exp", is_main_process=True) as
 
 ### RNG State Helpers
 
-`ReproducibilityManager` records RNG state at entry and exit and provides helpers for manual snapshots:
+`ReproducibilityManager` records RNG state at entry and exit and provides helpers for manual snapshots. The RNG state capture matches PyTorch Lightning's `seed_everything` behavior by including:
+
+- PyTorch CPU RNG state
+- CUDA RNG states for all devices (if CUDA is available)
+- NumPy RNG state
+- Python `random` module state
 
 ```python
 with ReproducibilityManager(output_dir="./runs/my_exp", is_main_process=True) as repro:
     # Initial RNG state captured at context entry
     initial_rng = repro.initial_rng_state
+    # {
+    #   "torch": <torch.Tensor>,           # CPU RNG state
+    #   "torch_cuda": [<torch.Tensor>, ...] # CUDA RNG states (one per device) or None
+    #   "cuda_device_count": int,          # Number of CUDA devices
+    #   "numpy": <numpy RNG state tuple>,
+    #   "random": <Python random state tuple>,
+    # }
 
     # Current RNG state (on demand)
     current_rng = repro.get_rng_states()
 
-    # Restore RNG state
+    # Restore RNG state (includes CUDA states if available and device count matches)
     repro.set_rng_states(initial_rng)
 
     # Final RNG state will be saved on exit to:

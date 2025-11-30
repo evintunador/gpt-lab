@@ -284,7 +284,7 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
             # RNG state includes non-tensor Python/numpy objects; use weights_only=False
             loaded = torch.load(rng_file, weights_only=False)
             assert isinstance(loaded, dict)
-            for key in ("torch", "numpy", "random"):
+            for key in ("torch", "numpy", "random", "torch_cuda", "cuda_device_count"):
                 assert key in loaded
 
             # Properties/methods are available
@@ -293,19 +293,38 @@ def test_initial_rng_state_persisted_and_exposed(git_repo: Path):
             current = manager.get_rng_states()
             assert isinstance(current, dict)
 
+            # Verify CUDA RNG states are captured if CUDA is available
+            if torch.cuda.is_available():
+                assert "torch_cuda" in current
+                assert "cuda_device_count" in current
+                assert current["cuda_device_count"] == torch.cuda.device_count()
+                if current["torch_cuda"] is not None:
+                    assert len(current["torch_cuda"]) == current["cuda_device_count"]
+            else:
+                assert current["torch_cuda"] is None
+                assert current["cuda_device_count"] == 0
+
             # Sanity check set_rng_states works round-trip for torch RNG
             rng_before = manager.get_rng_states()
             _ = torch.rand(1)  # change RNG
+            if torch.cuda.is_available():
+                _ = torch.cuda.FloatTensor(1).normal_()  # change CUDA RNG
             manager.set_rng_states(rng_before)
             rng_after = manager.get_rng_states()
             assert torch.equal(rng_before["torch"], rng_after["torch"])
+            
+            # Verify CUDA RNG states are restored if available
+            if torch.cuda.is_available() and rng_before["torch_cuda"] is not None:
+                assert len(rng_before["torch_cuda"]) == len(rng_after["torch_cuda"])
+                for i, (before_state, after_state) in enumerate(zip(rng_before["torch_cuda"], rng_after["torch_cuda"])):
+                    assert torch.equal(before_state, after_state), f"CUDA device {i} RNG state mismatch"
             
         # Final RNG state file should exist by the time context exits
         final_rng_file = repro_subdir / "rng_state_final.pt"
         assert final_rng_file.exists()
         final_state = torch.load(final_rng_file, weights_only=False)
         assert isinstance(final_state, dict)
-        for key in ("torch", "numpy", "random"):
+        for key in ("torch", "numpy", "random", "torch_cuda", "cuda_device_count"):
             assert key in final_state
 
     finally:
@@ -457,5 +476,44 @@ def test_git_helpers_no_submodules_or_superprojects(git_repo: Path):
         superprojects = get_git_superprojects_info(output_dir=None)
         assert submodules == []
         assert superprojects == []
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_cuda_rng_state_capture_and_restore(git_repo: Path):
+    """Verify that CUDA RNG states are properly captured and restored."""
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(git_repo)
+        runs_dir = git_repo / "experiments" / "test-exp" / "runs"
+        with ReproducibilityManager(output_dir=str(runs_dir), is_main_process=True) as manager:
+            rng_state = manager.get_rng_states()
+            
+            # Verify CUDA fields are always present
+            assert "torch_cuda" in rng_state
+            assert "cuda_device_count" in rng_state
+            
+            if torch.cuda.is_available():
+                # If CUDA is available, verify states are captured
+                assert rng_state["torch_cuda"] is not None
+                assert rng_state["cuda_device_count"] == torch.cuda.device_count()
+                assert len(rng_state["torch_cuda"]) == torch.cuda.device_count()
+                
+                # Test round-trip restore for CUDA
+                # Generate some random numbers to change CUDA RNG state
+                original_states = [torch.cuda.get_rng_state(i) for i in range(torch.cuda.device_count())]
+                _ = torch.cuda.FloatTensor(10).normal_()  # Change CUDA RNG
+                
+                # Restore and verify
+                manager.set_rng_states(rng_state)
+                restored_states = [torch.cuda.get_rng_state(i) for i in range(torch.cuda.device_count())]
+                
+                for i, (orig, restored) in enumerate(zip(original_states, restored_states)):
+                    assert torch.equal(orig, restored), f"CUDA device {i} RNG state not properly restored"
+            else:
+                # If CUDA is not available, verify None/0 values
+                assert rng_state["torch_cuda"] is None
+                assert rng_state["cuda_device_count"] == 0
+                
     finally:
         os.chdir(original_cwd)

@@ -24,11 +24,32 @@ logger = logging.getLogger(__name__)
 
 
 def get_rng_state():
-    return {
+    """
+    Captures the complete RNG state for reproducibility.
+    
+    Includes:
+    - PyTorch CPU RNG state
+    - CUDA RNG states for all devices (if CUDA is available)
+    - NumPy RNG state
+    - Python random module state
+    
+    This matches what PyTorch Lightning's seed_everything captures.
+    """
+    state = {
         'torch': torch.get_rng_state(),
         'numpy': np.random.get_state(),
         'random': random.getstate(),
     }
+    
+    # Capture CUDA RNG states for all devices (if CUDA is available)
+    if torch.cuda.is_available():
+        state['torch_cuda'] = torch.cuda.get_rng_state_all()
+        state['cuda_device_count'] = torch.cuda.device_count()
+    else:
+        state['torch_cuda'] = None
+        state['cuda_device_count'] = 0
+    
+    return state
 
 
 def compute_file_hash(filepath: str) -> Optional[str]:
@@ -832,7 +853,27 @@ class ReproducibilityManager:
         return get_rng_state()
 
     def set_rng_states(self, rng_state: Dict[str, Any]) -> None:
-        """Restores RNG states for torch, numpy, and random."""
+        """
+        Restores RNG states for torch, numpy, random, and CUDA devices.
+        
+        This matches PyTorch Lightning's seed_everything behavior by restoring
+        all RNG states including CUDA device states.
+        """
         torch.set_rng_state(rng_state["torch"])
         np.random.set_state(rng_state["numpy"])
         random.setstate(rng_state["random"])
+        
+        # Restore CUDA RNG states if available and present in the saved state
+        if torch.cuda.is_available() and rng_state.get("torch_cuda") is not None:
+            cuda_states = rng_state["torch_cuda"]
+            saved_device_count = rng_state.get("cuda_device_count", len(cuda_states))
+            current_device_count = torch.cuda.device_count()
+            
+            # Only restore if the device count matches
+            if saved_device_count == current_device_count:
+                torch.cuda.set_rng_state_all(cuda_states)
+            else:
+                logger.warning(
+                    f"Cannot restore CUDA RNG states: device count mismatch "
+                    f"(saved: {saved_device_count}, current: {current_device_count})"
+                )
